@@ -1,18 +1,26 @@
-# 🎈 Blank app template
+# 🥗 Gestor de Macros
 
-A simple Streamlit app template for you to modify!
+Aplicación en Streamlit para gestionar tus macronutrientes diarios: define objetivos de calorías, proteína, carbohidratos y grasas, guarda tus alimentos habituales y registra lo que comes cada día.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+## Funcionalidades
 
-### How to run it on your own machine
+- **📊 Hoy**: resumen del día con barras de progreso frente a tus objetivos y el registro detallado.
+- **➕ Registrar**: añade entradas al registro, ya sea desde tu lista de alimentos (indicando gramos) o con una entrada manual rápida.
+- **🍎 Alimentos**: biblioteca de alimentos con sus macros por cada 100 g, reutilizable al registrar.
+- **📈 Historial**: evolución de calorías y macros a lo largo del tiempo.
+- **🎯 Objetivos**: configura tus metas diarias de calorías, proteína, carbohidratos y grasas.
 
-1. Install the requirements
+Los datos se guardan en una base de datos SQLite local (`data/macros.db`), que no se sube al repositorio.
+
+### Cómo ejecutarla en tu máquina
+
+1. Instala las dependencias
 
    ```
    $ pip install -r requirements.txt
    ```
 
-2. Run the app
+2. Ejecuta la app
 
    ```
    $ streamlit run streamlit_app.py
