@@ -105,6 +105,25 @@ class DefectModel:
             return LABEL_GOOD, float(conf_normal), MODE_ANOMALY
         return LABEL_DEFECT, float(1 - conf_normal), MODE_ANOMALY
 
+    def defect_score(self, x: np.ndarray) -> float:
+        """Puntuación continua de 0 a 1 de "cuánto se parece a un defecto",
+        usada para ordenar candidatos en el escaneo automático (más alto =
+        más sospechoso). A diferencia de predict(), no aplica el corte en
+        0.5: sirve para comparar y priorizar zonas entre sí."""
+        if not self.is_trained():
+            return 0.0
+
+        xs = self.scaler.transform(x.reshape(1, -1))
+
+        if self.mode == MODE_SUPERVISED and self.classifier is not None:
+            proba = self.classifier.predict_proba(xs)[0]
+            classes = list(self.classifier.classes_)
+            return float(proba[classes.index(LABEL_DEFECT)]) if LABEL_DEFECT in classes else 0.0
+
+        score = float(self.iso_forest.decision_function(xs)[0])
+        diff = score - self.iso_threshold
+        return float(1.0 / (1.0 + np.exp(diff * 8)))
+
     def save(self) -> None:
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(MODEL_PATH, "wb") as f:

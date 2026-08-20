@@ -24,8 +24,3 @@ MIN_SUPERVISED_DEFECT = 3
 
 LABEL_GOOD = "good"
 LABEL_DEFECT = "defect"
-
-MARKER_NONE = "ninguno"
-MARKER_RED = "rojo"
-MARKER_YELLOW = "amarillo"
-MARKER_GREEN = "verde"

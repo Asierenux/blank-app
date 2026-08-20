@@ -2,12 +2,10 @@
 
 Cada fila es una *indicación*: un recorte (recuadro relativo) dentro de una
 tira completa guardada en disco. Guarda el recuadro, el vector de
-características, el color de marca que el sistema de inspección puso ahí,
-la predicción del modelo en el momento del análisis y la etiqueta final (la
-"verdad" tras la confirmación o corrección del usuario). Esa etiqueta final
-es la que alimenta el reentrenamiento: así el sistema aprende de los
-aciertos y errores que le vayas señalando, incluida la fiabilidad real de
-la marca roja del propio sistema.
+características, la predicción del modelo en el momento del análisis y la
+etiqueta final (la "verdad" tras la confirmación o corrección del usuario).
+Esa etiqueta final es la que alimenta el reentrenamiento: así el sistema
+aprende de los aciertos y errores que le vayas señalando.
 """
 
 import pickle
@@ -30,7 +28,6 @@ CREATE TABLE IF NOT EXISTS images (
     crop_h REAL NOT NULL,
     image_hash TEXT NOT NULL UNIQUE,
     role TEXT NOT NULL CHECK (role IN ('good_reference', 'review')),
-    marker_color TEXT,
     features BLOB NOT NULL,
     predicted_label TEXT,
     predicted_confidence REAL,
@@ -82,7 +79,6 @@ def add_image(
     image_hash: str,
     role: str,
     features: np.ndarray,
-    marker_color: str | None = None,
     predicted_label: str | None = None,
     predicted_confidence: float | None = None,
     predicted_method: str | None = None,
@@ -98,10 +94,10 @@ def add_image(
             """
             INSERT INTO images (
                 filename, parent_filepath, crop_x, crop_y, crop_w, crop_h,
-                image_hash, role, marker_color, features,
+                image_hash, role, features,
                 predicted_label, predicted_confidence, predicted_method,
                 final_label, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 filename,
@@ -109,7 +105,6 @@ def add_image(
                 *crop_bbox,
                 image_hash,
                 role,
-                marker_color,
                 _serialize(features),
                 predicted_label,
                 predicted_confidence,
@@ -209,22 +204,3 @@ def counts() -> dict:
         "feedback_given": feedback_given,
         "corrections": corrections,
     }
-
-
-def red_marker_reliability() -> dict | None:
-    """De las indicaciones marcadas en rojo por el propio sistema y ya
-    confirmadas por el usuario, qué porcentaje resultaron ser defecto real.
-    Responde directamente a si la marca roja es fiable o no."""
-    with get_connection() as conn:
-        rows = conn.execute(
-            """
-            SELECT final_label FROM images
-            WHERE role = 'review' AND marker_color = 'rojo' AND final_label IS NOT NULL
-            """
-        ).fetchall()
-    if not rows:
-        return None
-    labels = [r["final_label"] for r in rows]
-    n = len(labels)
-    n_defect = sum(1 for l in labels if l == "defect")
-    return {"n": n, "n_defect": n_defect, "ratio_defect": n_defect / n}

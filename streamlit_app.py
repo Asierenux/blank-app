@@ -5,8 +5,8 @@ from defect_detector import io_utils, storage
 from defect_detector.config import MIN_SUPERVISED_DEFECT, MIN_SUPERVISED_GOOD, MIN_TRAIN_GOOD
 from defect_detector.explain import diff_heatmap
 from defect_detector.features import extract_features
-from defect_detector.markers import detect_red_regions, dominant_marker_color
 from defect_detector.model import DefectModel, find_nearest_good
+from defect_detector.scanner import scan_image
 
 st.set_page_config(page_title="Control de calidad de tubos", page_icon="🔍", layout="wide")
 
@@ -63,8 +63,6 @@ def render_crop_tool(image_bgr, key_prefix: str, defaults=(0.35, 0.35, 0.3, 0.3)
 
 
 def render_feedback_controls(record):
-    marker = record["marker_color"] or "ninguna"
-    st.caption(f"Marca del sistema en esta zona: **{marker}**")
     st.caption(
         f"Predicción: **{LABELS.get(record['predicted_label'], '—')}** "
         f"({record['predicted_confidence']:.0%} confianza, método: "
@@ -92,8 +90,8 @@ def page_referencias():
     st.header("📥 Indicaciones de referencia (buenas)")
     st.write(
         "Sube una tira de inspección y marca sobre ella una o varias zonas "
-        "**sin defecto** (sin pliegue ni soldadura abierta). El sistema aprende "
-        "de esas zonas cómo es la textura normal del tubo."
+        "**sin defecto** (sin solape, pliegue ni materia extraña). El sistema "
+        "aprende de esas zonas cómo es la textura normal del tubo."
     )
 
     uploaded = st.file_uploader(
@@ -126,10 +124,9 @@ def page_referencias():
                 st.info("Esa zona ya estaba guardada.")
             else:
                 feats = extract_features(patch)
-                marker = dominant_marker_color(patch)
                 storage.add_image(
                     filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
-                    image_hash=patch_hash, role="good_reference", features=feats, marker_color=marker,
+                    image_hash=patch_hash, role="good_reference", features=feats,
                 )
                 model = retrain_model()
                 st.success(f"Zona guardada como referencia buena. Modelo actualizado ({MODE_LABELS[model.mode]}).")
@@ -153,8 +150,7 @@ def page_analizar():
     if not model.is_trained():
         st.warning(
             f"El modelo todavía no está entrenado: guarda al menos {MIN_TRAIN_GOOD} "
-            "referencias buenas en la pestaña anterior para tener una primera predicción "
-            "(mientras tanto puedes seguir añadiendo y etiquetando indicaciones)."
+            "referencias buenas en la pestaña anterior antes de escanear una imagen."
         )
 
     uploaded = st.file_uploader(
@@ -170,32 +166,34 @@ def page_analizar():
 
         st.image(io_utils.bgr_to_rgb(img_bgr), caption=uploaded.name, use_container_width=True)
 
-        if st.button("🔎 Detectar indicaciones en rojo y analizar", type="primary"):
+        with st.expander("⚙️ Ajustes del escaneo"):
+            win_h_pct = st.slider("Altura de cada ventana (%)", 2, 20, 6, key="scan_win_h")
+            top_k = st.slider("Nº de zonas más sospechosas a mostrar", 1, 20, 8, key="scan_top_k")
+
+        if st.button("🔎 Escanear imagen automáticamente", type="primary", disabled=not model.is_trained()):
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
-            boxes = detect_red_regions(img_bgr)
+            with st.spinner("Recorriendo la imagen con la ventana deslizante..."):
+                results = scan_image(img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k)
             new_ids = []
-            for bbox in boxes:
+            for bbox, feats, _score in results:
                 patch_hash = io_utils.patch_hash(parent_hash, bbox)
                 if storage.image_exists(patch_hash):
                     continue
-                patch = io_utils.crop_relative(img_bgr, bbox)
-                feats = extract_features(patch)
                 label, confidence, method = model.predict(feats)
-                marker = dominant_marker_color(patch)
                 image_id = storage.add_image(
                     filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
-                    image_hash=patch_hash, role="review", features=feats, marker_color=marker,
+                    image_hash=patch_hash, role="review", features=feats,
                     predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                 )
                 new_ids.append(image_id)
-            if not boxes:
-                st.info("No se detectó ninguna marca roja en esta imagen. Puedes añadir una indicación manualmente abajo.")
-            elif new_ids:
+            if new_ids:
                 st.session_state.last_analyzed_ids = new_ids
+            elif results:
+                st.info("Las zonas más sospechosas de esta imagen ya habían sido analizadas antes.")
             else:
-                st.info("Las indicaciones detectadas ya habían sido analizadas antes.")
+                st.info("No se encontró ningún tramo con contenido para escanear en esta imagen.")
 
-        with st.expander("➕ Añadir indicación manualmente (si el detector no la marcó)"):
+        with st.expander("➕ Añadir indicación manualmente (para marcar tú una zona concreta)"):
             bbox_manual, patch_manual = render_crop_tool(img_bgr, "manual_crop")
             if st.button("Analizar esta zona"):
                 dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
@@ -205,10 +203,9 @@ def page_analizar():
                 else:
                     feats = extract_features(patch_manual)
                     label, confidence, method = model.predict(feats)
-                    marker = dominant_marker_color(patch_manual)
                     image_id = storage.add_image(
                         filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox_manual,
-                        image_hash=patch_hash, role="review", features=feats, marker_color=marker,
+                        image_hash=patch_hash, role="review", features=feats,
                         predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                     )
                     st.session_state.last_analyzed_ids = [image_id]
@@ -225,11 +222,7 @@ def page_analizar():
             with st.container(border=True):
                 col_img, col_ref, col_info = st.columns([1, 1, 1.4])
                 patch = load_patch_image(record)
-                col_img.image(
-                    io_utils.bgr_to_rgb(patch),
-                    caption=f"{record['filename']} · marca: {record['marker_color'] or 'ninguna'}",
-                    use_container_width=True,
-                )
+                col_img.image(io_utils.bgr_to_rgb(patch), caption=record["filename"], use_container_width=True)
 
                 nearest_id, dist = find_nearest_good(
                     storage.deserialize_features(record["features"]), good_X, good_ids
@@ -275,17 +268,6 @@ def page_estado():
     col3.metric("Con feedback confirmado", c["feedback_given"])
     col4.metric("Correcciones hechas", c["corrections"])
 
-    reliability = storage.red_marker_reliability()
-    if reliability:
-        st.metric(
-            "Fiabilidad de la marca roja del sistema",
-            f"{reliability['ratio_defect']:.0%}",
-            help=(
-                f"De {reliability['n']} indicaciones marcadas en rojo y confirmadas por ti, "
-                f"{reliability['n_defect']} resultaron ser defecto real."
-            ),
-        )
-
     st.write(f"**Modo actual:** {MODE_LABELS[model.mode]}")
     if model.trained_at:
         st.write(f"**Último entrenamiento:** {model.trained_at}")
@@ -328,7 +310,7 @@ def page_historial():
     df = pd.DataFrame([dict(r) for r in records])
     df["created_at"] = pd.to_datetime(df["created_at"])
     display_cols = [
-        "created_at", "filename", "role", "marker_color", "predicted_label",
+        "created_at", "filename", "role", "predicted_label",
         "predicted_confidence", "predicted_method", "final_label",
     ]
     st.dataframe(df[display_cols].sort_values("created_at", ascending=False), use_container_width=True, hide_index=True)

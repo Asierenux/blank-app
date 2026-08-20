@@ -14,28 +14,26 @@ real de una falsa alarma en un punto concreto.
 
 1. **Referencias buenas**: subes una tira y recortas una o varias zonas
    **sin defecto**. El sistema aprende de ellas la textura normal del tubo
-   (patrón de rayado, bordes) usando visión clásica y un detector de
-   anomalías (`IsolationForest`).
-2. **Analizar imágenes**: subes una tira nueva. El sistema detecta
-   automáticamente las marcas en **rojo** que tu propio equipo de
-   inspección ya dibuja sobre la imagen, recorta cada una con contexto y la
-   clasifica como buena o con defecto, mostrando la confianza y una
-   comparación visual con la referencia más parecida. También puedes añadir
-   manualmente una indicación que el detector no haya marcado.
+   (patrón de rayado, bordes, regularidad del brillo por filas/columnas)
+   usando visión clásica y un detector de anomalías (`IsolationForest`).
+2. **Analizar imágenes**: subes una tira nueva y el sistema la recorre con
+   una **ventana deslizante** de arriba a abajo, sin fiarse de ninguna
+   marca de color que pueda traer la imagen. Cada zona se puntúa por su
+   parecido a la textura normal aprendida, y se te proponen las más
+   sospechosas (posible solape de bandas, pliegue, materia extraña) para
+   que las revises, con los recuadros solapados fusionados para no
+   repetir la misma indicación varias veces. También puedes añadir
+   manualmente cualquier zona que el escaneo no haya destacado.
 3. **Feedback**: para cada indicación puedes confirmar la predicción o
    corregirla ("en realidad es buena" / "en realidad tiene defecto"). Cada
-   corrección se guarda y el modelo se reentrena al momento. Como la marca
-   roja del sistema no siempre acierta, esa marca se usa solo como una
-   característica más de entrada, nunca como verdad absoluta: es tu
-   feedback el que decide.
+   corrección se guarda y el modelo se reentrena al momento: es tu
+   feedback, no ninguna marca automática, el que decide.
 4. En cuanto hay suficiente feedback confirmado de ambas clases (por
    defecto: 5 buenas y 3 con defecto), el sistema pasa automáticamente de
    detección de anomalías a un clasificador supervisado
    (`RandomForestClassifier`), normalmente más preciso.
-5. **Historial**: todas las indicaciones procesadas, la evolución de la
-   precisión a medida que das feedback, y la fiabilidad real de la marca
-   roja del sistema (qué porcentaje de las marcadas en rojo resultaron ser
-   defecto real, según tus confirmaciones).
+5. **Historial**: todas las indicaciones procesadas y la evolución de la
+   precisión del sistema a medida que le das feedback.
 
 ## Cómo ejecutarla en tu equipo
 

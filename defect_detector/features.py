@@ -1,16 +1,18 @@
 """Extracción de características de un recorte (indicación) de la tira.
 
-La tira de inspección es, en la práctica, escala de grises, así que aquí no
-se usan histogramas de color de toda la imagen (no aportarían nada). En su
-lugar se combinan:
+Solo se usa el contenido visual del propio recorte (textura y bordes en
+escala de grises): ninguna marca de color que el sistema de inspección
+haya podido dibujar influye en la decisión, precisamente porque esa marca
+puede equivocarse.
 
 - Textura (Local Binary Pattern): captura el patrón regular de rayado del
-  tubo y sus roturas/discontinuidades (pliegues, soldaduras abiertas).
+  tubo y sus roturas/discontinuidades (solapes, pliegues, materia extraña).
 - Densidad de bordes por celdas: localiza cambios bruscos dentro del recorte.
+- Perfil de brillo por filas y columnas: un pliegue, solape o materia
+  extraña suele romper la regularidad del rayado con una banda horizontal
+  o vertical que destaca sobre el patrón normal; su variación (desviación
+  típica y rango) es una señal fuerte de anomalía.
 - Estadísticas básicas de brillo/contraste.
-- Fracción de píxeles rojo/amarillo/verde: la marca que el propio sistema
-  de inspección ya ha dibujado ahí, usada como una característica más (el
-  modelo aprende, con el feedback, cuánto fiarse de ella).
 
 Todo se calcula en local con OpenCV y scikit-image.
 """
@@ -19,14 +21,12 @@ import cv2
 import numpy as np
 from skimage.feature import local_binary_pattern
 
-from .markers import color_flags
-
 PATCH_SIZE = (160, 160)
 LBP_RADIUS = 2
 LBP_POINTS = 8 * LBP_RADIUS
 EDGE_GRID = 4  # celdas por lado para la densidad de bordes
 
-FEATURE_LENGTH = (LBP_POINTS + 2) + (EDGE_GRID * EDGE_GRID) + 2 + 3
+FEATURE_LENGTH = (LBP_POINTS + 2) + (EDGE_GRID * EDGE_GRID) + 2 + 4
 
 
 def extract_features(patch_bgr: np.ndarray) -> np.ndarray:
@@ -42,7 +42,7 @@ def extract_features(patch_bgr: np.ndarray) -> np.ndarray:
     hist_lbp, _ = np.histogram(lbp, bins=n_bins, range=(0, n_bins), density=True)
 
     # Densidad de bordes por celda de una rejilla, para localizar dónde
-    # aparecen los cambios bruscos (pliegues, soldaduras abiertas).
+    # aparecen los cambios bruscos (solapes, pliegues, materia extraña).
     edges = cv2.Canny(gray, 80, 160)
     h, w = edges.shape
     gh, gw = h // EDGE_GRID, w // EDGE_GRID
@@ -55,8 +55,14 @@ def extract_features(patch_bgr: np.ndarray) -> np.ndarray:
 
     stats = np.array([gray.mean() / 255.0, gray.std() / 255.0])
 
-    red, yellow, green = color_flags(img)
-    color = np.array([red, yellow, green])
+    row_means = gray.mean(axis=1) / 255.0
+    col_means = gray.mean(axis=0) / 255.0
+    profile = np.array([
+        float(row_means.std()),
+        float(row_means.max() - row_means.min()),
+        float(col_means.std()),
+        float(col_means.max() - col_means.min()),
+    ])
 
-    features = np.concatenate([hist_lbp, grid_feats, stats, color])
+    features = np.concatenate([hist_lbp, grid_feats, stats, profile])
     return features.astype(np.float32)
