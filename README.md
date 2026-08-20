@@ -28,6 +28,23 @@ propias referencias, indicaciones y modelo por separado (no se mezclan):
 Puedes usar los dos con las mismas imágenes y comparar cuál te da mejores
 resultados con tus datos reales.
 
+## Dos modos: entrenamiento y producción
+
+También en la barra lateral, independiente del motor:
+
+- **📚 Entrenamiento**: el flujo de siempre — subes referencias, analizas
+  imágenes, confirmas o corriges cada predicción. Aquí es donde el modelo
+  aprende.
+- **🏭 Producción**: le das una carpeta de este equipo con imágenes, las
+  procesa **todas automáticamente** con el modelo ya entrenado (sin que
+  tengas que juzgar cada una) y las copia a subcarpetas `buena/`, `mala/`
+  o `revisar/` (cuando el modelo no está lo bastante seguro — mejor
+  apartarla para que la mire una persona que forzar una decisión
+  binaria). También genera un informe CSV con el veredicto y la confianza
+  de cada imagen, para tener trazabilidad. **El modelo no se modifica ni
+  aprende en este modo**: si quieres corregir algún resultado, hazlo
+  después en modo Entrenamiento.
+
 ## Cómo funciona
 
 La unidad de análisis es la **indicación** (un recorte dentro de la tira),

@@ -1,9 +1,11 @@
 from functools import partial
+from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 
 from defect_detector import features, features_dl, io_utils, storage
+from defect_detector.batch import process_folder
 from defect_detector.config import (
     ENGINE_CLASSIC,
     ENGINE_DL,
@@ -381,6 +383,83 @@ def page_estado(engine: str):
         st.success("Datos locales eliminados. Recarga la página para empezar de nuevo.")
 
 
+def page_produccion(engine: str):
+    st.header("🏭 Procesar carpeta (modo producción)")
+    model = get_model(engine)
+
+    if not model.is_trained():
+        st.warning(
+            "El modelo de este motor todavía no está entrenado. Ve a modo 📚 Entrenamiento "
+            "y sube referencias buenas antes de procesar imágenes en producción."
+        )
+        return
+
+    st.write(
+        "Indica una carpeta de este equipo con imágenes. Se analizan **todas automáticamente** "
+        "con el modelo ya entrenado, sin que tengas que revisar cada una, y se copian a "
+        "subcarpetas según el veredicto: `buena`, `mala`, o `revisar` (cuando el modelo no está "
+        "lo bastante seguro — mejor apartarla para que la mire una persona que forzar una "
+        "decisión). También se guarda un informe CSV con el detalle de cada imagen. "
+        "**El modelo no se modifica ni aprende de esto**: si quieres corregir algún resultado, "
+        "hazlo en modo Entrenamiento."
+    )
+
+    input_dir = st.text_input("Carpeta de entrada (ruta completa)", placeholder=r"C:\ia\entrada")
+    output_dir = st.text_input("Carpeta de salida (ruta completa)", placeholder=r"C:\ia\resultados")
+
+    with st.expander("⚙️ Ajustes"):
+        min_confidence_pct = st.slider(
+            "Confianza mínima para decidir automáticamente (%)", 50, 99, 70, key="prod_min_conf",
+            help="Por debajo de esta confianza, la imagen se manda a 'revisar' en vez de forzar buena/mala.",
+        )
+        win_h_pct = st.slider("Altura de cada ventana (%)", 2, 20, 6, key="prod_win_h")
+        include_start_zone = st.checkbox(
+            "Revisar siempre la zona de arranque (solape lateral)", value=True, key="prod_start_zone",
+        )
+        start_zone_pct = st.slider(
+            "Tamaño de la zona de arranque (%)", 5, 40, 18, key="prod_start_zone_pct",
+        )
+
+    if st.button("▶️ Procesar carpeta", type="primary", disabled=not (input_dir and output_dir)):
+        in_path = Path(input_dir)
+        if not in_path.is_dir():
+            st.error(f"No encuentro la carpeta de entrada: {input_dir}")
+            return
+
+        extractor = partial(extract_features_for, engine)
+        progress = st.progress(0.0)
+        status = st.empty()
+
+        def on_progress(done, total, name):
+            progress.progress(done / total if total else 1.0)
+            status.text(f"{done}/{total}: {name}")
+
+        with st.spinner("Procesando la carpeta..."):
+            rows = process_folder(
+                in_path, Path(output_dir), model, extractor,
+                min_confidence=min_confidence_pct / 100,
+                progress_callback=on_progress,
+                win_h_frac=win_h_pct / 100, top_k=9999, iou_thresh=0.3,
+                include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
+            )
+
+        if not rows:
+            st.warning("No se encontró ninguna imagen (png/jpg/jpeg/bmp) en esa carpeta.")
+            return
+
+        n_buena = sum(1 for r in rows if r["veredicto"] == "buena")
+        n_mala = sum(1 for r in rows if r["veredicto"] == "mala")
+        n_revisar = sum(1 for r in rows if r["veredicto"] == "revisar")
+        n_error = sum(1 for r in rows if r["veredicto"] == "error")
+        st.success(
+            f"Procesadas {len(rows)} imágenes → ✅ {n_buena} buenas · ❌ {n_mala} malas · "
+            f"⚠️ {n_revisar} para revisar"
+            + (f" · 🚫 {n_error} con error de lectura" if n_error else "")
+        )
+        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.caption(f"Copiadas a subcarpetas dentro de: {output_dir}")
+
+
 def page_historial(engine: str):
     st.header("📊 Historial y aprendizaje")
     records = storage.get_records(engine=engine)
@@ -432,24 +511,47 @@ def main():
         "no se mezclan entre sí."
     )
 
-    page = st.sidebar.radio(
-        "Navegación",
-        [
-            "📥 Referencias buenas",
-            "🔍 Analizar imágenes",
-            "🧠 Estado del modelo",
-            "📊 Historial",
-        ],
+    st.sidebar.divider()
+    modo = st.sidebar.radio(
+        "Modo",
+        ["📚 Entrenamiento", "🏭 Producción"],
+        key="modo",
+        help=(
+            "Entrenamiento: tú revisas y corriges, el modelo aprende. "
+            "Producción: procesa carpetas enteras sola, sin que juzgues cada imagen; "
+            "no modifica el modelo."
+        ),
     )
 
-    if page == "📥 Referencias buenas":
-        page_referencias(engine)
-    elif page == "🔍 Analizar imágenes":
-        page_analizar(engine)
-    elif page == "🧠 Estado del modelo":
-        page_estado(engine)
+    if modo == "📚 Entrenamiento":
+        page = st.sidebar.radio(
+            "Navegación",
+            [
+                "📥 Referencias buenas",
+                "🔍 Analizar imágenes",
+                "🧠 Estado del modelo",
+                "📊 Historial",
+            ],
+        )
+        if page == "📥 Referencias buenas":
+            page_referencias(engine)
+        elif page == "🔍 Analizar imágenes":
+            page_analizar(engine)
+        elif page == "🧠 Estado del modelo":
+            page_estado(engine)
+        else:
+            page_historial(engine)
     else:
-        page_historial(engine)
+        page = st.sidebar.radio(
+            "Navegación",
+            ["🏭 Procesar carpeta", "🧠 Estado del modelo", "📊 Historial"],
+        )
+        if page == "🏭 Procesar carpeta":
+            page_produccion(engine)
+        elif page == "🧠 Estado del modelo":
+            page_estado(engine)
+        else:
+            page_historial(engine)
 
 
 main()
