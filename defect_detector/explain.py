@@ -1,19 +1,16 @@
-"""Explicación visual de una predicción: perfil de brillo por fila.
+"""Explicación visual de una predicción: resalta sobre la propia imagen del
+recorte las filas que se apartan del rango normal.
 
-Se probó primero una comparación de imagen completa (SSIM) contra la
-referencia buena más parecida, pero con fotos reales del rayado del tubo
-resultó poco fiable: la textura tiene demasiada variación pixel a pixel
-(incluso entre dos zonas igualmente normales) para que una comparación de
-imagen completa aísle bien el defecto, y encima reaccionaba a brillos y
-reflejos que no son estructura real.
-
-En su lugar, aquí se compara el **perfil de brillo medio por fila** de la
-indicación contra el rango que cubren varias referencias buenas parecidas
-— literalmente la misma señal (perfil de fila) que ya usan las
-características del modelo (`features.py`) para decidir. Donde la línea de
-tu indicación se sale del rango normal, ahí está la anomalía: mucho más
-robusto frente al ruido fino del rayado que una comparación píxel a píxel,
-y más honesto porque muestra justo lo que el modelo "ve".
+Se probaron antes dos enfoques que no funcionaron bien con fotos reales:
+una comparación de imagen completa (SSIM), que reaccionaba al ruido fino
+del rayado y a los reflejos del material; y un gráfico de líneas aparte
+con el perfil de brillo, que resultaba difícil de interpretar. Aquí se usa
+la misma señal de perfil de brillo por fila (la que ya usan las
+características del modelo en `features.py`), pero en vez de dibujarla en
+un gráfico separado, se pinta directamente como una franja roja
+semitransparente sobre las filas del propio recorte que se salen del rango
+que cubren varias referencias buenas parecidas — así se ve de un vistazo,
+sobre la imagen, sin tener que interpretar nada aparte.
 
 No es una localización exacta del defecto ni lo que decide la predicción
 (eso lo hace el modelo, a partir de tu feedback): es solo una ayuda para
@@ -24,6 +21,9 @@ import cv2
 import numpy as np
 
 PROFILE_ROWS = 100
+BAND_WIDTH_STD = 2.5  # ancho del rango "normal" en desviaciones típicas
+HIGHLIGHT_COLOR_BGR = (0, 0, 220)  # rojo
+HIGHLIGHT_ALPHA = 0.45
 
 
 def row_profile(patch_bgr: np.ndarray) -> np.ndarray:
@@ -39,3 +39,29 @@ def row_profile(patch_bgr: np.ndarray) -> np.ndarray:
     row_means = gray.mean(axis=1) / 255.0
     resized = cv2.resize(row_means.reshape(-1, 1), (1, PROFILE_ROWS), interpolation=cv2.INTER_AREA)
     return resized.flatten()
+
+
+def anomaly_row_mask(query_profile: np.ndarray, ref_profiles: list[np.ndarray]) -> np.ndarray:
+    """Filas (en el espacio remuestreado de PROFILE_ROWS) donde el perfil de
+    la indicación se sale de la banda media ± BAND_WIDTH_STD·desviación de
+    las referencias buenas parecidas."""
+    ref_stack = np.vstack(ref_profiles)
+    mean = ref_stack.mean(axis=0)
+    std = np.maximum(ref_stack.std(axis=0), 0.01)
+    lo, hi = mean - BAND_WIDTH_STD * std, mean + BAND_WIDTH_STD * std
+    return (query_profile < lo) | (query_profile > hi)
+
+
+def highlight_patch(patch_bgr: np.ndarray, row_mask: np.ndarray) -> np.ndarray:
+    """Devuelve el recorte en RGB con una franja roja semitransparente sobre
+    las filas marcadas en `row_mask` (definida sobre PROFILE_ROWS puntos,
+    se escala a la altura real del recorte)."""
+    h, w = patch_bgr.shape[:2]
+    mask_col = row_mask.astype(np.uint8).reshape(-1, 1)
+    mask_full = cv2.resize(mask_col, (1, h), interpolation=cv2.INTER_NEAREST).flatten().astype(bool)
+
+    overlay = patch_bgr.astype(np.float32)
+    color = np.array(HIGHLIGHT_COLOR_BGR, dtype=np.float32)
+    overlay[mask_full] = overlay[mask_full] * (1 - HIGHLIGHT_ALPHA) + color * HIGHLIGHT_ALPHA
+    overlay = overlay.astype(np.uint8)
+    return cv2.cvtColor(overlay, cv2.COLOR_BGR2RGB)

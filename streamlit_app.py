@@ -1,10 +1,9 @@
-import numpy as np
 import pandas as pd
 import streamlit as st
 
 from defect_detector import io_utils, storage
 from defect_detector.config import MIN_SUPERVISED_DEFECT, MIN_SUPERVISED_GOOD, MIN_TRAIN_GOOD
-from defect_detector.explain import row_profile
+from defect_detector.explain import anomaly_row_mask, highlight_patch, row_profile
 from defect_detector.features import extract_features
 from defect_detector.model import DefectModel, find_nearest_good_many
 from defect_detector.scanner import scan_image
@@ -262,21 +261,20 @@ def page_analizar():
                         if ref_patch is not None:
                             ref_profiles.append(row_profile(ref_patch))
                     if ref_profiles:
-                        ref_stack = np.vstack(ref_profiles)
-                        ref_mean = ref_stack.mean(axis=0)
-                        ref_std = np.maximum(ref_stack.std(axis=0), 0.01)
-                        profile_df = pd.DataFrame(
-                            {
-                                "tu indicación": query_profile,
-                                "normal (mín)": ref_mean - 2.5 * ref_std,
-                                "normal (máx)": ref_mean + 2.5 * ref_std,
-                            }
-                        )
-                        col_ref.caption(
-                            f"Brillo por fila vs. rango normal de {len(ref_profiles)} referencias buenas "
-                            "parecidas. Donde tu indicación se sale del rango, ahí está la anomalía."
-                        )
-                        col_ref.line_chart(profile_df)
+                        row_mask = anomaly_row_mask(query_profile, ref_profiles)
+                        highlighted = highlight_patch(patch, row_mask)
+                        n_hot = int(row_mask.sum())
+                        if n_hot > 0:
+                            caption = (
+                                f"En rojo: filas que se salen del rango normal de "
+                                f"{len(ref_profiles)} referencias buenas parecidas."
+                            )
+                        else:
+                            caption = (
+                                f"No se aparta del rango normal de {len(ref_profiles)} "
+                                "referencias buenas parecidas."
+                            )
+                        col_ref.image(highlighted, caption=caption, use_container_width=True)
                     else:
                         col_ref.info("No se pudieron cargar las referencias para comparar.")
                 else:
