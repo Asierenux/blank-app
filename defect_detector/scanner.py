@@ -7,6 +7,12 @@ puntuar cada zona por su parecido a "lo normal". Las zonas más sospechosas
 (posible solape/pliegue, materia extraña...) se proponen como candidatas a
 revisar, con las ventanas solapadas fusionadas para no repetir la misma
 indicación varias veces.
+
+Además, la revisión del solape de las bandas laterales ocurre siempre en el
+mismo punto (el arranque de cada tubo, con solo unos mm de variación), así
+que esa "zona de arranque" se propone siempre como candidata, tenga o no
+puntuación de anomalía alta: así nunca se pasa por alto y el modelo
+acumula muchos ejemplos de esa posición exacta, la más crítica.
 """
 
 import cv2
@@ -80,25 +86,49 @@ def _non_max_suppress(candidates: list, iou_thresh: float, top_k: int) -> list:
     return selected
 
 
+def _score_window(image_bgr: np.ndarray, model, bbox: BBox):
+    patch = io_utils.crop_relative(image_bgr, bbox)
+    if patch.size == 0:
+        return None
+    feats = extract_features(patch)
+    score = model.defect_score(feats)
+    return bbox, feats, score
+
+
 def scan_image(
     image_bgr: np.ndarray, model, win_h_frac: float = 0.06, overlap: float = 0.5,
     top_k: int = 8, iou_thresh: float = 0.25,
-) -> list[tuple[BBox, np.ndarray, float]]:
+    include_start_zone: bool = True, start_zone_frac: float = 0.18,
+) -> list[tuple[BBox, np.ndarray, float, str]]:
     """Devuelve hasta `top_k` recuadros (bbox, features, puntuación de
-    anomalía), ordenados de más a menos sospechosos y sin solapes fuertes
-    entre sí."""
+    anomalía, origen), ordenados de más a menos sospechosos y sin solapes
+    fuertes entre sí. `origen` es "arranque" para la ventana fija del
+    inicio del tubo (solape lateral) o "barrido" para las encontradas por
+    la ventana deslizante. Si `include_start_zone` está activo, la zona de
+    arranque se añade siempre, independientemente de su puntuación."""
     h, w = image_bgr.shape[:2]
     bands = detect_bands(image_bgr)
 
     candidates = []
     for x0, x1 in bands:
         for bbox in sliding_windows_for_band(x0, x1, h, win_h_frac, overlap):
-            patch = io_utils.crop_relative(image_bgr, bbox)
-            if patch.size == 0:
-                continue
-            feats = extract_features(patch)
-            score = model.defect_score(feats)
-            candidates.append((bbox, feats, score))
+            item = _score_window(image_bgr, model, bbox)
+            if item is not None:
+                candidates.append((*item, "barrido"))
 
     candidates.sort(key=lambda c: c[2], reverse=True)
-    return _non_max_suppress(candidates, iou_thresh=iou_thresh, top_k=top_k)
+    selected = _non_max_suppress(candidates, iou_thresh=iou_thresh, top_k=top_k)
+
+    if include_start_zone:
+        # La zona de arranque se añade siempre, sin filtrarla por solape
+        # contra el resto de candidatas: es un punto de control fijo que
+        # se revisa en toda tira, coincida o no con lo que ya haya
+        # encontrado el barrido general.
+        start_items = []
+        for x0, x1 in bands:
+            item = _score_window(image_bgr, model, (x0, 0.0, x1 - x0, start_zone_frac))
+            if item is not None:
+                start_items.append((*item, "arranque"))
+        selected = start_items + selected
+
+    return selected

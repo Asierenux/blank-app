@@ -169,13 +169,24 @@ def page_analizar():
         with st.expander("⚙️ Ajustes del escaneo"):
             win_h_pct = st.slider("Altura de cada ventana (%)", 2, 20, 6, key="scan_win_h")
             top_k = st.slider("Nº de zonas más sospechosas a mostrar", 1, 20, 8, key="scan_top_k")
+            include_start_zone = st.checkbox(
+                "Revisar siempre la zona de arranque (solape lateral)", value=True, key="scan_start_zone",
+            )
+            start_zone_pct = st.slider(
+                "Tamaño de la zona de arranque (%)", 5, 40, 18, key="scan_start_zone_pct",
+                disabled=not include_start_zone,
+            )
 
         if st.button("🔎 Escanear imagen automáticamente", type="primary", disabled=not model.is_trained()):
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
             with st.spinner("Recorriendo la imagen con la ventana deslizante..."):
-                results = scan_image(img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k)
+                results = scan_image(
+                    img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k,
+                    include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
+                )
             new_ids = []
-            for bbox, feats, _score in results:
+            origins = {}
+            for bbox, feats, _score, origen in results:
                 patch_hash = io_utils.patch_hash(parent_hash, bbox)
                 if storage.image_exists(patch_hash):
                     continue
@@ -186,8 +197,10 @@ def page_analizar():
                     predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                 )
                 new_ids.append(image_id)
+                origins[image_id] = origen
             if new_ids:
                 st.session_state.last_analyzed_ids = new_ids
+                st.session_state.last_analyzed_origins = origins
             elif results:
                 st.info("Las zonas más sospechosas de esta imagen ya habían sido analizadas antes.")
             else:
@@ -209,11 +222,19 @@ def page_analizar():
                         predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                     )
                     st.session_state.last_analyzed_ids = [image_id]
+                    st.session_state.last_analyzed_origins = {image_id: "manual"}
                     st.rerun()
+
+    ORIGIN_LABELS = {
+        "arranque": "🎯 Zona de arranque (solape lateral)",
+        "barrido": "🔎 Detectada por el barrido automático",
+        "manual": "✋ Añadida manualmente",
+    }
 
     last_ids = st.session_state.get("last_analyzed_ids", [])
     if last_ids:
         st.subheader("Resultados del último análisis")
+        last_origins = st.session_state.get("last_analyzed_origins", {})
         good_X, good_ids = storage.get_good_reference_data()
         for image_id in last_ids:
             record = storage.get_record(image_id)
@@ -222,7 +243,12 @@ def page_analizar():
             with st.container(border=True):
                 col_img, col_ref, col_info = st.columns([1, 1, 1.4])
                 patch = load_patch_image(record)
-                col_img.image(io_utils.bgr_to_rgb(patch), caption=record["filename"], use_container_width=True)
+                origen = ORIGIN_LABELS.get(last_origins.get(image_id), "")
+                col_img.image(
+                    io_utils.bgr_to_rgb(patch),
+                    caption=f"{record['filename']}" + (f" · {origen}" if origen else ""),
+                    use_container_width=True,
+                )
 
                 nearest_id, dist = find_nearest_good(
                     storage.deserialize_features(record["features"]), good_X, good_ids
@@ -297,6 +323,7 @@ def page_estado():
         shutil.rmtree(DATA_DIR, ignore_errors=True)
         st.session_state.pop("model", None)
         st.session_state.pop("last_analyzed_ids", None)
+        st.session_state.pop("last_analyzed_origins", None)
         st.success("Datos locales eliminados. Recarga la página para empezar de nuevo.")
 
 

@@ -22,8 +22,12 @@ real de una falsa alarma en un punto concreto.
    parecido a la textura normal aprendida, y se te proponen las más
    sospechosas (posible solape de bandas, pliegue, materia extraña) para
    que las revises, con los recuadros solapados fusionados para no
-   repetir la misma indicación varias veces. También puedes añadir
-   manualmente cualquier zona que el escaneo no haya destacado.
+   repetir la misma indicación varias veces. La revisión del **solape
+   lateral** ocurre siempre en el arranque de la tira (con solo unos mm de
+   variación), así que esa zona se propone siempre como candidata a
+   revisar, tenga o no puntuación de anomalía alta — es configurable en
+   "⚙️ Ajustes del escaneo". También puedes añadir manualmente cualquier
+   otra zona que el escaneo no haya destacado.
 3. **Feedback**: para cada indicación puedes confirmar la predicción o
    corregirla ("en realidad es buena" / "en realidad tiene defecto"). Cada
    corrección se guarda y el modelo se reentrena al momento: es tu
