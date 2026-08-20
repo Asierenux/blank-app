@@ -146,3 +146,14 @@ def find_nearest_good(x: np.ndarray, good_X: np.ndarray, good_ids: list):
     dists = np.linalg.norm(good_X - x.reshape(1, -1), axis=1)
     idx = int(np.argmin(dists))
     return good_ids[idx], float(dists[idx])
+
+
+def find_nearest_good_many(x: np.ndarray, good_X: np.ndarray, good_ids: list, n: int = 5):
+    """Ids de las `n` indicaciones buenas más parecidas, usadas para
+    construir un rango de "lo normal" (en vez de comparar contra una sola
+    referencia, que puede no ser representativa)."""
+    if good_X is None or len(good_X) == 0:
+        return []
+    dists = np.linalg.norm(good_X - x.reshape(1, -1), axis=1)
+    order = np.argsort(dists)[:n]
+    return [(good_ids[i], float(dists[i])) for i in order]

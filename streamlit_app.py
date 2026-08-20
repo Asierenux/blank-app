@@ -1,11 +1,12 @@
+import numpy as np
 import pandas as pd
 import streamlit as st
 
 from defect_detector import io_utils, storage
 from defect_detector.config import MIN_SUPERVISED_DEFECT, MIN_SUPERVISED_GOOD, MIN_TRAIN_GOOD
-from defect_detector.explain import diff_heatmap
+from defect_detector.explain import row_profile
 from defect_detector.features import extract_features
-from defect_detector.model import DefectModel, find_nearest_good
+from defect_detector.model import DefectModel, find_nearest_good_many
 from defect_detector.scanner import scan_image
 
 st.set_page_config(page_title="Control de calidad de tubos", page_icon="🔍", layout="wide")
@@ -250,17 +251,34 @@ def page_analizar():
                     use_container_width=True,
                 )
 
-                nearest_id, dist = find_nearest_good(
-                    storage.deserialize_features(record["features"]), good_X, good_ids
+                nearest_list = find_nearest_good_many(
+                    storage.deserialize_features(record["features"]), good_X, good_ids, n=5
                 )
-                if nearest_id:
-                    nearest_patch = load_patch_image(storage.get_record(nearest_id))
-                    score, overlay_rgb = diff_heatmap(patch, nearest_patch)
-                    col_ref.image(
-                        overlay_rgb,
-                        caption=f"Comparación con referencia más parecida (similitud {score:.0%})",
-                        use_container_width=True,
-                    )
+                if nearest_list:
+                    query_profile = row_profile(patch)
+                    ref_profiles = []
+                    for nearest_id, _dist in nearest_list:
+                        ref_patch = load_patch_image(storage.get_record(nearest_id))
+                        if ref_patch is not None:
+                            ref_profiles.append(row_profile(ref_patch))
+                    if ref_profiles:
+                        ref_stack = np.vstack(ref_profiles)
+                        ref_mean = ref_stack.mean(axis=0)
+                        ref_std = np.maximum(ref_stack.std(axis=0), 0.01)
+                        profile_df = pd.DataFrame(
+                            {
+                                "tu indicación": query_profile,
+                                "normal (mín)": ref_mean - 2.5 * ref_std,
+                                "normal (máx)": ref_mean + 2.5 * ref_std,
+                            }
+                        )
+                        col_ref.caption(
+                            f"Brillo por fila vs. rango normal de {len(ref_profiles)} referencias buenas "
+                            "parecidas. Donde tu indicación se sale del rango, ahí está la anomalía."
+                        )
+                        col_ref.line_chart(profile_df)
+                    else:
+                        col_ref.info("No se pudieron cargar las referencias para comparar.")
                 else:
                     col_ref.info("Sin referencias buenas para comparar todavía.")
 
