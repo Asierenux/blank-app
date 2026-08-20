@@ -202,10 +202,10 @@ def page_analizar(engine: str):
                 disabled=not include_start_zone,
             )
 
-        if st.button("🔎 Escanear imagen automáticamente", type="primary", disabled=not model.is_trained()):
+        def _run_scan():
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
             extractor = partial(extract_features_for, engine)
-            with st.spinner("Recorriendo la imagen con la ventana deslizante..."):
+            with st.spinner("Analizando la imagen automáticamente..."):
                 results = scan_image(
                     img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k,
                     include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
@@ -225,13 +225,20 @@ def page_analizar(engine: str):
                 )
                 new_ids.append(image_id)
                 origins[image_id] = origen
-            if new_ids:
-                st.session_state.last_analyzed_ids = new_ids
-                st.session_state.last_analyzed_origins = origins
-            elif results:
-                st.info("Las zonas más sospechosas de esta imagen ya habían sido analizadas antes.")
-            else:
+            st.session_state.last_analyzed_ids = new_ids
+            st.session_state.last_analyzed_origins = origins
+            if not new_ids and not results:
                 st.info("No se encontró ningún tramo con contenido para escanear en esta imagen.")
+
+        # Se analiza sola en cuanto subes la imagen, sin tener que pulsar nada.
+        # Se guarda qué imagen (+ motor + ajustes) ya se analizó para no
+        # repetir el escaneo en cada interacción sin que hayas cambiado nada.
+        auto_key = (parent_hash, engine, win_h_pct, top_k, include_start_zone, start_zone_pct)
+        if model.is_trained() and st.session_state.get("auto_scanned_key") != auto_key:
+            _run_scan()
+            st.session_state.auto_scanned_key = auto_key
+        elif model.is_trained():
+            st.button("🔁 Volver a analizar", on_click=_run_scan)
 
         with st.expander("➕ Añadir indicación manualmente (para marcar tú una zona concreta)"):
             bbox_manual, patch_manual = render_crop_tool(img_bgr, "manual_crop")
