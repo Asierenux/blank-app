@@ -1,5 +1,9 @@
 .streamlit/secrets.toml
 
+# Datos locales de la app: imágenes, base de datos y modelo entrenado.
+# Nunca deben subirse al repositorio (son privados y locales al equipo).
+data/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
