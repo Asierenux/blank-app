@@ -52,19 +52,38 @@ def _load_model():
 
 
 def extract_features(patch_bgr: np.ndarray) -> np.ndarray:
+    if patch_bgr is None or patch_bgr.size == 0:
+        raise ValueError("Recorte vacío o no decodificable")
+    return extract_features_batch([patch_bgr])[0]
+
+
+def extract_features_batch(patches: list[np.ndarray], batch_size: int = 32) -> list[np.ndarray]:
+    """Igual que `extract_features`, pero agrupando varios recortes en un
+    único paso por la red (por tandas de `batch_size`) en vez de uno a uno.
+
+    Con una CNN, pasar N imágenes juntas es mucho más rápido que N pases
+    individuales (mejor aprovechamiento de CPU/vectorización): en un
+    escaneo de una tira, que revisa varias decenas de ventanas, la
+    diferencia es considerable. El motor clásico no lo necesita — sus
+    características ya son rápidas de calcular una a una."""
     import torch
     from PIL import Image
 
-    if patch_bgr is None or patch_bgr.size == 0:
-        raise ValueError("Recorte vacío o no decodificable")
+    if not patches:
+        return []
 
     model, transform = _load_model()
+    results: list[np.ndarray] = []
+    for start in range(0, len(patches), batch_size):
+        chunk = patches[start:start + batch_size]
+        tensors = []
+        for patch_bgr in chunk:
+            rgb = patch_bgr[:, :, ::-1]  # BGR -> RGB, sin depender de cv2 aquí
+            tensors.append(transform(Image.fromarray(rgb)))
+        batch_tensor = torch.stack(tensors)
 
-    rgb = patch_bgr[:, :, ::-1]  # BGR -> RGB, sin depender de cv2 aquí
-    pil_img = Image.fromarray(rgb)
-    tensor = transform(pil_img).unsqueeze(0)
+        with torch.no_grad():
+            embeddings = model(batch_tensor)
 
-    with torch.no_grad():
-        embedding = model(tensor)
-
-    return embedding.squeeze(0).numpy().astype(np.float32)
+        results.extend(e.numpy().astype(np.float32) for e in embeddings)
+    return results

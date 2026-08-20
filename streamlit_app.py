@@ -33,10 +33,18 @@ EXTRACTORS = {
     ENGINE_CLASSIC: features.extract_features,
     ENGINE_DL: features_dl.extract_features,
 }
+BATCH_EXTRACTORS = {
+    ENGINE_CLASSIC: None,  # el motor clásico ya es rápido calculando ventana a ventana
+    ENGINE_DL: features_dl.extract_features_batch,
+}
 
 
 def get_engine() -> str:
     return st.session_state.get("engine", ENGINE_CLASSIC)
+
+
+def get_batch_extractor(engine: str):
+    return BATCH_EXTRACTORS[engine]
 
 
 def extract_features_for(engine: str, patch_bgr):
@@ -211,7 +219,7 @@ def page_analizar(engine: str):
                 results = scan_image(
                     img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k,
                     include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
-                    extract_features=extractor,
+                    extract_features=extractor, extract_features_batch=get_batch_extractor(engine),
                 )
             new_ids = []
             origins = {}
@@ -403,6 +411,12 @@ def page_produccion(engine: str):
         "**El modelo no se modifica ni aprende de esto**: si quieres corregir algún resultado, "
         "hazlo en modo Entrenamiento."
     )
+    if engine == ENGINE_DL:
+        st.caption(
+            "⏱️ El motor 🧠 Red neuronal es más lento por ventana analizada que el 🔬 Clásico. "
+            "Para procesar muchas imágenes de golpe, si la velocidad es más importante que la "
+            "sutileza, prueba primero con el motor clásico."
+        )
 
     input_dir = st.text_input("Carpeta de entrada (ruta completa)", placeholder=r"C:\ia\entrada")
     output_dir = st.text_input("Carpeta de salida (ruta completa)", placeholder=r"C:\ia\resultados")
@@ -412,7 +426,15 @@ def page_produccion(engine: str):
             "Confianza mínima para decidir automáticamente (%)", 50, 99, 70, key="prod_min_conf",
             help="Por debajo de esta confianza, la imagen se manda a 'revisar' en vez de forzar buena/mala.",
         )
-        win_h_pct = st.slider("Altura de cada ventana (%)", 2, 20, 6, key="prod_win_h")
+        win_h_pct = st.slider("Altura de cada ventana (%)", 2, 20, 8, key="prod_win_h")
+        overlap_pct = st.slider(
+            "Solape entre ventanas (%)", 0, 75, 20, key="prod_overlap",
+            help=(
+                "Más solape = más ventanas analizadas = más preciso pero más lento. "
+                "En producción solo hace falta el veredicto por imagen, no localizar el defecto "
+                "al milímetro, así que un solape bajo suele bastar y va bastante más rápido."
+            ),
+        )
         include_start_zone = st.checkbox(
             "Revisar siempre la zona de arranque (solape lateral)", value=True, key="prod_start_zone",
         )
@@ -439,8 +461,9 @@ def page_produccion(engine: str):
                 in_path, Path(output_dir), model, extractor,
                 min_confidence=min_confidence_pct / 100,
                 progress_callback=on_progress,
-                win_h_frac=win_h_pct / 100, top_k=9999, iou_thresh=0.3,
+                win_h_frac=win_h_pct / 100, overlap=overlap_pct / 100, top_k=9999, iou_thresh=0.3,
                 include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
+                extract_features_batch=get_batch_extractor(engine),
             )
 
         if not rows:

@@ -88,20 +88,12 @@ def _non_max_suppress(candidates: list, iou_thresh: float, top_k: int) -> list:
     return selected
 
 
-def _score_window(image_bgr: np.ndarray, model, bbox: BBox, extract_features: Callable):
-    patch = io_utils.crop_relative(image_bgr, bbox)
-    if patch.size == 0:
-        return None
-    feats = extract_features(patch)
-    score = model.defect_score(feats)
-    return bbox, feats, score
-
-
 def scan_image(
     image_bgr: np.ndarray, model, win_h_frac: float = 0.06, overlap: float = 0.5,
     top_k: int = 8, iou_thresh: float = 0.25,
     include_start_zone: bool = True, start_zone_frac: float = 0.18,
     extract_features: Callable = _default_extract_features,
+    extract_features_batch: Callable[[list], list] | None = None,
 ) -> list[tuple[BBox, np.ndarray, float, str]]:
     """Devuelve hasta `top_k` recuadros (bbox, features, puntuación de
     anomalía, origen), ordenados de más a menos sospechosos y sin solapes
@@ -110,32 +102,44 @@ def scan_image(
     la ventana deslizante. Si `include_start_zone` está activo, la zona de
     arranque se añade siempre, independientemente de su puntuación.
 
-    `extract_features` es inyectable para poder usar este mismo escaneo
-    con el motor clásico o con el de red neuronal, según qué modelo se
-    esté puntuando (deben ser consistentes entre sí)."""
+    `extract_features`/`extract_features_batch` son inyectables para poder
+    usar este mismo escaneo con el motor clásico o con el de red neuronal.
+    Si se da `extract_features_batch`, todas las ventanas de la imagen se
+    mandan juntas en un único paso por el modelo en vez de una a una — con
+    una CNN eso es mucho más rápido, y con un escaneo que revisa varias
+    decenas de ventanas la diferencia se nota bastante."""
     h, w = image_bgr.shape[:2]
     bands = detect_bands(image_bgr)
 
-    candidates = []
+    tagged_boxes: list[tuple[BBox, str]] = []
     for x0, x1 in bands:
-        for bbox in sliding_windows_for_band(x0, x1, h, win_h_frac, overlap):
-            item = _score_window(image_bgr, model, bbox, extract_features)
-            if item is not None:
-                candidates.append((*item, "barrido"))
-
-    candidates.sort(key=lambda c: c[2], reverse=True)
-    selected = _non_max_suppress(candidates, iou_thresh=iou_thresh, top_k=top_k)
-
+        tagged_boxes.extend((bbox, "barrido") for bbox in sliding_windows_for_band(x0, x1, h, win_h_frac, overlap))
     if include_start_zone:
-        # La zona de arranque se añade siempre, sin filtrarla por solape
-        # contra el resto de candidatas: es un punto de control fijo que
-        # se revisa en toda tira, coincida o no con lo que ya haya
-        # encontrado el barrido general.
-        start_items = []
-        for x0, x1 in bands:
-            item = _score_window(image_bgr, model, (x0, 0.0, x1 - x0, start_zone_frac), extract_features)
-            if item is not None:
-                start_items.append((*item, "arranque"))
-        selected = start_items + selected
+        tagged_boxes.extend(((x0, 0.0, x1 - x0, start_zone_frac), "arranque") for x0, x1 in bands)
 
-    return selected
+    patches, valid = [], []
+    for bbox, origin in tagged_boxes:
+        patch = io_utils.crop_relative(image_bgr, bbox)
+        if patch.size == 0:
+            continue
+        patches.append(patch)
+        valid.append((bbox, origin))
+
+    if extract_features_batch is not None:
+        feats_list = extract_features_batch(patches)
+    else:
+        feats_list = [extract_features(p) for p in patches]
+
+    barrido_scored, start_scored = [], []
+    for (bbox, origin), feats in zip(valid, feats_list):
+        score = model.defect_score(feats)
+        item = (bbox, feats, score, origin)
+        (start_scored if origin == "arranque" else barrido_scored).append(item)
+
+    barrido_scored.sort(key=lambda c: c[2], reverse=True)
+    selected = _non_max_suppress(barrido_scored, iou_thresh=iou_thresh, top_k=top_k)
+
+    # La zona de arranque se añade siempre, sin filtrarla por solape contra
+    # el resto de candidatas: es un punto de control fijo que se revisa en
+    # toda tira, coincida o no con lo que ya haya encontrado el barrido.
+    return start_scored + selected
