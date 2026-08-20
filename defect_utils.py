@@ -1,68 +1,13 @@
 """Utilidades para la detección de fallos en imágenes de producto.
 
-Incluye dos métodos independientes:
-- analyze_image_with_claude: usa el modelo de visión de Claude (API de Anthropic).
-- compute_defect_map: comparación clásica de visión por computador (SSIM) contra
-  una o varias imágenes de referencia "buenas".
+Comparación clásica de visión por computador (SSIM) contra una o varias
+imágenes de referencia "buenas". Todo el procesamiento es local: ninguna
+imagen sale de esta máquina.
 """
-
-import base64
-import json
-import re
 
 import cv2
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
-
-
-def _extract_json(text):
-    """Extrae el primer objeto JSON de un texto, tolerando bloques ```json```."""
-    match = re.search(r"\{.*\}", text, re.DOTALL)
-    if not match:
-        raise ValueError(f"No se encontró JSON en la respuesta del modelo: {text!r}")
-    return json.loads(match.group(0))
-
-
-def analyze_image_with_claude(client, image_bytes, media_type, product_description="", model="claude-sonnet-5"):
-    """Envía una imagen a Claude y pide un veredicto de control de calidad.
-
-    Devuelve un dict: {"defecto": bool, "tipo_defecto": str, "confianza": str, "explicacion": str}
-    """
-    b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
-
-    contexto = f"\nContexto del producto proporcionado por el usuario: {product_description}\n" if product_description else ""
-
-    prompt = (
-        "Eres un inspector de control de calidad experto en manufactura. "
-        "Analiza la imagen de un producto y determina si presenta algún defecto visible "
-        "(arañazos, grietas, deformaciones, manchas, piezas faltantes, mal ensamblaje, "
-        "decoloración, suciedad, asimetrías, etc.)."
-        f"{contexto}"
-        "\nResponde ÚNICAMENTE con un objeto JSON válido, sin texto adicional ni markdown, "
-        "con este formato exacto:\n"
-        '{"defecto": true/false, "tipo_defecto": "descripción breve o \'ninguno\'", '
-        '"confianza": "alta/media/baja", "explicacion": "explicación breve de tu análisis"}'
-    )
-
-    message = client.messages.create(
-        model=model,
-        max_tokens=500,
-        messages=[
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {"type": "base64", "media_type": media_type, "data": b64},
-                    },
-                    {"type": "text", "text": prompt},
-                ],
-            }
-        ],
-    )
-
-    text = "".join(block.text for block in message.content if getattr(block, "type", None) == "text")
-    return _extract_json(text)
 
 
 def compute_defect_map(reference_img, test_img, min_area=150):
