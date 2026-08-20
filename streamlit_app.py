@@ -369,7 +369,11 @@ def page_analizar(engine: str):
 
     st.divider()
     st.subheader("Indicaciones pendientes de confirmar")
-    pending = [r for r in storage.get_records(role="review", engine=engine) if r["final_label"] is None]
+    st.caption("No incluye las del último análisis, que ya tienes justo arriba.")
+    pending = [
+        r for r in storage.get_records(role="review", engine=engine)
+        if r["final_label"] is None and r["id"] not in last_ids
+    ]
     if not pending:
         st.info("No hay indicaciones pendientes de confirmación con este motor.")
     else:
