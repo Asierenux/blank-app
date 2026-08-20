@@ -14,8 +14,12 @@ real de una falsa alarma en un punto concreto.
 
 1. **Referencias buenas**: subes una tira y recortas una o varias zonas
    **sin defecto**. El sistema aprende de ellas la textura normal del tubo
-   (patrón de rayado, bordes, regularidad del brillo por filas/columnas)
+   (patrón de rayado, densidad y regularidad de bordes por filas/columnas)
    usando visión clásica y un detector de anomalías (`IsolationForest`).
+   Deliberadamente no se usa el brillo como señal: en un material
+   brillante (goma) el brillo cambia con la luz/ángulo de cada foto sin
+   ser un defecto real, así que basarse en bordes/textura en vez de
+   brillo evita que esos reflejos confundan al sistema.
 2. **Analizar imágenes**: subes una tira nueva y el sistema la recorre con
    una **ventana deslizante** de arriba a abajo, sin fiarse de ninguna
    marca de color que pueda traer la imagen. Cada zona se puntúa por su
