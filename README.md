@@ -51,10 +51,18 @@ La unidad de análisis es la **indicación** (un recorte dentro de la tira),
 no la tira completa: así el sistema puede aprender a distinguir un defecto
 real de una falsa alarma en un punto concreto.
 
-1. **Referencias buenas**: subes una tira y recortas una o varias zonas
-   **sin defecto**. El sistema aprende de ellas cómo es la textura normal
-   del tubo con un detector de anomalías (`IsolationForest`). En el motor
-   clásico, deliberadamente no se usa el brillo como señal: en un material
+1. **Referencias buenas**: subes una tira y marcas una o varias zonas
+   **sin defecto**. Cada una se guarda en un **banco de memoria** (el
+   enfoque estándar en detección de anomalías industriales, tipo
+   PatchCore): no se "aprende" una frontera fija, se memorizan ejemplos
+   normales y cada indicación nueva se compara por distancia a los
+   vecinos más parecidos del banco — generaliza mejor que un
+   `IsolationForest` con pocos ejemplos. Las zonas se recortan siempre con
+   el ancho completo de la banda del tubo y la misma altura que las
+   ventanas del escaneo, para que el banco de memoria compare cosas del
+   mismo tamaño (si se mezclan formas distintas, el sistema puede confundir
+   el tamaño del recorte con una anomalía real). En el motor clásico,
+   deliberadamente no se usa el brillo como señal: en un material
    brillante (goma) el brillo cambia con la luz/ángulo de cada foto sin
    ser un defecto real, así que basarse en bordes/textura en vez de brillo
    evita que esos reflejos confundan al sistema.

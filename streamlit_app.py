@@ -18,14 +18,14 @@ from defect_detector.config import (
 )
 from defect_detector.explain import anomaly_row_mask, highlight_patch, row_profile
 from defect_detector.model import DefectModel, find_nearest_good_many
-from defect_detector.scanner import scan_image
+from defect_detector.scanner import detect_bands, scan_image
 
 st.set_page_config(page_title="Control de calidad de tubos", page_icon="🔍", layout="wide")
 
 LABELS = {"good": "✅ Buena", "defect": "❌ Defecto"}
 MODE_LABELS = {
     "sin_entrenar": "Sin entrenar todavía",
-    "anomalia": "Detección de anomalías (solo referencias buenas)",
+    "anomalia": "Vecino más cercano (banco de memoria de referencias buenas)",
     "supervisado": "Clasificador supervisado (usa tu feedback)",
 }
 
@@ -96,6 +96,37 @@ def render_crop_tool(image_bgr, key_prefix: str, defaults=(0.35, 0.35, 0.3, 0.3)
     return bbox, patch
 
 
+def render_band_crop_tool(image_bgr, key_prefix: str):
+    """Recorte para referencias buenas: ancho completo de la banda del
+    tubo y altura igual a la de las ventanas del escáner (comparten la
+    clave "scan_win_h" con "Ajustes del escaneo"). Si una referencia se
+    recortase con otra forma, el banco de memoria del vecino más cercano
+    quedaría desalineado con lo que realmente se compara al escanear, y
+    eso dispara falsos positivos por toda la imagen, no solo en el
+    defecto — por eso aquí no se deja elegir ancho/alto libremente."""
+    bands = detect_bands(image_bgr)
+    if len(bands) > 1:
+        band_idx = st.selectbox(
+            "Banda del tubo", range(len(bands)),
+            format_func=lambda i: f"Banda {i + 1} ({bands[i][0]:.0%}–{bands[i][1]:.0%} del ancho)",
+            key=f"{key_prefix}_band",
+        )
+    else:
+        band_idx = 0
+    x0, x1 = bands[band_idx]
+
+    y_pct = st.slider("Posición vertical (%)", 0, 99, 30, key=f"{key_prefix}_y")
+    win_h_pct = st.slider(
+        "Altura de la zona (%)", 2, 20, 6, key="scan_win_h",
+        help="La misma que 'Altura de cada ventana' en Ajustes del escaneo — así el banco de memoria queda alineado con lo que se compara al analizar.",
+    )
+    h_pct = min(win_h_pct, 100 - y_pct)
+    bbox = (x0, y_pct / 100, x1 - x0, h_pct / 100)
+    patch = io_utils.crop_relative(image_bgr, bbox)
+    st.image(io_utils.bgr_to_rgb(patch), caption="Vista previa de la referencia", use_container_width=True)
+    return bbox, patch
+
+
 def render_feedback_controls(record, engine: str):
     st.caption(
         f"Predicción: **{LABELS.get(record['predicted_label'], '—')}** "
@@ -125,7 +156,15 @@ def page_referencias(engine: str):
     st.write(
         "Sube una tira de inspección y marca sobre ella una o varias zonas "
         "**sin defecto** (sin solape, pliegue ni materia extraña). El sistema "
-        "aprende de esas zonas cómo es la textura normal del tubo."
+        "guarda estas zonas en un banco de memoria: cada indicación nueva se "
+        "compara por parecido contra las más similares de este banco, así que "
+        "cuantas más referencias variadas le des, mejor distingue lo normal."
+    )
+    st.caption(
+        "Las referencias se recortan con el ancho completo de la banda del tubo y la misma "
+        "altura que las ventanas del escaneo — así el banco de memoria queda alineado con lo "
+        "que realmente se compara al analizar. Si mezclas formas distintas, el sistema puede "
+        "confundir el tamaño del recorte con una anomalía real."
     )
 
     uploaded = st.file_uploader(
@@ -143,13 +182,13 @@ def page_referencias(engine: str):
 
         modo = st.radio(
             "¿Qué quieres guardar como buena?",
-            ["Recortar una zona concreta", "La imagen completa"],
+            ["Recortar una zona (recomendado)", "La imagen completa (solo si ya es un recorte ajustado)"],
             key="good_mode",
         )
-        if modo == "La imagen completa":
+        if modo.startswith("La imagen completa"):
             bbox, patch = (0.0, 0.0, 1.0, 1.0), img_bgr
         else:
-            bbox, patch = render_crop_tool(img_bgr, "good_crop")
+            bbox, patch = render_band_crop_tool(img_bgr, "good_crop")
 
         if st.button("Guardar esta zona como buena", type="primary"):
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
