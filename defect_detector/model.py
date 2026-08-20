@@ -16,6 +16,7 @@ data/model.pkl. Todo el entrenamiento y la inferencia ocurren en local.
 import pickle
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 from sklearn.ensemble import IsolationForest, RandomForestClassifier
@@ -124,15 +125,17 @@ class DefectModel:
         diff = score - self.iso_threshold
         return float(1.0 / (1.0 + np.exp(diff * 8)))
 
-    def save(self) -> None:
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(MODEL_PATH, "wb") as f:
+    def save(self, path: Path | None = None) -> None:
+        path = path or MODEL_PATH
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "wb") as f:
             pickle.dump(self, f)
 
     @staticmethod
-    def load() -> "DefectModel":
-        if MODEL_PATH.exists():
-            with open(MODEL_PATH, "rb") as f:
+    def load(path: Path | None = None) -> "DefectModel":
+        path = path or MODEL_PATH
+        if path.exists():
+            with open(path, "rb") as f:
                 return pickle.load(f)
         return DefectModel()
 

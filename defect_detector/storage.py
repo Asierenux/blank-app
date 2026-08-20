@@ -1,11 +1,14 @@
 """Capa de persistencia local en SQLite (data/store.db).
 
 Cada fila es una *indicación*: un recorte (recuadro relativo) dentro de una
-tira completa guardada en disco. Guarda el recuadro, el vector de
-características, la predicción del modelo en el momento del análisis y la
-etiqueta final (la "verdad" tras la confirmación o corrección del usuario).
-Esa etiqueta final es la que alimenta el reentrenamiento: así el sistema
-aprende de los aciertos y errores que le vayas señalando.
+tira completa guardada en disco. Guarda el recuadro, con qué motor se
+extrajeron sus características (clásico o red neuronal — no son
+compatibles entre sí, así que todo el entrenamiento y las consultas van
+siempre filtradas por motor), el vector de características, la predicción
+del modelo en el momento del análisis y la etiqueta final (la "verdad"
+tras la confirmación o corrección del usuario). Esa etiqueta final es la
+que alimenta el reentrenamiento: así el sistema aprende de los aciertos y
+errores que le vayas señalando.
 """
 
 import pickle
@@ -28,6 +31,7 @@ CREATE TABLE IF NOT EXISTS images (
     crop_h REAL NOT NULL,
     image_hash TEXT NOT NULL UNIQUE,
     role TEXT NOT NULL CHECK (role IN ('good_reference', 'review')),
+    engine TEXT NOT NULL,
     features BLOB NOT NULL,
     predicted_label TEXT,
     predicted_confidence REAL,
@@ -78,6 +82,7 @@ def add_image(
     crop_bbox: tuple[float, float, float, float],
     image_hash: str,
     role: str,
+    engine: str,
     features: np.ndarray,
     predicted_label: str | None = None,
     predicted_confidence: float | None = None,
@@ -94,10 +99,10 @@ def add_image(
             """
             INSERT INTO images (
                 filename, parent_filepath, crop_x, crop_y, crop_w, crop_h,
-                image_hash, role, features,
+                image_hash, role, engine, features,
                 predicted_label, predicted_confidence, predicted_method,
                 final_label, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 filename,
@@ -105,6 +110,7 @@ def add_image(
                 *crop_bbox,
                 image_hash,
                 role,
+                engine,
                 _serialize(features),
                 predicted_label,
                 predicted_confidence,
@@ -132,24 +138,28 @@ def get_record(image_id: int) -> sqlite3.Row | None:
         ).fetchone()
 
 
-def get_records(role: str | None = None) -> list[sqlite3.Row]:
+def get_records(role: str | None = None, engine: str | None = None) -> list[sqlite3.Row]:
+    query = "SELECT * FROM images WHERE 1=1"
+    params: list = []
+    if role is not None:
+        query += " AND role = ?"
+        params.append(role)
+    if engine is not None:
+        query += " AND engine = ?"
+        params.append(engine)
+    query += " ORDER BY created_at DESC"
     with get_connection() as conn:
-        if role is None:
-            return conn.execute(
-                "SELECT * FROM images ORDER BY created_at DESC"
-            ).fetchall()
-        return conn.execute(
-            "SELECT * FROM images WHERE role = ? ORDER BY created_at DESC",
-            (role,),
-        ).fetchall()
+        return conn.execute(query, params).fetchall()
 
 
-def get_labeled_data():
-    """Devuelve (X, y, ids) de todas las indicaciones con etiqueta final
-    conocida (referencias buenas + confirmaciones/correcciones de feedback)."""
+def get_labeled_data(engine: str):
+    """Devuelve (X, y, ids) de todas las indicaciones de ese motor con
+    etiqueta final conocida (referencias buenas + confirmaciones/
+    correcciones de feedback)."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, features, final_label FROM images WHERE final_label IS NOT NULL"
+            "SELECT id, features, final_label FROM images WHERE engine = ? AND final_label IS NOT NULL",
+            (engine,),
         ).fetchall()
     if not rows:
         return np.empty((0, 0)), np.array([]), []
@@ -159,13 +169,13 @@ def get_labeled_data():
     return X, y, ids
 
 
-def get_good_reference_data():
-    """Features + ids de todas las indicaciones confirmadas como buenas,
-    usadas para la comparación visual con la más parecida."""
+def get_good_reference_data(engine: str):
+    """Features + ids de todas las indicaciones de ese motor confirmadas
+    como buenas, usadas para la comparación visual con la más parecida."""
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, features FROM images WHERE final_label = ?",
-            (LABEL_GOOD,),
+            "SELECT id, features FROM images WHERE engine = ? AND final_label = ?",
+            (engine, LABEL_GOOD),
         ).fetchall()
     if not rows:
         return np.empty((0, 0)), []
@@ -178,24 +188,28 @@ def deserialize_features(blob: bytes) -> np.ndarray:
     return _deserialize(blob)
 
 
-def counts() -> dict:
+def counts(engine: str) -> dict:
     with get_connection() as conn:
-        total = conn.execute("SELECT COUNT(*) c FROM images").fetchone()["c"]
+        total = conn.execute(
+            "SELECT COUNT(*) c FROM images WHERE engine = ?", (engine,)
+        ).fetchone()["c"]
         good_refs = conn.execute(
-            "SELECT COUNT(*) c FROM images WHERE role = 'good_reference'"
+            "SELECT COUNT(*) c FROM images WHERE engine = ? AND role = 'good_reference'", (engine,)
         ).fetchone()["c"]
         reviewed = conn.execute(
-            "SELECT COUNT(*) c FROM images WHERE role = 'review'"
+            "SELECT COUNT(*) c FROM images WHERE engine = ? AND role = 'review'", (engine,)
         ).fetchone()["c"]
         feedback_given = conn.execute(
-            "SELECT COUNT(*) c FROM images WHERE role = 'review' AND final_label IS NOT NULL"
+            "SELECT COUNT(*) c FROM images WHERE engine = ? AND role = 'review' AND final_label IS NOT NULL",
+            (engine,),
         ).fetchone()["c"]
         corrections = conn.execute(
             """
             SELECT COUNT(*) c FROM images
-            WHERE role = 'review' AND final_label IS NOT NULL
+            WHERE engine = ? AND role = 'review' AND final_label IS NOT NULL
               AND predicted_label IS NOT NULL AND predicted_label != final_label
-            """
+            """,
+            (engine,),
         ).fetchone()["c"]
     return {
         "total": total,

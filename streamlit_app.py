@@ -1,10 +1,20 @@
+from functools import partial
+
 import pandas as pd
 import streamlit as st
 
-from defect_detector import io_utils, storage
-from defect_detector.config import MIN_SUPERVISED_DEFECT, MIN_SUPERVISED_GOOD, MIN_TRAIN_GOOD
+from defect_detector import features, features_dl, io_utils, storage
+from defect_detector.config import (
+    ENGINE_CLASSIC,
+    ENGINE_DL,
+    ENGINE_LABELS,
+    ENGINES,
+    MIN_SUPERVISED_DEFECT,
+    MIN_SUPERVISED_GOOD,
+    MIN_TRAIN_GOOD,
+    model_path_for,
+)
 from defect_detector.explain import anomaly_row_mask, highlight_patch, row_profile
-from defect_detector.features import extract_features
 from defect_detector.model import DefectModel, find_nearest_good_many
 from defect_detector.scanner import scan_image
 
@@ -17,25 +27,39 @@ MODE_LABELS = {
     "supervisado": "Clasificador supervisado (usa tu feedback)",
 }
 
+EXTRACTORS = {
+    ENGINE_CLASSIC: features.extract_features,
+    ENGINE_DL: features_dl.extract_features,
+}
 
-def get_model() -> DefectModel:
-    if "model" not in st.session_state:
-        st.session_state.model = DefectModel.load()
-    return st.session_state.model
+
+def get_engine() -> str:
+    return st.session_state.get("engine", ENGINE_CLASSIC)
 
 
-def retrain_model() -> DefectModel:
-    X, y, _ids = storage.get_labeled_data()
+def extract_features_for(engine: str, patch_bgr):
+    return EXTRACTORS[engine](patch_bgr)
+
+
+def get_model(engine: str) -> DefectModel:
+    models = st.session_state.setdefault("models", {})
+    if engine not in models:
+        models[engine] = DefectModel.load(model_path_for(engine))
+    return models[engine]
+
+
+def retrain_model(engine: str) -> DefectModel:
+    X, y, _ids = storage.get_labeled_data(engine)
     model = DefectModel()
     model.train(X, y)
-    model.save()
-    st.session_state.model = model
+    model.save(model_path_for(engine))
+    st.session_state.setdefault("models", {})[engine] = model
     return model
 
 
-def apply_feedback(image_id: int, final_label: str):
+def apply_feedback(image_id: int, final_label: str, engine: str):
     storage.set_feedback(image_id, final_label)
-    retrain_model()
+    retrain_model(engine)
     st.rerun()
 
 
@@ -62,7 +86,7 @@ def render_crop_tool(image_bgr, key_prefix: str, defaults=(0.35, 0.35, 0.3, 0.3)
     return bbox, patch
 
 
-def render_feedback_controls(record):
+def render_feedback_controls(record, engine: str):
     st.caption(
         f"Predicción: **{LABELS.get(record['predicted_label'], '—')}** "
         f"({record['predicted_confidence']:.0%} confianza, método: "
@@ -79,14 +103,14 @@ def render_feedback_controls(record):
     c1, c2, c3 = st.columns(3)
     if c1.button("✔️ Correcto", key=f"ok_{record['id']}", use_container_width=True):
         if record["predicted_label"]:
-            apply_feedback(record["id"], record["predicted_label"])
+            apply_feedback(record["id"], record["predicted_label"], engine)
     if c2.button("✏️ Es BUENA", key=f"good_{record['id']}", use_container_width=True):
-        apply_feedback(record["id"], "good")
+        apply_feedback(record["id"], "good", engine)
     if c3.button("✏️ Tiene DEFECTO", key=f"defect_{record['id']}", use_container_width=True):
-        apply_feedback(record["id"], "defect")
+        apply_feedback(record["id"], "defect", engine)
 
 
-def page_referencias():
+def page_referencias(engine: str):
     st.header("📥 Indicaciones de referencia (buenas)")
     st.write(
         "Sube una tira de inspección y marca sobre ella una o varias zonas "
@@ -119,20 +143,21 @@ def page_referencias():
 
         if st.button("Guardar esta zona como buena", type="primary"):
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
-            patch_hash = io_utils.patch_hash(parent_hash, bbox)
+            patch_hash = io_utils.patch_hash(parent_hash, bbox, engine)
             if storage.image_exists(patch_hash):
                 st.info("Esa zona ya estaba guardada.")
             else:
-                feats = extract_features(patch)
+                with st.spinner("Extrayendo características..."):
+                    feats = extract_features_for(engine, patch)
                 storage.add_image(
                     filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
-                    image_hash=patch_hash, role="good_reference", features=feats,
+                    image_hash=patch_hash, role="good_reference", engine=engine, features=feats,
                 )
-                model = retrain_model()
+                model = retrain_model(engine)
                 st.success(f"Zona guardada como referencia buena. Modelo actualizado ({MODE_LABELS[model.mode]}).")
 
-    refs = storage.get_records(role="good_reference")
-    st.subheader(f"Referencias guardadas ({len(refs)})")
+    refs = storage.get_records(role="good_reference", engine=engine)
+    st.subheader(f"Referencias guardadas con este motor ({len(refs)})")
     if refs:
         cols = st.columns(6)
         for i, r in enumerate(refs):
@@ -140,16 +165,16 @@ def page_referencias():
             if patch is not None:
                 cols[i % 6].image(io_utils.bgr_to_rgb(patch), caption=r["filename"], use_container_width=True)
     else:
-        st.info("Aún no hay referencias buenas.")
+        st.info("Aún no hay referencias buenas con este motor.")
 
 
-def page_analizar():
+def page_analizar(engine: str):
     st.header("🔍 Analizar imágenes")
-    model = get_model()
+    model = get_model(engine)
 
     if not model.is_trained():
         st.warning(
-            f"El modelo todavía no está entrenado: guarda al menos {MIN_TRAIN_GOOD} "
+            f"El modelo de este motor todavía no está entrenado: guarda al menos {MIN_TRAIN_GOOD} "
             "referencias buenas en la pestaña anterior antes de escanear una imagen."
         )
 
@@ -179,21 +204,23 @@ def page_analizar():
 
         if st.button("🔎 Escanear imagen automáticamente", type="primary", disabled=not model.is_trained()):
             dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
+            extractor = partial(extract_features_for, engine)
             with st.spinner("Recorriendo la imagen con la ventana deslizante..."):
                 results = scan_image(
                     img_bgr, model, win_h_frac=win_h_pct / 100, top_k=top_k,
                     include_start_zone=include_start_zone, start_zone_frac=start_zone_pct / 100,
+                    extract_features=extractor,
                 )
             new_ids = []
             origins = {}
             for bbox, feats, _score, origen in results:
-                patch_hash = io_utils.patch_hash(parent_hash, bbox)
+                patch_hash = io_utils.patch_hash(parent_hash, bbox, engine)
                 if storage.image_exists(patch_hash):
                     continue
                 label, confidence, method = model.predict(feats)
                 image_id = storage.add_image(
                     filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
-                    image_hash=patch_hash, role="review", features=feats,
+                    image_hash=patch_hash, role="review", engine=engine, features=feats,
                     predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                 )
                 new_ids.append(image_id)
@@ -210,15 +237,16 @@ def page_analizar():
             bbox_manual, patch_manual = render_crop_tool(img_bgr, "manual_crop")
             if st.button("Analizar esta zona"):
                 dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
-                patch_hash = io_utils.patch_hash(parent_hash, bbox_manual)
+                patch_hash = io_utils.patch_hash(parent_hash, bbox_manual, engine)
                 if storage.image_exists(patch_hash):
                     st.info("Esa zona ya había sido analizada.")
                 else:
-                    feats = extract_features(patch_manual)
+                    with st.spinner("Extrayendo características..."):
+                        feats = extract_features_for(engine, patch_manual)
                     label, confidence, method = model.predict(feats)
                     image_id = storage.add_image(
                         filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox_manual,
-                        image_hash=patch_hash, role="review", features=feats,
+                        image_hash=patch_hash, role="review", engine=engine, features=feats,
                         predicted_label=label, predicted_confidence=confidence, predicted_method=method,
                     )
                     st.session_state.last_analyzed_ids = [image_id]
@@ -235,10 +263,10 @@ def page_analizar():
     if last_ids:
         st.subheader("Resultados del último análisis")
         last_origins = st.session_state.get("last_analyzed_origins", {})
-        good_X, good_ids = storage.get_good_reference_data()
+        good_X, good_ids = storage.get_good_reference_data(engine)
         for image_id in last_ids:
             record = storage.get_record(image_id)
-            if record is None:
+            if record is None or record["engine"] != engine:
                 continue
             with st.container(border=True):
                 col_img, col_ref, col_info = st.columns([1, 1, 1.4])
@@ -281,13 +309,13 @@ def page_analizar():
                     col_ref.info("Sin referencias buenas para comparar todavía.")
 
                 with col_info:
-                    render_feedback_controls(record)
+                    render_feedback_controls(record, engine)
 
     st.divider()
     st.subheader("Indicaciones pendientes de confirmar")
-    pending = [r for r in storage.get_records(role="review") if r["final_label"] is None]
+    pending = [r for r in storage.get_records(role="review", engine=engine) if r["final_label"] is None]
     if not pending:
-        st.info("No hay indicaciones pendientes de confirmación.")
+        st.info("No hay indicaciones pendientes de confirmación con este motor.")
     else:
         for record in pending:
             with st.expander(f"{record['filename']} — predicción: {LABELS.get(record['predicted_label'], '—')}"):
@@ -296,13 +324,13 @@ def page_analizar():
                 if patch is not None:
                     c1.image(io_utils.bgr_to_rgb(patch), use_container_width=True)
                 with c2:
-                    render_feedback_controls(record)
+                    render_feedback_controls(record, engine)
 
 
-def page_estado():
+def page_estado(engine: str):
     st.header("🧠 Estado del modelo")
-    model = get_model()
-    c = storage.counts()
+    model = get_model(engine)
+    c = storage.counts(engine)
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Referencias buenas", c["good_refs"])
@@ -324,12 +352,15 @@ def page_estado():
         )
 
     if st.button("🔄 Reentrenar manualmente"):
-        model = retrain_model()
+        model = retrain_model(engine)
         st.success(f"Modelo reentrenado ({MODE_LABELS[model.mode]}).")
 
     st.divider()
     st.subheader("🗑️ Zona de peligro")
-    st.caption("Borra todas las imágenes, el feedback y el modelo guardados en este equipo.")
+    st.caption(
+        "Borra TODAS las imágenes, el feedback y los modelos de los DOS motores "
+        "guardados en este equipo (no solo el motor actual)."
+    )
     confirm = st.checkbox("Entiendo que esto borra todos los datos locales de forma permanente")
     if st.button("Reiniciar todo", disabled=not confirm, type="secondary"):
         import shutil
@@ -337,17 +368,17 @@ def page_estado():
         from defect_detector.config import DATA_DIR
 
         shutil.rmtree(DATA_DIR, ignore_errors=True)
-        st.session_state.pop("model", None)
+        st.session_state.pop("models", None)
         st.session_state.pop("last_analyzed_ids", None)
         st.session_state.pop("last_analyzed_origins", None)
         st.success("Datos locales eliminados. Recarga la página para empezar de nuevo.")
 
 
-def page_historial():
+def page_historial(engine: str):
     st.header("📊 Historial y aprendizaje")
-    records = storage.get_records()
+    records = storage.get_records(engine=engine)
     if not records:
-        st.info("Todavía no hay indicaciones registradas.")
+        st.info("Todavía no hay indicaciones registradas con este motor.")
         return
 
     df = pd.DataFrame([dict(r) for r in records])
@@ -376,6 +407,24 @@ def main():
         "(carpeta local `data/`). Nada se sube a internet."
     )
 
+    engine = st.sidebar.radio(
+        "Motor de análisis",
+        ENGINES,
+        format_func=lambda e: ENGINE_LABELS[e],
+        key="engine",
+    )
+    if engine == ENGINE_DL:
+        st.sidebar.caption(
+            "La primera vez que analices algo con este motor, se descargan una vez "
+            "los pesos de una red preentrenada (~10 MB, descarga genérica del modelo, "
+            "no de tus imágenes). A partir de ahí todo corre en local, igual que el "
+            "motor clásico."
+        )
+    st.sidebar.caption(
+        "Cada motor guarda sus propias referencias, indicaciones y modelo por separado: "
+        "no se mezclan entre sí."
+    )
+
     page = st.sidebar.radio(
         "Navegación",
         [
@@ -387,13 +436,13 @@ def main():
     )
 
     if page == "📥 Referencias buenas":
-        page_referencias()
+        page_referencias(engine)
     elif page == "🔍 Analizar imágenes":
-        page_analizar()
+        page_analizar(engine)
     elif page == "🧠 Estado del modelo":
-        page_estado()
+        page_estado(engine)
     else:
-        page_historial()
+        page_historial(engine)
 
 
 main()

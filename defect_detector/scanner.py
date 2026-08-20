@@ -15,11 +15,13 @@ puntuación de anomalía alta: así nunca se pasa por alto y el modelo
 acumula muchos ejemplos de esa posición exacta, la más crítica.
 """
 
+from typing import Callable
+
 import cv2
 import numpy as np
 
 from . import io_utils
-from .features import extract_features
+from .features import extract_features as _default_extract_features
 
 BBox = tuple[float, float, float, float]
 
@@ -86,7 +88,7 @@ def _non_max_suppress(candidates: list, iou_thresh: float, top_k: int) -> list:
     return selected
 
 
-def _score_window(image_bgr: np.ndarray, model, bbox: BBox):
+def _score_window(image_bgr: np.ndarray, model, bbox: BBox, extract_features: Callable):
     patch = io_utils.crop_relative(image_bgr, bbox)
     if patch.size == 0:
         return None
@@ -99,20 +101,25 @@ def scan_image(
     image_bgr: np.ndarray, model, win_h_frac: float = 0.06, overlap: float = 0.5,
     top_k: int = 8, iou_thresh: float = 0.25,
     include_start_zone: bool = True, start_zone_frac: float = 0.18,
+    extract_features: Callable = _default_extract_features,
 ) -> list[tuple[BBox, np.ndarray, float, str]]:
     """Devuelve hasta `top_k` recuadros (bbox, features, puntuación de
     anomalía, origen), ordenados de más a menos sospechosos y sin solapes
     fuertes entre sí. `origen` es "arranque" para la ventana fija del
     inicio del tubo (solape lateral) o "barrido" para las encontradas por
     la ventana deslizante. Si `include_start_zone` está activo, la zona de
-    arranque se añade siempre, independientemente de su puntuación."""
+    arranque se añade siempre, independientemente de su puntuación.
+
+    `extract_features` es inyectable para poder usar este mismo escaneo
+    con el motor clásico o con el de red neuronal, según qué modelo se
+    esté puntuando (deben ser consistentes entre sí)."""
     h, w = image_bgr.shape[:2]
     bands = detect_bands(image_bgr)
 
     candidates = []
     for x0, x1 in bands:
         for bbox in sliding_windows_for_band(x0, x1, h, win_h_frac, overlap):
-            item = _score_window(image_bgr, model, bbox)
+            item = _score_window(image_bgr, model, bbox, extract_features)
             if item is not None:
                 candidates.append((*item, "barrido"))
 
@@ -126,7 +133,7 @@ def scan_image(
         # encontrado el barrido general.
         start_items = []
         for x0, x1 in bands:
-            item = _score_window(image_bgr, model, (x0, 0.0, x1 - x0, start_zone_frac))
+            item = _score_window(image_bgr, model, (x0, 0.0, x1 - x0, start_zone_frac), extract_features)
             if item is not None:
                 start_items.append((*item, "arranque"))
         selected = start_items + selected

@@ -4,3 +4,6 @@ scikit-image
 scikit-learn
 numpy
 pandas
+torch
+torchvision
+pillow

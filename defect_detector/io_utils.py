@@ -55,6 +55,9 @@ def crop_relative(image_bgr: np.ndarray, bbox_rel: tuple[float, float, float, fl
     return image_bgr[y0:y1, x0:x1]
 
 
-def patch_hash(parent_hash: str, bbox_rel: tuple[float, float, float, float]) -> str:
+def patch_hash(parent_hash: str, bbox_rel: tuple[float, float, float, float], engine: str) -> str:
+    """Incluye el motor en el hash: la misma zona analizada con los dos
+    motores debe guardarse como dos indicaciones independientes, porque
+    sus características (y por tanto sus modelos) no son compatibles."""
     coords = "_".join(f"{v:.4f}" for v in bbox_rel)
-    return hashlib.sha1(f"{parent_hash}:{coords}".encode()).hexdigest()
+    return hashlib.sha1(f"{parent_hash}:{coords}:{engine}".encode()).hexdigest()
