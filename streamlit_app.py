@@ -2,11 +2,13 @@ import pandas as pd
 import streamlit as st
 
 from defect_detector import io_utils, storage
+from defect_detector.config import MIN_SUPERVISED_DEFECT, MIN_SUPERVISED_GOOD, MIN_TRAIN_GOOD
 from defect_detector.explain import diff_heatmap
 from defect_detector.features import extract_features
+from defect_detector.markers import detect_red_regions, dominant_marker_color
 from defect_detector.model import DefectModel, find_nearest_good
 
-st.set_page_config(page_title="Control de calidad visual", page_icon="🔍", layout="wide")
+st.set_page_config(page_title="Control de calidad de tubos", page_icon="🔍", layout="wide")
 
 LABELS = {"good": "✅ Buena", "defect": "❌ Defecto"}
 MODE_LABELS = {
@@ -37,7 +39,32 @@ def apply_feedback(image_id: int, final_label: str):
     st.rerun()
 
 
+def load_patch_image(record):
+    """Reconstruye el recorte (indicación) a partir de la tira completa
+    guardada y el recuadro relativo almacenado en la base de datos."""
+    parent = io_utils.load_image_bgr_from_path(record["parent_filepath"])
+    if parent is None:
+        return None
+    bbox = (record["crop_x"], record["crop_y"], record["crop_w"], record["crop_h"])
+    return io_utils.crop_relative(parent, bbox)
+
+
+def render_crop_tool(image_bgr, key_prefix: str, defaults=(0.35, 0.35, 0.3, 0.3)):
+    """Herramienta de recorte por porcentajes, con vista previa en vivo."""
+    c1, c2 = st.columns(2)
+    x_pct = c1.slider("Inicio X (%)", 0, 99, int(defaults[0] * 100), key=f"{key_prefix}_x")
+    y_pct = c2.slider("Inicio Y (%)", 0, 99, int(defaults[1] * 100), key=f"{key_prefix}_y")
+    w_pct = c1.slider("Ancho (%)", 1, 100 - x_pct, min(int(defaults[2] * 100), 100 - x_pct), key=f"{key_prefix}_w")
+    h_pct = c2.slider("Alto (%)", 1, 100 - y_pct, min(int(defaults[3] * 100), 100 - y_pct), key=f"{key_prefix}_h")
+    bbox = (x_pct / 100, y_pct / 100, w_pct / 100, h_pct / 100)
+    patch = io_utils.crop_relative(image_bgr, bbox)
+    st.image(io_utils.bgr_to_rgb(patch), caption="Vista previa del recorte", width=300)
+    return bbox, patch
+
+
 def render_feedback_controls(record):
+    marker = record["marker_color"] or "ninguna"
+    st.caption(f"Marca del sistema en esta zona: **{marker}**")
     st.caption(
         f"Predicción: **{LABELS.get(record['predicted_label'], '—')}** "
         f"({record['predicted_confidence']:.0%} confianza, método: "
@@ -62,50 +89,61 @@ def render_feedback_controls(record):
 
 
 def page_referencias():
-    st.header("📥 Imágenes de referencia (buenas)")
+    st.header("📥 Indicaciones de referencia (buenas)")
     st.write(
-        "Sube ejemplos de producto **sin defectos**. El sistema aprende de ellas "
-        "cómo es 'lo normal' y a partir de ahí compara el resto."
+        "Sube una tira de inspección y marca sobre ella una o varias zonas "
+        "**sin defecto** (sin pliegue ni soldadura abierta). El sistema aprende "
+        "de esas zonas cómo es la textura normal del tubo."
     )
 
     uploaded = st.file_uploader(
-        "Imágenes buenas", type=["png", "jpg", "jpeg", "bmp"],
-        accept_multiple_files=True, key="upload_good",
+        "Tira de inspección", type=["png", "jpg", "jpeg", "bmp"], key="upload_good_parent",
     )
-    if uploaded and st.button("Guardar y actualizar modelo", type="primary"):
-        added = 0
-        for f in uploaded:
-            file_bytes = f.getvalue()
-            image_hash = io_utils.compute_hash(file_bytes)
-            if storage.image_exists(image_hash):
-                continue
-            img_bgr = io_utils.decode_image_bgr(file_bytes)
-            if img_bgr is None:
-                st.warning(f"No se pudo leer '{f.name}', se omite.")
-                continue
-            dest, _ = io_utils.save_image_bytes(file_bytes, f.name, "good_reference")
-            feats = extract_features(img_bgr)
-            storage.add_image(
-                filename=f.name, filepath=str(dest), image_hash=image_hash,
-                role="good_reference", features=feats,
-            )
-            added += 1
-        if added:
-            model = retrain_model()
-            st.success(f"{added} imagen(es) de referencia añadidas. Modelo actualizado ({MODE_LABELS[model.mode]}).")
+    if uploaded is not None:
+        file_bytes = uploaded.getvalue()
+        parent_hash = io_utils.compute_hash(file_bytes)
+        img_bgr = io_utils.decode_image_bgr(file_bytes)
+        if img_bgr is None:
+            st.error("No se pudo leer la imagen.")
+            return
+
+        st.image(io_utils.bgr_to_rgb(img_bgr), caption=uploaded.name, use_container_width=True)
+
+        modo = st.radio(
+            "¿Qué quieres guardar como buena?",
+            ["Recortar una zona concreta", "La imagen completa"],
+            key="good_mode",
+        )
+        if modo == "La imagen completa":
+            bbox, patch = (0.0, 0.0, 1.0, 1.0), img_bgr
         else:
-            st.info("No se añadió ninguna imagen nueva (ya estaban cargadas).")
+            bbox, patch = render_crop_tool(img_bgr, "good_crop")
+
+        if st.button("Guardar esta zona como buena", type="primary"):
+            dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
+            patch_hash = io_utils.patch_hash(parent_hash, bbox)
+            if storage.image_exists(patch_hash):
+                st.info("Esa zona ya estaba guardada.")
+            else:
+                feats = extract_features(patch)
+                marker = dominant_marker_color(patch)
+                storage.add_image(
+                    filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
+                    image_hash=patch_hash, role="good_reference", features=feats, marker_color=marker,
+                )
+                model = retrain_model()
+                st.success(f"Zona guardada como referencia buena. Modelo actualizado ({MODE_LABELS[model.mode]}).")
 
     refs = storage.get_records(role="good_reference")
     st.subheader(f"Referencias guardadas ({len(refs)})")
     if refs:
         cols = st.columns(6)
         for i, r in enumerate(refs):
-            img = io_utils.load_image_bgr_from_path(r["filepath"])
-            if img is not None:
-                cols[i % 6].image(io_utils.bgr_to_rgb(img), caption=r["filename"], use_container_width=True)
+            patch = load_patch_image(r)
+            if patch is not None:
+                cols[i % 6].image(io_utils.bgr_to_rgb(patch), caption=r["filename"], use_container_width=True)
     else:
-        st.info("Aún no hay imágenes de referencia.")
+        st.info("Aún no hay referencias buenas.")
 
 
 def page_analizar():
@@ -114,60 +152,96 @@ def page_analizar():
 
     if not model.is_trained():
         st.warning(
-            "El modelo todavía no está entrenado: sube al menos "
-            f"{3} imágenes de referencia buenas en la pestaña anterior."
+            f"El modelo todavía no está entrenado: guarda al menos {MIN_TRAIN_GOOD} "
+            "referencias buenas en la pestaña anterior para tener una primera predicción "
+            "(mientras tanto puedes seguir añadiendo y etiquetando indicaciones)."
         )
 
     uploaded = st.file_uploader(
-        "Imágenes a analizar", type=["png", "jpg", "jpeg", "bmp"],
-        accept_multiple_files=True, key="upload_review",
+        "Tira a analizar", type=["png", "jpg", "jpeg", "bmp"], key="upload_review_parent",
     )
-    if uploaded and st.button("Analizar", type="primary", disabled=not model.is_trained()):
-        good_X, good_ids, good_paths = storage.get_good_reference_data()
-        new_ids = []
-        for f in uploaded:
-            file_bytes = f.getvalue()
-            image_hash = io_utils.compute_hash(file_bytes)
-            if storage.image_exists(image_hash):
-                continue
-            img_bgr = io_utils.decode_image_bgr(file_bytes)
-            if img_bgr is None:
-                st.warning(f"No se pudo leer '{f.name}', se omite.")
-                continue
-            dest, _ = io_utils.save_image_bytes(file_bytes, f.name, "review")
-            feats = extract_features(img_bgr)
-            label, confidence, method = model.predict(feats)
-            image_id = storage.add_image(
-                filename=f.name, filepath=str(dest), image_hash=image_hash,
-                role="review", features=feats,
-                predicted_label=label, predicted_confidence=confidence, predicted_method=method,
-            )
-            new_ids.append(image_id)
-        if new_ids:
-            st.session_state.last_analyzed_ids = new_ids
-        else:
-            st.info("No se analizó ninguna imagen nueva (ya estaban cargadas).")
+    if uploaded is not None:
+        file_bytes = uploaded.getvalue()
+        parent_hash = io_utils.compute_hash(file_bytes)
+        img_bgr = io_utils.decode_image_bgr(file_bytes)
+        if img_bgr is None:
+            st.error("No se pudo leer la imagen.")
+            return
+
+        st.image(io_utils.bgr_to_rgb(img_bgr), caption=uploaded.name, use_container_width=True)
+
+        if st.button("🔎 Detectar indicaciones en rojo y analizar", type="primary"):
+            dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
+            boxes = detect_red_regions(img_bgr)
+            new_ids = []
+            for bbox in boxes:
+                patch_hash = io_utils.patch_hash(parent_hash, bbox)
+                if storage.image_exists(patch_hash):
+                    continue
+                patch = io_utils.crop_relative(img_bgr, bbox)
+                feats = extract_features(patch)
+                label, confidence, method = model.predict(feats)
+                marker = dominant_marker_color(patch)
+                image_id = storage.add_image(
+                    filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox,
+                    image_hash=patch_hash, role="review", features=feats, marker_color=marker,
+                    predicted_label=label, predicted_confidence=confidence, predicted_method=method,
+                )
+                new_ids.append(image_id)
+            if not boxes:
+                st.info("No se detectó ninguna marca roja en esta imagen. Puedes añadir una indicación manualmente abajo.")
+            elif new_ids:
+                st.session_state.last_analyzed_ids = new_ids
+            else:
+                st.info("Las indicaciones detectadas ya habían sido analizadas antes.")
+
+        with st.expander("➕ Añadir indicación manualmente (si el detector no la marcó)"):
+            bbox_manual, patch_manual = render_crop_tool(img_bgr, "manual_crop")
+            if st.button("Analizar esta zona"):
+                dest, _ = io_utils.save_parent_image(file_bytes, uploaded.name)
+                patch_hash = io_utils.patch_hash(parent_hash, bbox_manual)
+                if storage.image_exists(patch_hash):
+                    st.info("Esa zona ya había sido analizada.")
+                else:
+                    feats = extract_features(patch_manual)
+                    label, confidence, method = model.predict(feats)
+                    marker = dominant_marker_color(patch_manual)
+                    image_id = storage.add_image(
+                        filename=uploaded.name, parent_filepath=str(dest), crop_bbox=bbox_manual,
+                        image_hash=patch_hash, role="review", features=feats, marker_color=marker,
+                        predicted_label=label, predicted_confidence=confidence, predicted_method=method,
+                    )
+                    st.session_state.last_analyzed_ids = [image_id]
+                    st.rerun()
 
     last_ids = st.session_state.get("last_analyzed_ids", [])
     if last_ids:
         st.subheader("Resultados del último análisis")
-        good_X, good_ids, good_paths = storage.get_good_reference_data()
+        good_X, good_ids = storage.get_good_reference_data()
         for image_id in last_ids:
             record = storage.get_record(image_id)
             if record is None:
                 continue
             with st.container(border=True):
                 col_img, col_ref, col_info = st.columns([1, 1, 1.4])
-                img_bgr = io_utils.load_image_bgr_from_path(record["filepath"])
-                col_img.image(io_utils.bgr_to_rgb(img_bgr), caption=record["filename"], use_container_width=True)
-
-                nearest_id, nearest_path, dist = find_nearest_good(
-                    storage.deserialize_features(record["features"]), good_X, good_ids, good_paths
+                patch = load_patch_image(record)
+                col_img.image(
+                    io_utils.bgr_to_rgb(patch),
+                    caption=f"{record['filename']} · marca: {record['marker_color'] or 'ninguna'}",
+                    use_container_width=True,
                 )
-                if nearest_path:
-                    ref_img_bgr = io_utils.load_image_bgr_from_path(nearest_path)
-                    score, overlay_rgb = diff_heatmap(img_bgr, ref_img_bgr)
-                    col_ref.image(overlay_rgb, caption=f"Comparación con referencia más parecida (similitud {score:.0%})", use_container_width=True)
+
+                nearest_id, dist = find_nearest_good(
+                    storage.deserialize_features(record["features"]), good_X, good_ids
+                )
+                if nearest_id:
+                    nearest_patch = load_patch_image(storage.get_record(nearest_id))
+                    score, overlay_rgb = diff_heatmap(patch, nearest_patch)
+                    col_ref.image(
+                        overlay_rgb,
+                        caption=f"Comparación con referencia más parecida (similitud {score:.0%})",
+                        use_container_width=True,
+                    )
                 else:
                     col_ref.info("Sin referencias buenas para comparar todavía.")
 
@@ -175,16 +249,17 @@ def page_analizar():
                     render_feedback_controls(record)
 
     st.divider()
-    st.subheader("Historial de revisadas pendientes de confirmar")
+    st.subheader("Indicaciones pendientes de confirmar")
     pending = [r for r in storage.get_records(role="review") if r["final_label"] is None]
     if not pending:
-        st.info("No hay imágenes pendientes de confirmación.")
+        st.info("No hay indicaciones pendientes de confirmación.")
     else:
         for record in pending:
             with st.expander(f"{record['filename']} — predicción: {LABELS.get(record['predicted_label'], '—')}"):
-                img_bgr = io_utils.load_image_bgr_from_path(record["filepath"])
+                patch = load_patch_image(record)
                 c1, c2 = st.columns([1, 2])
-                c1.image(io_utils.bgr_to_rgb(img_bgr), use_container_width=True)
+                if patch is not None:
+                    c1.image(io_utils.bgr_to_rgb(patch), use_container_width=True)
                 with c2:
                     render_feedback_controls(record)
 
@@ -195,10 +270,21 @@ def page_estado():
     c = storage.counts()
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Imágenes de referencia", c["good_refs"])
-    col2.metric("Imágenes analizadas", c["reviewed"])
+    col1.metric("Referencias buenas", c["good_refs"])
+    col2.metric("Indicaciones analizadas", c["reviewed"])
     col3.metric("Con feedback confirmado", c["feedback_given"])
     col4.metric("Correcciones hechas", c["corrections"])
+
+    reliability = storage.red_marker_reliability()
+    if reliability:
+        st.metric(
+            "Fiabilidad de la marca roja del sistema",
+            f"{reliability['ratio_defect']:.0%}",
+            help=(
+                f"De {reliability['n']} indicaciones marcadas en rojo y confirmadas por ti, "
+                f"{reliability['n_defect']} resultaron ser defecto real."
+            ),
+        )
 
     st.write(f"**Modo actual:** {MODE_LABELS[model.mode]}")
     if model.trained_at:
@@ -207,10 +293,10 @@ def page_estado():
 
     if model.mode == "anomalia":
         st.info(
-            "El sistema todavía solo compara contra las imágenes buenas. "
-            "En cuanto confirmes o corrijas al menos 5 imágenes buenas y 3 con "
-            "defecto en la pestaña 'Analizar', pasará a modo supervisado, "
-            "normalmente más preciso."
+            "El sistema todavía solo compara contra las indicaciones buenas. "
+            f"En cuanto confirmes o corrijas al menos {MIN_SUPERVISED_GOOD} buenas y "
+            f"{MIN_SUPERVISED_DEFECT} con defecto en la pestaña 'Analizar', pasará a modo "
+            "supervisado, normalmente más preciso."
         )
 
     if st.button("🔄 Reentrenar manualmente"):
@@ -236,13 +322,13 @@ def page_historial():
     st.header("📊 Historial y aprendizaje")
     records = storage.get_records()
     if not records:
-        st.info("Todavía no hay imágenes registradas.")
+        st.info("Todavía no hay indicaciones registradas.")
         return
 
     df = pd.DataFrame([dict(r) for r in records])
     df["created_at"] = pd.to_datetime(df["created_at"])
     display_cols = [
-        "created_at", "filename", "role", "predicted_label",
+        "created_at", "filename", "role", "marker_color", "predicted_label",
         "predicted_confidence", "predicted_method", "final_label",
     ]
     st.dataframe(df[display_cols].sort_values("created_at", ascending=False), use_container_width=True, hide_index=True)
@@ -255,11 +341,11 @@ def page_historial():
         st.subheader("Precisión acumulada del sistema a medida que le das feedback")
         st.line_chart(reviewed.set_index("created_at")["precision_acumulada"])
     else:
-        st.caption("Da feedback sobre al menos 3 imágenes analizadas para ver la evolución de la precisión.")
+        st.caption("Da feedback sobre al menos 3 indicaciones analizadas para ver la evolución de la precisión.")
 
 
 def main():
-    st.title("🔍 Control de calidad visual")
+    st.title("🔍 Control de calidad de tubos")
     st.caption(
         "Todas las imágenes y datos se procesan y guardan únicamente en este equipo "
         "(carpeta local `data/`). Nada se sube a internet."

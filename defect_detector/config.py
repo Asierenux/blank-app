@@ -9,13 +9,12 @@ from pathlib import Path
 
 DATA_DIR = Path("data")
 IMAGES_DIR = DATA_DIR / "images"
-GOOD_DIR = IMAGES_DIR / "good"
-REVIEW_DIR = IMAGES_DIR / "review"
+PARENTS_DIR = IMAGES_DIR / "parents"  # tiras completas tal cual se suben
 DB_PATH = DATA_DIR / "store.db"
 MODEL_PATH = DATA_DIR / "model.pkl"
 
 # Tamaño mínimo de datos etiquetados para poder entrenar el detector de
-# anomalías (solo con imágenes "buenas").
+# anomalías (solo con indicaciones/recortes buenos).
 MIN_TRAIN_GOOD = 3
 
 # A partir de cuántas muestras de cada clase se pasa a un clasificador
@@ -25,3 +24,8 @@ MIN_SUPERVISED_DEFECT = 3
 
 LABEL_GOOD = "good"
 LABEL_DEFECT = "defect"
+
+MARKER_NONE = "ninguno"
+MARKER_RED = "rojo"
+MARKER_YELLOW = "amarillo"
+MARKER_GREEN = "verde"

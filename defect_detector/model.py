@@ -118,12 +118,12 @@ class DefectModel:
         return DefectModel()
 
 
-def find_nearest_good(x: np.ndarray, good_X: np.ndarray, good_ids: list, good_paths: list):
-    """Imagen buena más parecida (distancia euclídea en el espacio de
-    características), usada como referencia visual para explicar el porqué
-    de una predicción."""
+def find_nearest_good(x: np.ndarray, good_X: np.ndarray, good_ids: list):
+    """Id de la indicación buena más parecida (distancia euclídea en el
+    espacio de características), usada como referencia visual para
+    explicar el porqué de una predicción."""
     if good_X is None or len(good_X) == 0:
-        return None, None, None
+        return None, None
     dists = np.linalg.norm(good_X - x.reshape(1, -1), axis=1)
     idx = int(np.argmin(dists))
-    return good_ids[idx], good_paths[idx], float(dists[idx])
+    return good_ids[idx], float(dists[idx])
