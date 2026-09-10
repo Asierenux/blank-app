@@ -2,6 +2,11 @@ import streamlit as st
 
 import db
 
+# Identificador de versión visible en pantalla, para poder comprobar de un
+# vistazo si una instalación está actualizada a la última versión del
+# código (compáralo con el commit más reciente en GitHub).
+VERSION = "v7 · login + tarjetas por rol (10/09/2026)"
+
 st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
 
 if "auth_user" not in st.session_state:
@@ -10,6 +15,7 @@ if "auth_user" not in st.session_state:
 
 def pantalla_login():
     st.title("🛞 Control de Verificación de Carcasas y Bandages")
+    st.caption(f"Versión: {VERSION}")
 
     if db.count_usuarios() == 0:
         st.info(
@@ -57,6 +63,7 @@ with st.sidebar:
     if st.button("Cerrar sesión"):
         st.session_state.auth_user = None
         st.rerun()
+    st.caption(VERSION)
 
 registro = st.Page(
     "views/registro_verificacion.py", title="Registro de verificación", icon="✅",
