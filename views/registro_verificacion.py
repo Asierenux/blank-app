@@ -108,8 +108,15 @@ with st.container(border=True):
             value=cantidad_calculada if cantidad_calculada and cantidad_calculada > 0 else 1, step=1,
         )
 
+if not mat_inicial:
+    st.info("✍️ Escribe la matrícula inicial para continuar.")
+    st.stop()
+elif not cantidad_fija and not mat_final:
+    st.info("✍️ Indica también la matrícula final para continuar.")
+    st.stop()
+
 # ---------------------------------------------------------------------------
-# 3) ¿Qué has visto? — CQ detectados
+# 3) ¿Qué has visto? — CQ detectados (aparece tras rellenar el paso 2)
 # ---------------------------------------------------------------------------
 with st.container(border=True):
     st.subheader("3️⃣ ¿Has detectado algún defecto (CQ)?")
@@ -144,33 +151,6 @@ with st.container(border=True):
         st.success("✅ Sin defectos detectados en esta sesión.")
 
 # ---------------------------------------------------------------------------
-# Vista previa del resultado (se recalcula sola, sin botón intermedio)
-# ---------------------------------------------------------------------------
-transicion = None
-if mat_inicial and (cantidad_fija or mat_final):
-    transicion = db.procesar_verificacion(
-        asig, tipo_verificacion, st.session_state.cq_rows, cantidad=int(cantidad),
-        confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
-    )
-
-causas_input = []
-if transicion:
-    if transicion["requiere_causa_accion"] or transicion["nuevo_estado_maq"] != asig["estado_maq"] \
-            or transicion["nuevo_estado_dim"] != asig["estado_dim"]:
-        st.warning(f"⚠️ {transicion['comentario']}")
-    else:
-        st.info(transicion["comentario"])
-
-    if transicion["requiere_causa_accion"]:
-        with st.container(border=True):
-            st.subheader("🛠️ Causa y acción correctora")
-            for codigo in transicion["requiere_causa_accion"]:
-                st.markdown(f"**CQ {codigo}**")
-                causa = st.text_input(f"Causa ({codigo})", key=f"causa_{codigo}")
-                accion = st.text_area(f"Acción correctora ({codigo})", key=f"accion_{codigo}")
-                causas_input.append({"codigo_cq": codigo, "causa": causa, "accion_correctora": accion})
-
-# ---------------------------------------------------------------------------
 # Detalles opcionales (fecha, verificador, notas) — plegado por defecto
 # ---------------------------------------------------------------------------
 with st.expander("Más detalles (fecha, verificador, notas)"):
@@ -188,23 +168,67 @@ with st.expander("Más detalles (fecha, verificador, notas)"):
             st.warning(f"Este verificador tiene una alerta de vigencia: {alerta_verif}")
     notas = st.text_area("Notas de la verificación")
 
-st.divider()
+# ---------------------------------------------------------------------------
+# 4) Resumen y confirmación — revisa antes de guardar
+# ---------------------------------------------------------------------------
+transicion = db.procesar_verificacion(
+    asig, tipo_verificacion, st.session_state.cq_rows, cantidad=int(cantidad),
+    confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
+)
 
-if st.button("💾 Guardar verificación", type="primary", use_container_width=True):
-    if not mat_inicial:
-        st.error("Indica la matrícula inicial.")
-    elif not cantidad_fija and not mat_final:
-        st.error("Indica la matrícula final (verificación del 100% del lote).")
+with st.container(border=True):
+    st.subheader("4️⃣ Resumen — revisa antes de guardar")
+    st.caption("¿Algo mal? Corrígelo arriba: el resumen se actualiza solo.")
+
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown(f"**Máquina:** {maquina_sel}")
+        st.markdown(f"**Dimensión:** {dim_sel}")
+        st.markdown(f"**Tipo de verificación:** {db.TIPOS_VERIFICACION[tipo_verificacion]}")
+    with c2:
+        st.markdown(f"**Cantidad:** {cantidad} unidades")
+        st.markdown(f"**Matrícula:** {mat_inicial} → {mat_final}")
+        st.markdown(f"**Verificador:** {verificador_label}")
+
+    if st.session_state.cq_rows:
+        st.markdown("**Defectos detectados:**")
+        for row in st.session_state.cq_rows:
+            icono = "🔴" if row["familia"] == "NCNA" else "🟡"
+            st.markdown(f"- {icono} {row['codigo_cq']} ({row['familia']}) — matrícula {row['matricula'] or '—'}")
     else:
-        transicion_final = db.procesar_verificacion(
-            asig, tipo_verificacion, st.session_state.cq_rows, cantidad=int(cantidad),
-            confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
+        st.markdown("**Defectos detectados:** ✅ Ninguno")
+
+    cambios = []
+    if transicion["nuevo_estado_maq"] != asig["estado_maq"]:
+        cambios.append(
+            f"Máquina: {db.ESTADOS_MAQ[asig['estado_maq']]} → **{db.ESTADOS_MAQ[transicion['nuevo_estado_maq']]}**"
         )
+    if transicion["nuevo_estado_dim"] != asig["estado_dim"]:
+        cambios.append(
+            f"Dimensión: {db.ESTADOS_DIM[asig['estado_dim']]} → **{db.ESTADOS_DIM[transicion['nuevo_estado_dim']]}**"
+        )
+    if cambios or transicion["requiere_causa_accion"]:
+        st.warning(f"⚠️ {transicion['comentario']}")
+        if cambios:
+            st.caption(" · ".join(cambios))
+    else:
+        st.info(transicion["comentario"])
+
+    causas_input = []
+    if transicion["requiere_causa_accion"]:
+        st.markdown("**🛠️ Causa y acción correctora**")
+        for codigo in transicion["requiere_causa_accion"]:
+            st.markdown(f"CQ {codigo}")
+            causa = st.text_input(f"Causa ({codigo})", key=f"causa_{codigo}")
+            accion = st.text_area(f"Acción correctora ({codigo})", key=f"accion_{codigo}")
+            causas_input.append({"codigo_cq": codigo, "causa": causa, "accion_correctora": accion})
+
+    if st.button("💾 Confirmar y guardar", type="primary", use_container_width=True):
         verificacion_id = db.registrar_verificacion(
             fecha=fecha.isoformat(), asignacion_id=asignacion_id, verificador_id=verificador_id,
             tipo_verificacion=tipo_verificacion, mat_inicial=mat_inicial, mat_final=mat_final,
             cantidad=int(cantidad), cqs_detectados=st.session_state.cq_rows,
-            causas_acciones=causas_input, notas=notas, resultado_transicion=transicion_final,
+            causas_acciones=causas_input, notas=notas, resultado_transicion=transicion,
         )
         st.success(f"✅ Verificación #{verificacion_id} guardada correctamente.")
         st.session_state.cq_rows = []
