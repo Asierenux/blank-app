@@ -33,7 +33,7 @@ with tab_maq:
     if maquinas:
         df = pd.DataFrame([dict(m) for m in maquinas])
         df["estado_maq"] = df["estado_maq"].map(lambda e: db.ESTADOS_MAQ.get(e, e))
-        st.dataframe(df, width="stretch", hide_index=True)
+        st.dataframe(df, use_container_width=True, hide_index=True)
     else:
         st.info("Sin máquinas todavía. Crea al menos una (ej. MAC-1 ... MAC-6).")
 
@@ -55,7 +55,7 @@ with tab_dim:
 
     dimensiones = db.list_dimensiones()
     if dimensiones:
-        st.dataframe(pd.DataFrame([dict(d) for d in dimensiones]), width="stretch", hide_index=True)
+        st.dataframe(pd.DataFrame([dict(d) for d in dimensiones]), use_container_width=True, hide_index=True)
     else:
         st.info("Sin dimensiones todavía.")
 
@@ -103,7 +103,7 @@ with tab_asig:
                     "CQ disparador (dimensión)": a["cq_disparador_dim"] or "—",
                     "activa": bool(a["activa"]),
                 })
-            st.dataframe(pd.DataFrame(filas), width="stretch", hide_index=True)
+            st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
 
             st.divider()
             st.subheader("Forzar estado manualmente")
@@ -173,4 +173,4 @@ with tab_guia:
             "estado dimensión": db.ESTADOS_DIM[ed],
             "verificaciones aplicables": ", ".join(db.TIPOS_VERIFICACION[v] for v in vs) or "—",
         })
-    st.dataframe(pd.DataFrame(filas), width="stretch", hide_index=True)
+    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)

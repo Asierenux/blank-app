@@ -126,7 +126,7 @@ with st.container(border=True):
         codigo_cq = cc1.selectbox("Código CQ", catalogo + ["Otro..."])
         codigo_cq_manual = cc2.text_input("Código manual (si 'Otro...')")
         matricula = cc3.text_input("Matrícula del producto con el defecto")
-        add_cq = st.form_submit_button("➕ Añadir defecto", width="stretch")
+        add_cq = st.form_submit_button("➕ Añadir defecto", use_container_width=True)
         if add_cq:
             codigo_final = codigo_cq_manual.strip() if codigo_cq == "Otro..." and codigo_cq_manual.strip() else codigo_cq
             familia = db.familia_cq(asig["dimension_tipo"], codigo_final)
@@ -190,7 +190,7 @@ with st.expander("Más detalles (fecha, verificador, notas)"):
 
 st.divider()
 
-if st.button("💾 Guardar verificación", type="primary", width="stretch"):
+if st.button("💾 Guardar verificación", type="primary", use_container_width=True):
     if not mat_inicial:
         st.error("Indica la matrícula inicial.")
     elif not cantidad_fija and not mat_final:

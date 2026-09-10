@@ -96,7 +96,7 @@ with c1:
         df_v["tipo"] = df_v["tipo_verificacion"].map(lambda v: db.TIPOS_VERIFICACION.get(v, v))
         st.dataframe(
             df_v[["fecha", "maquina_codigo", "dimension_codigo", "tipo", "cantidad", "verificador_nombre"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
     else:
         st.info("Aún no se han registrado verificaciones.")

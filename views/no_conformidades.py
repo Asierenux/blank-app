@@ -23,7 +23,7 @@ with tab_cq:
         st.dataframe(
             df[["id", "fecha_verificacion", "maquina_codigo", "dimension_codigo", "tipo_verificacion",
                 "codigo_cq", "familia", "matricula", "verificador_nombre"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
         c1, c2 = st.columns(2)
         c1.metric("Total CQ", len(df))
@@ -40,7 +40,7 @@ with tab_causas:
         df = pd.DataFrame([dict(c) for c in causas])
         st.dataframe(
             df[["id", "fecha", "maquina_codigo", "dimension_codigo", "codigo_cq", "causa", "accion_correctora"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
 
 with tab_informe:
@@ -67,7 +67,7 @@ with tab_informe:
         st.dataframe(
             df[["fecha", "maquina_codigo", "dimension_codigo", "tipo_verificacion_desc",
                 "cantidad", "mat_inicial", "mat_final", "verificador_nombre", "comentario_sistema"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
 
         st.divider()
@@ -80,7 +80,7 @@ with tab_informe:
             st.dataframe(
                 df_c[["fecha", "maquina_codigo", "dimension_codigo", "estado_maq", "estado_dim", "comentario"]]
                 .rename(columns={"estado_maq": "estado máquina", "estado_dim": "estado dimensión"}),
-                width="stretch", hide_index=True,
+                use_container_width=True, hide_index=True,
             )
 
 with tab_ncf:
@@ -103,7 +103,7 @@ with tab_ncf:
         df_ncf["% NCF"] = df_ncf["pct_ncf"].map(lambda p: f"{p:.2f}%" if p is not None else "—")
         st.dataframe(
             df_ncf[["maquina", "dimension", "verificadas", "no_conformes", "% NCF"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
 
     st.divider()
@@ -116,7 +116,7 @@ with tab_ncf:
         df_op["% NCF"] = df_op["pct_ncf"].map(lambda p: f"{p:.2f}%" if p is not None else "—")
         st.dataframe(
             df_op[["operario", "verificadas", "no_conformes", "% NCF"]],
-            width="stretch", hide_index=True,
+            use_container_width=True, hide_index=True,
         )
         st.caption(
             "Un % NCF alto y sostenido por operario es señal para revisar su "

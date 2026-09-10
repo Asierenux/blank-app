@@ -36,7 +36,7 @@ with tab_cq:
     st.metric("Códigos CQ en el catálogo", len(catalogo))
     if catalogo:
         import pandas as pd
-        st.dataframe(pd.DataFrame([dict(c) for c in catalogo]), width="stretch", hide_index=True)
+        st.dataframe(pd.DataFrame([dict(c) for c in catalogo]), use_container_width=True, hide_index=True)
 
 with tab_dim:
     st.markdown(
