@@ -9,27 +9,28 @@ st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_ic
 
 st.title("🛞 Control de Verificación de Carcasas y Bandages")
 st.caption(
-    "Digitalización de la MDV **INS_001_CYT_DOMF_OEU1_VIT_v19** — "
-    "Instrucción para la verificación de carcasas y bandages de Turismo y Camioneta."
+    "Digitalización de la MDV de verificación (sustituye a MDV_MAC.xlsm): estado de "
+    "muestreo por máquina (E1-E3) y por dimensión en esa máquina (D0-D5)."
 )
 
-dimensiones = db.list_dimensiones()
-verificaciones = db.list_verificaciones(limit=2000)
-cq_abiertas = db.list_cq_detecciones(solo_abiertas=True)
+maquinas = db.list_maquinas()
+asignaciones = db.list_asignaciones(solo_activas=True)
+verificaciones = db.list_verificaciones(limit=5000)
+no_conformidades = db.list_no_conformidades()
 verificadores = db.list_verificadores()
 
 # --- KPIs ---------------------------------------------------------------
 col1, col2, col3, col4 = st.columns(4)
 
-activas = [d for d in dimensiones if d["estado"] != "Descalificada"]
-en_sondeo_tri = [d for d in activas if d["estado"] in ("Fase 2 - Sondeo", "Fase 2 - Tri Dirigido", "Tri")]
+en_tri_dirigido_maq = [m for m in maquinas if m["estado_maq"] == "E2"]
+en_tri_dirigido_dim = [a for a in asignaciones if a["estado_dim"] == "D2"]
 hoy = date.today().isoformat()
 verificaciones_hoy = [v for v in verificaciones if v["fecha"] == hoy]
 
-col1.metric("Dimensiones activas", len(activas))
-col2.metric("En Sondeo / Tri Dirigido / Tri", len(en_sondeo_tri))
-col3.metric("Verificaciones hoy", len(verificaciones_hoy))
-col4.metric("No conformidades abiertas", len(cq_abiertas), delta=None)
+col1.metric("Máquinas", len(maquinas))
+col2.metric("Máquinas en Tri Dirigido (E2)", len(en_tri_dirigido_maq))
+col3.metric("Dimensiones en Tri Dirigido (D2)", len(en_tri_dirigido_dim))
+col4.metric("Verificaciones hoy", len(verificaciones_hoy))
 
 st.divider()
 
@@ -37,12 +38,18 @@ st.divider()
 st.subheader("🔔 Alertas")
 
 alertas_mostradas = 0
-ncna_abiertas = [c for c in cq_abiertas if c["familia"] == "NCNA"]
-if ncna_abiertas:
+for m in en_tri_dirigido_maq:
     alertas_mostradas += 1
     st.error(
-        f"**{len(ncna_abiertas)} CQ NCNA sin resolver** — requieren acción de "
-        "bloqueo/búsqueda inmediata (sección 7 de la MDV)."
+        f"**{m['codigo']}** está en Tri Dirigido de máquina (E2) por el CQ "
+        f"**{m['cq_disparador_maq'] or '—'}** — afecta a todas las dimensiones de esta máquina."
+    )
+
+for a in en_tri_dirigido_dim:
+    alertas_mostradas += 1
+    st.warning(
+        f"**{a['maquina_codigo']} / {a['dimension_codigo']}** está en Tri Dirigido 20 ud (D2) "
+        f"por el CQ **{a['cq_disparador_dim'] or '—'}**."
     )
 
 for v in verificadores:
@@ -52,18 +59,31 @@ for v in verificadores:
         st.warning(f"**{v['nombre']}**: {alerta}")
 
 if alertas_mostradas == 0:
-    st.success("Sin alertas activas.")
+    st.success("Sin alertas activas: todas las máquinas y dimensiones activas están en Sondeo.")
 
 st.divider()
 
-# --- Estado de dimensiones -------------------------------------------------
-st.subheader("📋 Estado de las dimensiones")
-if dimensiones:
-    df_dim = pd.DataFrame([dict(d) for d in dimensiones])
-    conteo = df_dim["estado"].value_counts().reindex(db.ESTADOS_DIMENSION, fill_value=0)
-    st.bar_chart(conteo)
-else:
-    st.info("Todavía no hay dimensiones registradas. Ve a la página **Dimensiones** para crear la primera.")
+# --- Estado de máquinas y dimensiones ---------------------------------------
+c1, c2 = st.columns(2)
+with c1:
+    st.subheader("⚙️ Estado de las máquinas")
+    if maquinas:
+        df_m = pd.DataFrame([dict(m) for m in maquinas])
+        conteo = df_m["estado_maq"].value_counts().reindex(db.ESTADOS_MAQ.keys(), fill_value=0)
+        conteo.index = [f"{k} - {db.ESTADOS_MAQ[k]}" for k in conteo.index]
+        st.bar_chart(conteo)
+    else:
+        st.info("Todavía no hay máquinas registradas. Ve a **Máquinas y Dimensiones**.")
+
+with c2:
+    st.subheader("📦 Estado de las dimensiones activas")
+    if asignaciones:
+        df_a = pd.DataFrame([dict(a) for a in asignaciones])
+        conteo = df_a["estado_dim"].value_counts().reindex(db.ESTADOS_DIM.keys(), fill_value=0)
+        conteo.index = [f"{k} - {db.ESTADOS_DIM[k]}" for k in conteo.index]
+        st.bar_chart(conteo)
+    else:
+        st.info("Todavía no hay asignaciones máquina/dimensión.")
 
 st.divider()
 
@@ -74,9 +94,9 @@ with c1:
     st.subheader("✅ Últimas verificaciones")
     if verificaciones:
         df_v = pd.DataFrame([dict(v) for v in verificaciones[:15]])
+        df_v["tipo"] = df_v["tipo_verificacion"].map(lambda v: f"{v} · {db.TIPOS_VERIFICACION.get(v, '')}")
         st.dataframe(
-            df_v[["fecha", "turno", "dimension_codigo", "tipo_muestreo", "motivo",
-                  "n_verificados", "n_conformes", "resultado", "verificador_nombre"]],
+            df_v[["fecha", "maquina_codigo", "dimension_codigo", "tipo", "cantidad", "verificador_nombre"]],
             use_container_width=True, hide_index=True,
         )
     else:
@@ -84,16 +104,16 @@ with c1:
 
 with c2:
     st.subheader("⚠️ No conformidades por familia (CQ)")
-    todas_cq = db.list_cq_detecciones()
-    if todas_cq:
-        df_cq = pd.DataFrame([dict(c) for c in todas_cq])
+    if no_conformidades:
+        df_cq = pd.DataFrame([dict(c) for c in no_conformidades])
         st.bar_chart(df_cq["familia"].value_counts())
     else:
         st.info("No se han registrado detecciones de CQ.")
 
 st.divider()
 st.markdown(
-    "Usa el menú lateral para: dar de alta **Dimensiones** (código carcasa/bandage), "
-    "registrar **Verificaciones** siguiendo las reglas de muestreo de la MDV, "
-    "gestionar **No Conformidades** (CQ) y las **Verificadores** habilitados."
+    "Usa el menú lateral para: gestionar **Máquinas y Dimensiones** (y forzar estados), "
+    "registrar **Verificaciones** (el sistema calcula automáticamente el tipo de "
+    "verificación y la transición de estado), consultar **No Conformidades y Causas**, "
+    "y gestionar los **Verificadores** habilitados (Anexo 1)."
 )
