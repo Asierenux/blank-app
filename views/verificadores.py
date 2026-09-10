@@ -51,22 +51,21 @@ with tab_lista:
             estado = db.calcula_estado_verificador(v["test_sala_pct"], v["errores_ncna"], v["errores_otros_cq"])
             alerta = db.alerta_vigencia_verificador(v["fecha_ultima_verificacion"])
             filas.append({
-                "id": v["id"],
-                "nombre": v["nombre"],
-                "estado_calificación": estado,
-                "test_sala_%": v["test_sala_pct"],
-                "errores_NCNA": v["errores_ncna"],
-                "errores_otros_CQ": v["errores_otros_cq"],
-                "última_verificación": v["fecha_ultima_verificacion"] or "—",
-                "último_reciclaje": v["fecha_ultimo_reciclaje"] or "—",
-                "alerta_vigencia": alerta or "OK",
+                "Nombre": v["nombre"],
+                "Estado": estado,
+                "Test sala (%)": v["test_sala_pct"],
+                "Errores NCNA": v["errores_ncna"],
+                "Errores otros CQ": v["errores_otros_cq"],
+                "Última verificación": v["fecha_ultima_verificacion"] or "—",
+                "Último reciclaje": v["fecha_ultimo_reciclaje"] or "—",
+                "Alerta": alerta or "OK",
             })
         df = pd.DataFrame(filas)
         st.dataframe(df, use_container_width=True, hide_index=True)
 
         st.divider()
         st.subheader("Registrar reciclaje")
-        opciones = {f"{v['nombre']} (id {v['id']})": v["id"] for v in verificadores}
+        opciones = {v["nombre"]: v["id"] for v in verificadores}
         sel = st.selectbox("Verificador", list(opciones.keys()))
         if st.button("Registrar reciclaje realizado hoy"):
             db.registrar_reciclaje(opciones[sel])

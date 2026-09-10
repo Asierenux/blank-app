@@ -41,7 +41,11 @@ with tab_lista:
         st.info("No hay usuarios.")
     else:
         st.dataframe(
-            pd.DataFrame([dict(u) for u in usuarios]), use_container_width=True, hide_index=True,
+            pd.DataFrame([
+                {"Usuario": u["username"], "Rol": u["rol"], "Fecha de alta": u["fecha_creacion"]}
+                for u in usuarios
+            ]),
+            use_container_width=True, hide_index=True,
         )
 
         st.divider()

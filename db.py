@@ -419,6 +419,30 @@ def set_estado_maquina(maquina_id, estado_maq, cq_disparador=None, contador=None
     conn.commit()
 
 
+def update_maquina(maquina_id, codigo, proceso):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE maquinas SET codigo = ?, proceso = ? WHERE id = ?",
+        (codigo, proceso, maquina_id),
+    )
+    conn.commit()
+
+
+def count_asignaciones_de_maquina(maquina_id) -> int:
+    conn = get_conn()
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM asignaciones WHERE maquina_id = ?", (maquina_id,)
+    ).fetchone()["n"]
+
+
+def delete_maquina(maquina_id):
+    """Sólo se puede eliminar si no tiene ninguna asignación (ni activa ni
+    inactiva); si las tiene, hay que eliminarlas/desasignarlas primero."""
+    conn = get_conn()
+    conn.execute("DELETE FROM maquinas WHERE id = ?", (maquina_id,))
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Dimensiones y asignaciones (malla de gestión = código x máquina)
 # ---------------------------------------------------------------------------
@@ -436,6 +460,48 @@ def add_dimension(codigo, tipo, notas=""):
 def list_dimensiones():
     conn = get_conn()
     return conn.execute("SELECT * FROM dimensiones ORDER BY codigo").fetchall()
+
+
+def get_dimension(dimension_id):
+    conn = get_conn()
+    return conn.execute("SELECT * FROM dimensiones WHERE id = ?", (dimension_id,)).fetchone()
+
+
+def update_dimension(dimension_id, codigo, tipo, notas):
+    conn = get_conn()
+    conn.execute(
+        "UPDATE dimensiones SET codigo = ?, tipo = ?, notas = ? WHERE id = ?",
+        (codigo, tipo, notas, dimension_id),
+    )
+    conn.commit()
+
+
+def count_asignaciones_de_dimension(dimension_id) -> int:
+    conn = get_conn()
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM asignaciones WHERE dimension_id = ?", (dimension_id,)
+    ).fetchone()["n"]
+
+
+def delete_dimension(dimension_id):
+    conn = get_conn()
+    conn.execute("DELETE FROM dimensiones WHERE id = ?", (dimension_id,))
+    conn.commit()
+
+
+def delete_asignacion(asignacion_id):
+    """Sólo debería usarse si la asignación no tiene verificaciones
+    históricas; si las tiene, es preferible desactivarla (set_activa_asignacion)."""
+    conn = get_conn()
+    conn.execute("DELETE FROM asignaciones WHERE id = ?", (asignacion_id,))
+    conn.commit()
+
+
+def count_verificaciones_de_asignacion(asignacion_id) -> int:
+    conn = get_conn()
+    return conn.execute(
+        "SELECT COUNT(*) AS n FROM verificaciones WHERE asignacion_id = ?", (asignacion_id,)
+    ).fetchone()["n"]
 
 
 def add_asignacion(maquina_id, dimension_id, estado_dim="D0"):
