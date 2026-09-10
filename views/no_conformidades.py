@@ -5,11 +5,12 @@ import streamlit as st
 
 import db
 
-st.title("⚠️ No conformidades, causas y seguimiento")
+st.title(":material/report_problem: No conformidades, causas y seguimiento")
 st.caption("Histórico generado automáticamente al registrar cada verificación.")
 
 tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
-    ["🔴 CQ detectados", "🛠️ Causas y acciones correctoras", "📊 Informe de seguimiento", "📈 % No Conformes (NCF)"]
+    [":material/error: CQ detectados", ":material/build: Causas y acciones correctoras",
+     ":material/bar_chart: Informe de seguimiento", ":material/trending_up: % No Conformes (NCF)"]
 )
 
 with tab_cq:

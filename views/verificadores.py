@@ -5,14 +5,14 @@ import streamlit as st
 
 import db
 
-st.title("🧑‍🔧 Calificación de verificadores (Anexo 1)")
+st.title(":material/engineering: Calificación de verificadores (Anexo 1)")
 st.caption(
     "Umbrales de calificación: Test en sala ≥ 90% de respuestas correctas · "
     "CQ NCNA: Aceptado = 0, Rechazado = 1 · Otros CQ: Aceptado = 6, Rechazado = 7 "
     "(evaluación media sobre 500 productos)."
 )
 
-tab_alta, tab_lista = st.tabs(["➕ Nuevo verificador / evaluación", "📋 Listado y vigencia"])
+tab_alta, tab_lista = st.tabs([":material/add: Nuevo verificador / evaluación", ":material/checklist: Listado y vigencia"])
 
 with tab_alta:
     with st.form("nuevo_verificador"):

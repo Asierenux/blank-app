@@ -69,25 +69,25 @@ auth_user = st.session_state.auth_user
 
 with st.sidebar:
     st.divider()
-    st.write(f"👤 **{auth_user['username']}** · {auth_user['rol']}")
-    if st.button("Cerrar sesión"):
+    st.markdown(ui.icon_line("person", f"**{auth_user['username']}** · {auth_user['rol']}", color="#EDEFF3"), unsafe_allow_html=True)
+    if st.button(":material/logout: Cerrar sesión"):
         st.session_state.auth_user = None
         st.rerun()
     st.caption(VERSION)
 
 registro = st.Page(
-    "views/registro_verificacion.py", title="Registro de verificación", icon="✅",
+    "views/registro_verificacion.py", title="Registro de verificación", icon=":material/fact_check:",
     default=(auth_user["rol"] == "Operario"),
 )
 inicio = st.Page(
-    "views/inicio.py", title="Inicio", icon="🛞",
+    "views/inicio.py", title="Inicio", icon=":material/dashboard:",
     default=(auth_user["rol"] == "Técnico"),
 )
-maquinas = st.Page("views/maquinas_dimensiones.py", title="Máquinas y Dimensiones", icon="🏭")
-no_conformidades = st.Page("views/no_conformidades.py", title="No Conformidades y Causas", icon="⚠️")
-verificadores = st.Page("views/verificadores.py", title="Verificadores", icon="🧑‍🔧")
-importar = st.Page("views/importar_catalogos.py", title="Importar Catálogos", icon="📥")
-usuarios = st.Page("views/usuarios.py", title="Usuarios", icon="🔑")
+maquinas = st.Page("views/maquinas_dimensiones.py", title="Máquinas y Dimensiones", icon=":material/factory:")
+no_conformidades = st.Page("views/no_conformidades.py", title="No Conformidades y Causas", icon=":material/report_problem:")
+verificadores = st.Page("views/verificadores.py", title="Verificadores", icon=":material/engineering:")
+importar = st.Page("views/importar_catalogos.py", title="Importar Catálogos", icon=":material/upload_file:")
+usuarios = st.Page("views/usuarios.py", title="Usuarios", icon=":material/admin_panel_settings:")
 
 if auth_user["rol"] == "Operario":
     paginas = [registro]

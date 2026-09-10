@@ -3,7 +3,7 @@ import streamlit as st
 
 import db
 
-st.title("🏭 Máquinas y Dimensiones")
+st.title(":material/factory: Máquinas y Dimensiones")
 st.caption(
     "La malla de gestión real de la MDV es el código Carcasa/Bandage **por máquina** "
     "de fabricación. Cada máquina tiene su propio estado de muestreo, y cada "
@@ -11,7 +11,7 @@ st.caption(
 )
 
 tab_maq, tab_dim, tab_asig, tab_guia = st.tabs(
-    ["⚙️ Máquinas", "📦 Dimensiones", "🔗 Asignaciones y estado", "📖 Guía de estados"]
+    [":material/settings: Máquinas", ":material/inventory_2: Dimensiones", ":material/link: Asignaciones y estado", ":material/menu_book: Guía de estados"]
 )
 
 # --- Máquinas ----------------------------------------------------------------
@@ -20,7 +20,7 @@ with tab_maq:
         c1, c2 = st.columns(2)
         codigo = c1.text_input("Código de máquina * (ej. MAC-1)")
         proceso = c2.selectbox("Proceso", db.PROCESOS)
-        submitted = st.form_submit_button("➕ Crear máquina", type="primary")
+        submitted = st.form_submit_button(":material/add: Crear máquina", type="primary")
         if submitted:
             if not codigo.strip():
                 st.error("El código es obligatorio.")
@@ -42,7 +42,7 @@ with tab_maq:
         )
 
         st.divider()
-        st.subheader("✏️ Editar o eliminar una máquina")
+        st.subheader(":material/edit: Editar o eliminar una máquina")
         opciones_maq_editar = {m["codigo"]: m["id"] for m in maquinas}
         sel_maq_editar = st.selectbox("Máquina", list(opciones_maq_editar.keys()), key="sel_editar_maquina")
         maquina_sel = db.get_maquina(opciones_maq_editar[sel_maq_editar])
@@ -51,7 +51,7 @@ with tab_maq:
             c1, c2 = st.columns(2)
             nuevo_codigo = c1.text_input("Código", value=maquina_sel["codigo"])
             nuevo_proceso = c2.selectbox("Proceso", db.PROCESOS, index=db.PROCESOS.index(maquina_sel["proceso"]))
-            guardar = st.form_submit_button("💾 Guardar cambios", type="primary")
+            guardar = st.form_submit_button(":material/save: Guardar cambios", type="primary")
             if guardar:
                 if not nuevo_codigo.strip():
                     st.error("El código es obligatorio.")
@@ -63,11 +63,11 @@ with tab_maq:
         n_asig = db.count_asignaciones_de_maquina(maquina_sel["id"])
         if n_asig:
             st.caption(
-                f"🔒 No se puede eliminar: tiene {n_asig} dimensión(es) asignada(s). "
+                f":material/lock: No se puede eliminar: tiene {n_asig} dimensión(es) asignada(s). "
                 "Elimínalas primero en la pestaña **Asignaciones y estado**."
             )
         else:
-            if st.button("🗑️ Eliminar esta máquina"):
+            if st.button(":material/delete: Eliminar esta máquina"):
                 db.delete_maquina(maquina_sel["id"])
                 st.success("Máquina eliminada.")
                 st.rerun()
@@ -79,7 +79,7 @@ with tab_dim:
         codigo = c1.text_input("Código de dimensión (carcasa/bandage) *")
         tipo = c2.selectbox("Tipo de producto", db.TIPOS_PRODUCTO)
         notas = st.text_area("Notas (marca, mercado, observaciones)")
-        submitted = st.form_submit_button("➕ Crear dimensión", type="primary")
+        submitted = st.form_submit_button(":material/add: Crear dimensión", type="primary")
         if submitted:
             if not codigo.strip():
                 st.error("El código es obligatorio.")
@@ -101,7 +101,7 @@ with tab_dim:
         )
 
         st.divider()
-        st.subheader("✏️ Editar o eliminar una dimensión")
+        st.subheader(":material/edit: Editar o eliminar una dimensión")
         opciones_dim_editar = {d["codigo"]: d["id"] for d in dimensiones}
         sel_dim_editar = st.selectbox("Dimensión", list(opciones_dim_editar.keys()), key="sel_editar_dimension")
         dimension_sel = db.get_dimension(opciones_dim_editar[sel_dim_editar])
@@ -111,7 +111,7 @@ with tab_dim:
             nuevo_codigo_dim = c1.text_input("Código", value=dimension_sel["codigo"])
             nuevo_tipo = c2.selectbox("Tipo de producto", db.TIPOS_PRODUCTO, index=db.TIPOS_PRODUCTO.index(dimension_sel["tipo"]))
             nuevas_notas = st.text_area("Notas", value=dimension_sel["notas"] or "")
-            guardar_dim = st.form_submit_button("💾 Guardar cambios", type="primary")
+            guardar_dim = st.form_submit_button(":material/save: Guardar cambios", type="primary")
             if guardar_dim:
                 if not nuevo_codigo_dim.strip():
                     st.error("El código es obligatorio.")
@@ -123,11 +123,11 @@ with tab_dim:
         n_asig_dim = db.count_asignaciones_de_dimension(dimension_sel["id"])
         if n_asig_dim:
             st.caption(
-                f"🔒 No se puede eliminar: está asignada a {n_asig_dim} máquina(s). "
+                f":material/lock: No se puede eliminar: está asignada a {n_asig_dim} máquina(s). "
                 "Elimínala primero en la pestaña **Asignaciones y estado**."
             )
         else:
-            if st.button("🗑️ Eliminar esta dimensión"):
+            if st.button(":material/delete: Eliminar esta dimensión"):
                 db.delete_dimension(dimension_sel["id"])
                 st.success("Dimensión eliminada.")
                 st.rerun()
@@ -151,7 +151,7 @@ with tab_asig:
                 format_func=lambda k: db.ESTADOS_DIM[k],
                 help="TRI = arranque/fase de validación. Usa Sondeo si ya está calificada.",
             )
-            submitted = st.form_submit_button("➕ Crear asignación", type="primary")
+            submitted = st.form_submit_button(":material/add: Crear asignación", type="primary")
             if submitted:
                 db.add_asignacion(opciones_maq[sel_maq], opciones_dim[sel_dim], estado_inicial)
                 st.success("Asignación creada.")
@@ -221,11 +221,11 @@ with tab_asig:
             n_verif = db.count_verificaciones_de_asignacion(asig["id"])
             if n_verif:
                 st.caption(
-                    f"🔒 No se puede eliminar: tiene {n_verif} verificación(es) registradas. "
+                    f":material/lock: No se puede eliminar: tiene {n_verif} verificación(es) registradas. "
                     "Desactívala en vez de eliminarla si ya no está en uso."
                 )
             else:
-                if st.button("🗑️ Eliminar esta asignación (sin verificaciones registradas)"):
+                if st.button(":material/delete: Eliminar esta asignación (sin verificaciones registradas)"):
                     db.delete_asignacion(asig["id"])
                     st.success("Asignación eliminada.")
                     st.rerun()

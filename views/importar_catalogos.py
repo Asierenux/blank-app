@@ -5,7 +5,7 @@ import streamlit as st
 
 import db
 
-st.title("📥 Importar catálogos")
+st.title(":material/upload_file: Importar catálogos")
 st.caption(
     "Carga aquí los catálogos maestros exportados de vuestro Excel (TAB_MAE de "
     "MDV_EPQL.xlsm): códigos CQ, dimensiones y códigos de operario. Los ficheros "
@@ -13,7 +13,9 @@ st.caption(
     "estos datos en ningún sitio fuera de tu base de datos local."
 )
 
-tab_cq, tab_dim, tab_op = st.tabs(["🔴 Códigos CQ", "📦 Dimensiones", "🧑 Códigos de operario"])
+tab_cq, tab_dim, tab_op = st.tabs(
+    [":material/error: Códigos CQ", ":material/inventory_2: Dimensiones", ":material/person: Códigos de operario"]
+)
 
 with tab_cq:
     st.markdown(

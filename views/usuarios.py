@@ -3,13 +3,13 @@ import streamlit as st
 
 import db
 
-st.title("🔑 Usuarios")
+st.title(":material/admin_panel_settings: Usuarios")
 st.caption(
     "Gestión de accesos: cada usuario tiene un rol (Operario/Técnico) que determina "
     "qué páginas ve. Las contraseñas se guardan con hash + sal, nunca en texto plano."
 )
 
-tab_alta, tab_lista = st.tabs(["➕ Nuevo usuario", "📋 Usuarios existentes"])
+tab_alta, tab_lista = st.tabs([":material/add: Nuevo usuario", ":material/checklist: Usuarios existentes"])
 
 with tab_alta:
     with st.form("nuevo_usuario"):
@@ -75,7 +75,7 @@ with tab_lista:
 
         st.divider()
         if len(usuarios) > 1:
-            if st.button("🗑️ Eliminar este usuario", type="secondary"):
+            if st.button(":material/delete: Eliminar este usuario", type="secondary"):
                 db.eliminar_usuario(usuario_id)
                 st.success("Usuario eliminado.")
                 st.rerun()

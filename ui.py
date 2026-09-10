@@ -142,6 +142,19 @@ def inject():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
+def _icon_span(name: str, size: int = 20, color: str = "currentColor") -> str:
+    """Icono de Material Symbols vía la fuente que Streamlit ya carga por
+    defecto ('Material Symbols Rounded'), para usarlo embebido dentro de
+    HTML propio (donde el atajo :material/nombre: de Streamlit no se
+    procesa). Fuera de HTML propio, usa siempre :material/nombre: en el
+    texto normal de st.title/subheader/button/tabs/alertas, que Streamlit
+    ya convierte solo."""
+    return (
+        f'<span style="font-family:\'Material Symbols Rounded\'; font-size:{size}px; '
+        f'color:{color}; vertical-align:middle; line-height:1;">{name}</span>'
+    )
+
+
 def marca(texto: str = "Control de Verificación"):
     """Cabecera de marca compacta, para la pantalla de login."""
     st.markdown(
@@ -149,10 +162,51 @@ def marca(texto: str = "Control de Verificación"):
         <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;">
             <div style="width:40px; height:40px; border-radius:10px; background:{NAVY};
                         display:flex; align-items:center; justify-content:center;
-                        box-shadow:0 2px 8px rgba(27,42,74,.3); font-size:22px;">🛞</div>
+                        box-shadow:0 2px 8px rgba(27,42,74,.3);">{_icon_span("precision_manufacturing", 22, "#fff")}</div>
             <span style="font-family:'Manrope',sans-serif; font-weight:800; font-size:1.05rem;
                          color:{NAVY}; letter-spacing:-.01em;">{texto}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
+
+
+def step_badge(numero: int, texto: str):
+    """Cabecera de paso con una insignia circular numerada (sustituye a los
+    emoji de teclado 1️⃣2️⃣3️⃣ por un diseño propio)."""
+    st.markdown(
+        f"""
+        <div style="display:flex; align-items:center; gap:.6rem; margin:.1rem 0 .8rem 0;">
+            <div style="width:30px; height:30px; min-width:30px; border-radius:50%; background:{NAVY};
+                        display:flex; align-items:center; justify-content:center;
+                        color:#fff; font-family:'Manrope',sans-serif; font-weight:800; font-size:.95rem;">
+                {numero}
+            </div>
+            <span style="font-family:'Manrope',sans-serif; font-weight:700; font-size:1.25rem;
+                         color:{NAVY};">{texto}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+FAMILIA_COLOR = {"NCNA": "#C0392B", "H2": "#B8873B"}
+
+
+def dot(color: str) -> str:
+    """Punto de color plano (sin depender de ninguna fuente de iconos)."""
+    return (
+        f'<span style="display:inline-block; width:9px; height:9px; border-radius:50%; '
+        f'background:{color}; margin-right:.4rem; vertical-align:middle;"></span>'
+    )
+
+
+def familia_badge(familia: str) -> str:
+    color = FAMILIA_COLOR.get(familia, "#6B7280")
+    return dot(color) + familia
+
+
+def icon_line(icon_name: str, texto: str, size: int = 18, color: str = None) -> str:
+    """Icono + texto en una misma línea, para insertar dentro de un
+    st.markdown(unsafe_allow_html=True) propio."""
+    return f'{_icon_span(icon_name, size, color or NAVY)} {texto}'
