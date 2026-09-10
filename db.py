@@ -145,6 +145,53 @@ def texto_accion(codigo: str, cqs: list[str] | None = None) -> str:
     return texto
 
 
+def guia_estado_actual(asignacion) -> list[dict]:
+    """Guía de qué hay que hacer AHORA MISMO en esta máquina/dimensión, a
+    partir de su estado actual guardado (no depende de rellenar y enviar una
+    verificación nueva: es la misma información que en MDV_MAC.xlsm aparecía
+    ya en la celda de estado, antes de tocar nada). Devuelve una lista de
+    {"nivel": "error"|"warning"|"info", "texto": str}."""
+    guias = []
+
+    if asignacion["estado_maq"] == "E2":
+        cq = asignacion["cq_disparador_maq"]
+        contador = asignacion["contador_maq"] or 0
+        guias.append({
+            "nivel": "error",
+            "texto": (
+                f"Máquina en Tri Dirigido por el CQ {cq or '—'} "
+                f"(llevas {contador} de 20 unidades consecutivas sin encontrarlo). "
+                f"{texto_accion('T10', [cq] if cq else None)}"
+            ),
+        })
+
+    if asignacion["estado_dim"] == "D2":
+        cq = asignacion["cq_disparador_dim"]
+        guias.append({
+            "nivel": "warning",
+            "texto": f"Dimensión en Tri Dirigido por el CQ {cq or '—'}: {texto_accion('T40', [cq] if cq else None)}",
+        })
+    elif asignacion["estado_dim"] == "D1":
+        guias.append({"nivel": "info", "texto": texto_accion("T30")})
+    elif asignacion["estado_dim"] == "D0":
+        guias.append({
+            "nivel": "info",
+            "texto": "Fase TRI: verificación del 100% del lote hasta calificar esta dimensión en esta máquina.",
+        })
+    elif asignacion["estado_dim"] == "D4":
+        guias.append({
+            "nivel": "info",
+            "texto": "Arranque de campaña: verificación del 100% del lote (TRI) hasta que un Técnico la pase a Sondeo.",
+        })
+    elif asignacion["estado_dim"] == "D5":
+        guias.append({
+            "nivel": "info",
+            "texto": "Campaña finalizada: no quedan verificaciones pendientes para esta dimensión en esta máquina.",
+        })
+
+    return guias
+
+
 # Anexo 5 - Familias de clasificación de CQ (NCNA = H0, resto = H2)
 CQ_NCNA_CARCASA = [
     "57.20", "57.22", "57.23", "57.26", "57.28", "57.31", "57.39", "57.79",

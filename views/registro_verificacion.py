@@ -47,6 +47,14 @@ with st.container(border=True):
         f"dimensión: **{db.ESTADOS_DIM[asig['estado_dim']]}**"
     )
 
+    for guia in db.guia_estado_actual(asig):
+        if guia["nivel"] == "error":
+            st.error(f":material/report: {guia['texto']}")
+        elif guia["nivel"] == "warning":
+            st.warning(f":material/warning: {guia['texto']}")
+        else:
+            st.info(f":material/info: {guia['texto']}")
+
 tipos_aplicables = db.tipos_verificacion_aplicables(asig["estado_maq"], asig["estado_dim"])
 if not tipos_aplicables:
     st.warning(

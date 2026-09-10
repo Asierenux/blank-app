@@ -39,16 +39,19 @@ st.subheader(":material/notifications: Alertas")
 alertas_mostradas = 0
 for m in en_tri_dirigido_maq:
     alertas_mostradas += 1
+    cq = m["cq_disparador_maq"]
     st.error(
-        f"**{m['codigo']}** está en Tri Dirigido de máquina por el CQ "
-        f"**{m['cq_disparador_maq'] or '—'}** — afecta a todas las dimensiones de esta máquina."
+        f"**{m['codigo']}** está en Tri Dirigido de máquina por el CQ **{cq or '—'}** "
+        f"(lleva {m['contador_maq'] or 0} de 20 unidades consecutivas sin encontrarlo) — afecta a "
+        f"todas las dimensiones de esta máquina.\n\n**Qué hacer:** {db.texto_accion('T10', [cq] if cq else None)}"
     )
 
 for a in en_tri_dirigido_dim:
     alertas_mostradas += 1
+    cq = a["cq_disparador_dim"]
     st.warning(
         f"**{a['maquina_codigo']} / {a['dimension_codigo']}** está en Tri Dirigido de dimensión "
-        f"por el CQ **{a['cq_disparador_dim'] or '—'}**."
+        f"por el CQ **{cq or '—'}**.\n\n**Qué hacer:** {db.texto_accion('T40', [cq] if cq else None)}"
     )
 
 for v in verificadores:
