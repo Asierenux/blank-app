@@ -16,6 +16,9 @@ máquina + dimensión (la "malla de gestión" real):
 De la combinación de ambos estados sale qué tipo(s) de verificación tocan
 (V1-V8), igual que en la tabla "CONTROL VERIFICACIONES" de TAB_MAE.
 """
+import hashlib
+import hmac
+import secrets
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -302,6 +305,15 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS catalogo_cq (
             codigo TEXT PRIMARY KEY,
             familia TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS usuarios (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            salt TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            rol TEXT NOT NULL DEFAULT 'Operario',
+            fecha_creacion TEXT NOT NULL
         );
         """
     )
@@ -830,3 +842,78 @@ def informe_ncf_por_operario(fecha_desde, fecha_hasta):
             "no_conformes": no_conformes, "pct_ncf": pct,
         })
     return resultado
+
+
+# ---------------------------------------------------------------------------
+# Usuarios y autenticación (usuario/contraseña con hash + sal, sin
+# dependencias externas). El rol ("Operario"/"Técnico") de cada usuario
+# determina qué páginas ve en la app.
+# ---------------------------------------------------------------------------
+
+ROLES = ["Operario", "Técnico"]
+_PBKDF2_ITERACIONES = 200_000
+
+
+def _hash_password(password: str, salt_hex: str) -> str:
+    return hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), bytes.fromhex(salt_hex), _PBKDF2_ITERACIONES
+    ).hex()
+
+
+def count_usuarios() -> int:
+    conn = get_conn()
+    return conn.execute("SELECT COUNT(*) AS n FROM usuarios").fetchone()["n"]
+
+
+def add_usuario(username: str, password: str, rol: str):
+    conn = get_conn()
+    salt = secrets.token_hex(16)
+    password_hash = _hash_password(password, salt)
+    conn.execute(
+        "INSERT INTO usuarios (username, salt, password_hash, rol, fecha_creacion) "
+        "VALUES (?, ?, ?, ?, ?)",
+        (username.strip(), salt, password_hash, rol, date.today().isoformat()),
+    )
+    conn.commit()
+
+
+def list_usuarios():
+    conn = get_conn()
+    return conn.execute("SELECT id, username, rol, fecha_creacion FROM usuarios ORDER BY username").fetchall()
+
+
+def verificar_usuario(username: str, password: str):
+    """Devuelve el usuario (dict) si las credenciales son correctas, o None."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM usuarios WHERE username = ?", (username.strip(),)
+    ).fetchone()
+    if row is None:
+        return None
+    calculado = _hash_password(password, row["salt"])
+    if hmac.compare_digest(calculado, row["password_hash"]):
+        return {"id": row["id"], "username": row["username"], "rol": row["rol"]}
+    return None
+
+
+def cambiar_password_usuario(usuario_id: int, nueva_password: str):
+    conn = get_conn()
+    salt = secrets.token_hex(16)
+    password_hash = _hash_password(nueva_password, salt)
+    conn.execute(
+        "UPDATE usuarios SET salt = ?, password_hash = ? WHERE id = ?",
+        (salt, password_hash, usuario_id),
+    )
+    conn.commit()
+
+
+def cambiar_rol_usuario(usuario_id: int, nuevo_rol: str):
+    conn = get_conn()
+    conn.execute("UPDATE usuarios SET rol = ? WHERE id = ?", (nuevo_rol, usuario_id))
+    conn.commit()
+
+
+def eliminar_usuario(usuario_id: int):
+    conn = get_conn()
+    conn.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
+    conn.commit()
