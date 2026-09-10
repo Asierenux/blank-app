@@ -50,11 +50,10 @@ tipo_verificacion = st.radio(
     horizontal=True,
 )
 
-c1, c2, c3 = st.columns(3)
+c1, c2 = st.columns(2)
 fecha = c1.date_input("Fecha", value=date.today())
 verificador_label = c2.selectbox("Verificador", list(opciones_verif.keys()))
 verificador_id = opciones_verif[verificador_label]
-cantidad = c3.number_input("Cantidad verificada *", min_value=1, value=8, step=1)
 
 if verificador_id:
     alerta_verif = db.alerta_vigencia_verificador(
@@ -63,9 +62,39 @@ if verificador_id:
     if alerta_verif:
         st.warning(f"Este verificador tiene una alerta de vigencia: {alerta_verif}")
 
-c1, c2 = st.columns(2)
-mat_inicial = c1.text_input("Matrícula inicial (trazabilidad, opcional)")
-mat_final = c2.text_input("Matrícula final (trazabilidad, opcional)")
+cantidad_fija = db.CANTIDAD_FIJA_POR_TIPO.get(tipo_verificacion)
+
+if cantidad_fija:
+    # El tipo de verificación ya lleva la cantidad en su propia definición
+    # (8, 20 o 24 unidades): sólo hace falta la matrícula inicial, la final
+    # y la cantidad se calculan solas.
+    c1, c2 = st.columns(2)
+    mat_inicial = c1.text_input("Matrícula inicial *")
+    st.info(f"Cantidad a verificar (según tipo {tipo_verificacion}): **{cantidad_fija} unidades**.")
+    mat_final_auto = db.calcular_matricula_final(mat_inicial, cantidad_fija) if mat_inicial else ""
+    mat_final = c2.text_input(
+        "Matrícula final (calculada automáticamente, editable si hace falta corregirla)",
+        value=mat_final_auto,
+    )
+    cantidad = cantidad_fija
+else:
+    # V1 - TRI: se verifica el 100% del lote, no hay cantidad fija.
+    st.caption("TRI: verificación del 100% del lote. Indica matrícula inicial y final.")
+    c1, c2, c3 = st.columns(3)
+    mat_inicial = c1.text_input("Matrícula inicial *")
+    mat_final = c2.text_input("Matrícula final *")
+    cantidad_calculada = None
+    if mat_inicial and mat_final:
+        try:
+            ini = int("".join(ch for ch in mat_inicial if ch.isdigit())[-len(mat_final):] or 0)
+            fin = int("".join(ch for ch in mat_final if ch.isdigit()) or 0)
+            cantidad_calculada = fin - ini + 1 if fin >= ini else None
+        except ValueError:
+            cantidad_calculada = None
+    cantidad = c3.number_input(
+        "Cantidad verificada *", min_value=1,
+        value=cantidad_calculada if cantidad_calculada and cantidad_calculada > 0 else 1, step=1,
+    )
 
 confirmar_fin_tri_maq = False
 if tipo_verificacion in ("V2", "V3") and asig["estado_maq"] == "E2":
@@ -82,7 +111,11 @@ st.divider()
 st.subheader("CQ detectados en esta sesión de control")
 st.caption("El operario no debe detener el examen al 1er CQ; debe finalizar siempre el ciclo (Anexo 2).")
 
-catalogo = db.CQ_NCNA_CARCASA if asig["dimension_tipo"] == "Carcasa" else db.CQ_NCNA_BANDAGE
+catalogo_importado = [c["codigo"] for c in db.list_catalogo_cq()]
+if catalogo_importado:
+    catalogo = catalogo_importado
+else:
+    catalogo = db.CQ_NCNA_CARCASA if asig["dimension_tipo"] == "Carcasa" else db.CQ_NCNA_BANDAGE
 
 with st.form("add_cq_row", clear_on_submit=True):
     cc1, cc2, cc3 = st.columns([1, 1, 2])
@@ -114,10 +147,15 @@ notas = st.text_area("Notas de la verificación")
 st.divider()
 
 if st.button("🔎 Calcular transición de estado", type="secondary"):
-    st.session_state.transicion = db.procesar_verificacion(
-        asig, tipo_verificacion, st.session_state.cq_rows,
-        confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
-    )
+    if not mat_inicial:
+        st.error("Indica la matrícula inicial.")
+    elif not cantidad_fija and not mat_final:
+        st.error("Indica la matrícula final (verificación TRI).")
+    else:
+        st.session_state.transicion = db.procesar_verificacion(
+            asig, tipo_verificacion, st.session_state.cq_rows,
+            confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
+        )
 
 transicion = st.session_state.transicion
 causas_input = []

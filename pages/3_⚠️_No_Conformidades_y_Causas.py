@@ -10,8 +10,8 @@ st.caption(
     "del Excel, generado automáticamente al registrar cada verificación."
 )
 
-tab_cq, tab_causas, tab_informe = st.tabs(
-    ["🔴 CQ detectados", "🛠️ Causas y acciones correctoras", "📊 Informe de seguimiento"]
+tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
+    ["🔴 CQ detectados", "🛠️ Causas y acciones correctoras", "📊 Informe de seguimiento", "📈 % No Conformes (NCF)"]
 )
 
 with tab_cq:
@@ -80,3 +80,43 @@ with tab_informe:
                 df_c[["fecha", "maquina_codigo", "dimension_codigo", "estado_maq", "estado_dim", "comentario"]],
                 use_container_width=True, hide_index=True,
             )
+
+with tab_ncf:
+    st.caption(
+        "Equivalente a 'Informe NCF' / 'Informe NCFOper' de MDV_EPQL.xlsm: % de no "
+        "conformes sobre lo verificado, por máquina/dimensión y por operario, en un "
+        "rango de fechas."
+    )
+    from datetime import date, timedelta
+    c1, c2 = st.columns(2)
+    fecha_desde = c1.date_input("Desde", value=date.today() - timedelta(days=7), key="ncf_desde")
+    fecha_hasta = c2.date_input("Hasta", value=date.today(), key="ncf_hasta")
+
+    st.subheader("Por máquina / dimensión")
+    datos_maq = db.informe_ncf_por_maquina(fecha_desde.isoformat(), fecha_hasta.isoformat())
+    if not datos_maq:
+        st.info("Sin verificaciones en ese rango de fechas.")
+    else:
+        df_ncf = pd.DataFrame(datos_maq)
+        df_ncf["% NCF"] = df_ncf["pct_ncf"].map(lambda p: f"{p:.2f}%" if p is not None else "—")
+        st.dataframe(
+            df_ncf[["maquina", "dimension", "verificadas", "no_conformes", "% NCF"]],
+            use_container_width=True, hide_index=True,
+        )
+
+    st.divider()
+    st.subheader("Por operario")
+    datos_op = db.informe_ncf_por_operario(fecha_desde.isoformat(), fecha_hasta.isoformat())
+    if not datos_op:
+        st.info("Sin verificaciones en ese rango de fechas.")
+    else:
+        df_op = pd.DataFrame(datos_op)
+        df_op["% NCF"] = df_op["pct_ncf"].map(lambda p: f"{p:.2f}%" if p is not None else "—")
+        st.dataframe(
+            df_op[["operario", "verificadas", "no_conformes", "% NCF"]],
+            use_container_width=True, hide_index=True,
+        )
+        st.caption(
+            "Un % NCF alto y sostenido por operario es señal para revisar su "
+            "calificación (Anexo 1) en la página Verificadores."
+        )

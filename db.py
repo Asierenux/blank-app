@@ -79,6 +79,42 @@ def tipos_verificacion_aplicables(estado_maq: str, estado_dim: str) -> list[str]
     return TRANSICIONES_TIPO_VERIFICACION.get((estado_maq, estado_dim), [])
 
 
+# Cantidad fija de unidades a verificar según el tipo (va en el propio nombre
+# del tipo de verificación en TAB_MAE: "8 PRODUCTOS/HORA", "24 UNIDADES...",
+# "...20 PRODUCTOS..."). V1 (TRI) no tiene cantidad fija: es el 100% del lote.
+CANTIDAD_FIJA_POR_TIPO = {
+    "V2": 20,
+    "V3": 20,
+    "V4": 8,
+    "V5": 8,
+    "V6": 20,
+    "V7": 24,
+    "V8": 24,
+}
+
+
+def calcular_matricula_final(mat_inicial: str, cantidad: int) -> str:
+    """A partir de la matrícula inicial y la cantidad a verificar, calcula la
+    matrícula final sumando (cantidad - 1) a la parte numérica final de la
+    matrícula, conservando el prefijo y el ancho (ceros a la izquierda).
+    Devuelve "" si la matrícula no tiene una parte numérica reconocible."""
+    mat_inicial = (mat_inicial or "").strip()
+    match = None
+    for i in range(len(mat_inicial) - 1, -1, -1):
+        if not mat_inicial[i].isdigit():
+            match = mat_inicial[i + 1:]
+            prefijo = mat_inicial[: i + 1]
+            break
+    else:
+        match = mat_inicial
+        prefijo = ""
+    if not match or not cantidad:
+        return ""
+    ancho = len(match)
+    nuevo_numero = int(match) + cantidad - 1
+    return f"{prefijo}{nuevo_numero:0{ancho}d}"
+
+
 # Textos de acción (TAB_MAE!Z3:AA16, códigos T10-T70). Para MAC-1 a MAC-4
 # (máquinas con "Balancelas"), la MDV exige avisar además al conductor y
 # remontar en Balancelas de 20 en 20 unidades (comentarios T1-T4 del Excel).
@@ -127,9 +163,15 @@ CQ_NCNA_BANDAGE = [
 
 
 def familia_cq(tipo_producto: str, codigo_cq: str) -> str:
-    """Devuelve 'NCNA' o 'H2' según el Anexo 5 de la MDV."""
-    catalogo = CQ_NCNA_CARCASA if tipo_producto == "Carcasa" else CQ_NCNA_BANDAGE
+    """Devuelve 'NCNA' o 'H2'. Si el código está en el catálogo importado
+    (tabla catalogo_cq, ver Importar Catálogos) se usa esa clasificación
+    real; si no, se aplica la regla del Anexo 5 de la MDV como reserva."""
     codigo = (codigo_cq or "").strip().split(" ")[0].rstrip("*").strip()
+    conn = get_conn()
+    row = conn.execute("SELECT familia FROM catalogo_cq WHERE codigo = ?", (codigo,)).fetchone()
+    if row:
+        return row["familia"]
+    catalogo = CQ_NCNA_CARCASA if tipo_producto == "Carcasa" else CQ_NCNA_BANDAGE
     return "NCNA" if codigo in catalogo else "H2"
 
 
@@ -266,9 +308,79 @@ def init_db(conn):
             verificacion_id INTEGER,
             comentario TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS catalogo_cq (
+            codigo TEXT PRIMARY KEY,
+            familia TEXT NOT NULL
+        );
         """
     )
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Catálogo de CQ e importación masiva (ver página "Importar Catálogos")
+# ---------------------------------------------------------------------------
+
+def list_catalogo_cq():
+    conn = get_conn()
+    return conn.execute("SELECT * FROM catalogo_cq ORDER BY codigo").fetchall()
+
+
+def import_catalogo_cq(filas):
+    """filas: iterable de (codigo, familia) con familia en {'NCNA','H2'}."""
+    conn = get_conn()
+    n = 0
+    for codigo, familia in filas:
+        codigo = str(codigo).strip()
+        familia = str(familia).strip().upper()
+        if not codigo or familia not in ("NCNA", "H2"):
+            continue
+        conn.execute(
+            "INSERT INTO catalogo_cq (codigo, familia) VALUES (?, ?) "
+            "ON CONFLICT(codigo) DO UPDATE SET familia = excluded.familia",
+            (codigo, familia),
+        )
+        n += 1
+    conn.commit()
+    return n
+
+
+def import_dimensiones(filas, tipo_por_defecto="Carcasa"):
+    """filas: iterable de (codigo, designacion). Omite códigos ya existentes."""
+    conn = get_conn()
+    existentes = {d["codigo"] for d in list_dimensiones()}
+    n = 0
+    for codigo, designacion in filas:
+        codigo = str(codigo).strip()
+        if not codigo or codigo in existentes:
+            continue
+        conn.execute(
+            "INSERT INTO dimensiones (codigo, tipo, notas) VALUES (?, ?, ?)",
+            (codigo, tipo_por_defecto, str(designacion or "").strip()),
+        )
+        existentes.add(codigo)
+        n += 1
+    conn.commit()
+    return n
+
+
+def import_verificadores_codigos(codigos):
+    """Da de alta verificadores usando el código de operario como nombre,
+    sin ningún dato personal. Quedan en estado 'Pendiente de evaluación'
+    hasta que se registre su test de calificación (Anexo 1)."""
+    conn = get_conn()
+    existentes = {v["nombre"] for v in list_verificadores()}
+    n = 0
+    for codigo in codigos:
+        codigo = str(codigo).strip()
+        if not codigo or codigo in existentes:
+            continue
+        conn.execute("INSERT INTO verificadores (nombre) VALUES (?)", (codigo,))
+        existentes.add(codigo)
+        n += 1
+    conn.commit()
+    return n
 
 
 # ---------------------------------------------------------------------------
@@ -666,3 +778,60 @@ def list_cambios_estado(limit=200):
         "ORDER BY c.id DESC LIMIT ?",
         (limit,),
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Informe % NCF (No Conformes de Fabricación), equivalente a
+# "Informe NCF" / "Informe NCFOper" de MDV_EPQL.xlsm: verificadas vs.
+# no conformes, en % , por máquina/dimensión y por operario, en un rango
+# de fechas.
+# ---------------------------------------------------------------------------
+
+def informe_ncf_por_maquina(fecha_desde, fecha_hasta):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT m.codigo AS maquina, d.codigo AS dimension, "
+        "SUM(v.cantidad) AS verificadas, "
+        "SUM(CASE WHEN v.id IS NOT NULL THEN (SELECT COUNT(*) FROM no_conformidades n WHERE n.verificacion_id = v.id) ELSE 0 END) AS no_conformes "
+        "FROM verificaciones v "
+        "JOIN asignaciones a ON a.id = v.asignacion_id "
+        "JOIN maquinas m ON m.id = a.maquina_id "
+        "JOIN dimensiones d ON d.id = a.dimension_id "
+        "WHERE v.fecha BETWEEN ? AND ? "
+        "GROUP BY m.codigo, d.codigo ORDER BY m.codigo, d.codigo",
+        (fecha_desde, fecha_hasta),
+    ).fetchall()
+    resultado = []
+    for r in rows:
+        verificadas = r["verificadas"] or 0
+        no_conformes = r["no_conformes"] or 0
+        pct = (no_conformes / verificadas * 100) if verificadas else None
+        resultado.append({
+            "maquina": r["maquina"], "dimension": r["dimension"],
+            "verificadas": verificadas, "no_conformes": no_conformes, "pct_ncf": pct,
+        })
+    return resultado
+
+
+def informe_ncf_por_operario(fecha_desde, fecha_hasta):
+    conn = get_conn()
+    rows = conn.execute(
+        "SELECT ve.nombre AS operario, "
+        "SUM(v.cantidad) AS verificadas, "
+        "SUM((SELECT COUNT(*) FROM no_conformidades n WHERE n.verificacion_id = v.id)) AS no_conformes "
+        "FROM verificaciones v "
+        "JOIN verificadores ve ON ve.id = v.verificador_id "
+        "WHERE v.fecha BETWEEN ? AND ? "
+        "GROUP BY ve.nombre ORDER BY ve.nombre",
+        (fecha_desde, fecha_hasta),
+    ).fetchall()
+    resultado = []
+    for r in rows:
+        verificadas = r["verificadas"] or 0
+        no_conformes = r["no_conformes"] or 0
+        pct = (no_conformes / verificadas * 100) if verificadas else None
+        resultado.append({
+            "operario": r["operario"], "verificadas": verificadas,
+            "no_conformes": no_conformes, "pct_ncf": pct,
+        })
+    return resultado
