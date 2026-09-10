@@ -3,7 +3,6 @@ import streamlit as st
 
 import db
 
-st.set_page_config(page_title="Máquinas y Dimensiones", page_icon="🏭", layout="wide")
 st.title("🏭 Máquinas y Dimensiones")
 st.caption(
     "La malla de gestión real de la MDV es el código Carcasa/Bandage **por máquina** "
@@ -31,14 +30,14 @@ with tab_maq:
                 st.error("El código es obligatorio.")
             else:
                 db.add_maquina(codigo.strip(), proceso, balancelas)
-                st.success(f"Máquina '{codigo}' creada en estado **E3 - SONDEO**.")
+                st.success(f"Máquina '{codigo}' creada en estado **SONDEO**.")
                 st.rerun()
 
     maquinas = db.list_maquinas()
     if maquinas:
         df = pd.DataFrame([dict(m) for m in maquinas])
-        df["estado_maq"] = df["estado_maq"].map(lambda e: f"{e} - {db.ESTADOS_MAQ.get(e, e)}")
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        df["estado_maq"] = df["estado_maq"].map(lambda e: db.ESTADOS_MAQ.get(e, e))
+        st.dataframe(df, width="stretch", hide_index=True)
     else:
         st.info("Sin máquinas todavía. Crea al menos una (ej. MAC-1 ... MAC-6).")
 
@@ -60,7 +59,7 @@ with tab_dim:
 
     dimensiones = db.list_dimensiones()
     if dimensiones:
-        st.dataframe(pd.DataFrame([dict(d) for d in dimensiones]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame([dict(d) for d in dimensiones]), width="stretch", hide_index=True)
     else:
         st.info("Sin dimensiones todavía.")
 
@@ -80,8 +79,8 @@ with tab_asig:
             sel_dim = c2.selectbox("Dimensión", list(opciones_dim.keys()))
             estado_inicial = c3.selectbox(
                 "Estado inicial de la dimensión en esta máquina", list(db.ESTADOS_DIM.keys()),
-                format_func=lambda k: f"{k} - {db.ESTADOS_DIM[k]}",
-                help="D0 = TRI (arranque/fase de validación). Usa D3 si ya está calificada a sondeo.",
+                format_func=lambda k: db.ESTADOS_DIM[k],
+                help="TRI = arranque/fase de validación. Usa Sondeo si ya está calificada.",
             )
             submitted = st.form_submit_button("Crear asignación", type="primary")
             if submitted:
@@ -102,13 +101,13 @@ with tab_asig:
                     "máquina": a["maquina_codigo"],
                     "dimensión": a["dimension_codigo"],
                     "tipo": a["dimension_tipo"],
-                    "estado_máquina": f"{a['estado_maq']} - {db.ESTADOS_MAQ.get(a['estado_maq'], '')}",
-                    "estado_dimensión": f"{a['estado_dim']} - {db.ESTADOS_DIM.get(a['estado_dim'], '')}",
+                    "estado_máquina": db.ESTADOS_MAQ.get(a['estado_maq'], a['estado_maq']),
+                    "estado_dimensión": db.ESTADOS_DIM.get(a['estado_dim'], a['estado_dim']),
                     "CQ disparador (máquina)": a["cq_disparador_maq"] or "—",
                     "CQ disparador (dimensión)": a["cq_disparador_dim"] or "—",
                     "activa": bool(a["activa"]),
                 })
-            st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(filas), width="stretch", hide_index=True)
 
             st.divider()
             st.subheader("Forzar estado manualmente")
@@ -126,7 +125,7 @@ with tab_asig:
                 nuevo_estado_maq = st.selectbox(
                     "Estado de la MÁQUINA", list(db.ESTADOS_MAQ.keys()),
                     index=list(db.ESTADOS_MAQ.keys()).index(asig["estado_maq"]),
-                    format_func=lambda k: f"{k} - {db.ESTADOS_MAQ[k]}",
+                    format_func=lambda k: db.ESTADOS_MAQ[k],
                     key="force_estado_maq",
                 )
                 if st.button("Aplicar estado de máquina"):
@@ -137,7 +136,7 @@ with tab_asig:
                 nuevo_estado_dim = st.selectbox(
                     "Estado de la DIMENSIÓN", list(db.ESTADOS_DIM.keys()),
                     index=list(db.ESTADOS_DIM.keys()).index(asig["estado_dim"]),
-                    format_func=lambda k: f"{k} - {db.ESTADOS_DIM[k]}",
+                    format_func=lambda k: db.ESTADOS_DIM[k],
                     key="force_estado_dim",
                 )
                 if st.button("Aplicar estado de dimensión"):
@@ -174,8 +173,8 @@ with tab_guia:
     filas = []
     for (em, ed), vs in db.TRANSICIONES_TIPO_VERIFICACION.items():
         filas.append({
-            "estado máquina": f"{em} - {db.ESTADOS_MAQ[em]}",
-            "estado dimensión": f"{ed} - {db.ESTADOS_DIM[ed]}",
-            "verificaciones aplicables": ", ".join(f"{v} ({db.TIPOS_VERIFICACION[v]})" for v in vs) or "—",
+            "estado máquina": db.ESTADOS_MAQ[em],
+            "estado dimensión": db.ESTADOS_DIM[ed],
+            "verificaciones aplicables": ", ".join(db.TIPOS_VERIFICACION[v] for v in vs) or "—",
         })
-    st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(filas), width="stretch", hide_index=True)

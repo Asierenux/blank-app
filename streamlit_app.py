@@ -1,119 +1,44 @@
-from datetime import date
-
-import pandas as pd
 import streamlit as st
-
-import db
 
 st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
 
-st.title("🛞 Control de Verificación de Carcasas y Bandages")
-st.caption(
-    "Digitalización de la MDV de verificación (sustituye a MDV_MAC.xlsm): estado de "
-    "muestreo por máquina (E1-E3) y por dimensión en esa máquina (D0-D5)."
-)
+if "rol" not in st.session_state:
+    st.session_state.rol = "Operario"
 
-maquinas = db.list_maquinas()
-asignaciones = db.list_asignaciones(solo_activas=True)
-verificaciones = db.list_verificaciones(limit=5000)
-no_conformidades = db.list_no_conformidades()
-verificadores = db.list_verificadores()
-
-# --- KPIs ---------------------------------------------------------------
-col1, col2, col3, col4 = st.columns(4)
-
-en_tri_dirigido_maq = [m for m in maquinas if m["estado_maq"] == "E2"]
-en_tri_dirigido_dim = [a for a in asignaciones if a["estado_dim"] == "D2"]
-hoy = date.today().isoformat()
-verificaciones_hoy = [v for v in verificaciones if v["fecha"] == hoy]
-
-col1.metric("Máquinas", len(maquinas))
-col2.metric("Máquinas en Tri Dirigido (E2)", len(en_tri_dirigido_maq))
-col3.metric("Dimensiones en Tri Dirigido (D2)", len(en_tri_dirigido_dim))
-col4.metric("Verificaciones hoy", len(verificaciones_hoy))
-
-st.divider()
-
-# --- Alertas --------------------------------------------------------------
-st.subheader("🔔 Alertas")
-
-alertas_mostradas = 0
-for m in en_tri_dirigido_maq:
-    alertas_mostradas += 1
-    st.error(
-        f"**{m['codigo']}** está en Tri Dirigido de máquina (E2) por el CQ "
-        f"**{m['cq_disparador_maq'] or '—'}** — afecta a todas las dimensiones de esta máquina."
+with st.sidebar:
+    st.selectbox(
+        "Rol",
+        ["Operario", "Técnico"],
+        key="rol",
+        help=(
+            "Operario: sólo ve el registro de verificación. "
+            "Técnico: gestiona máquinas, dimensiones, no conformidades, "
+            "verificadores y catálogos."
+        ),
+    )
+    st.caption(
+        "Este selector organiza el menú; no es un control de acceso real "
+        "(cualquiera puede cambiarlo). Para restringirlo de verdad, añade "
+        "autenticación (por ejemplo con `st.login`)."
     )
 
-for a in en_tri_dirigido_dim:
-    alertas_mostradas += 1
-    st.warning(
-        f"**{a['maquina_codigo']} / {a['dimension_codigo']}** está en Tri Dirigido 20 ud (D2) "
-        f"por el CQ **{a['cq_disparador_dim'] or '—'}**."
-    )
-
-for v in verificadores:
-    alerta = db.alerta_vigencia_verificador(v["fecha_ultima_verificacion"])
-    if alerta:
-        alertas_mostradas += 1
-        st.warning(f"**{v['nombre']}**: {alerta}")
-
-if alertas_mostradas == 0:
-    st.success("Sin alertas activas: todas las máquinas y dimensiones activas están en Sondeo.")
-
-st.divider()
-
-# --- Estado de máquinas y dimensiones ---------------------------------------
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("⚙️ Estado de las máquinas")
-    if maquinas:
-        df_m = pd.DataFrame([dict(m) for m in maquinas])
-        conteo = df_m["estado_maq"].value_counts().reindex(db.ESTADOS_MAQ.keys(), fill_value=0)
-        conteo.index = [f"{k} - {db.ESTADOS_MAQ[k]}" for k in conteo.index]
-        st.bar_chart(conteo)
-    else:
-        st.info("Todavía no hay máquinas registradas. Ve a **Máquinas y Dimensiones**.")
-
-with c2:
-    st.subheader("📦 Estado de las dimensiones activas")
-    if asignaciones:
-        df_a = pd.DataFrame([dict(a) for a in asignaciones])
-        conteo = df_a["estado_dim"].value_counts().reindex(db.ESTADOS_DIM.keys(), fill_value=0)
-        conteo.index = [f"{k} - {db.ESTADOS_DIM[k]}" for k in conteo.index]
-        st.bar_chart(conteo)
-    else:
-        st.info("Todavía no hay asignaciones máquina/dimensión.")
-
-st.divider()
-
-# --- Últimas verificaciones y CQ por familia -------------------------------
-c1, c2 = st.columns(2)
-
-with c1:
-    st.subheader("✅ Últimas verificaciones")
-    if verificaciones:
-        df_v = pd.DataFrame([dict(v) for v in verificaciones[:15]])
-        df_v["tipo"] = df_v["tipo_verificacion"].map(lambda v: f"{v} · {db.TIPOS_VERIFICACION.get(v, '')}")
-        st.dataframe(
-            df_v[["fecha", "maquina_codigo", "dimension_codigo", "tipo", "cantidad", "verificador_nombre"]],
-            use_container_width=True, hide_index=True,
-        )
-    else:
-        st.info("Aún no se han registrado verificaciones.")
-
-with c2:
-    st.subheader("⚠️ No conformidades por familia (CQ)")
-    if no_conformidades:
-        df_cq = pd.DataFrame([dict(c) for c in no_conformidades])
-        st.bar_chart(df_cq["familia"].value_counts())
-    else:
-        st.info("No se han registrado detecciones de CQ.")
-
-st.divider()
-st.markdown(
-    "Usa el menú lateral para: gestionar **Máquinas y Dimensiones** (y forzar estados), "
-    "registrar **Verificaciones** (el sistema calcula automáticamente el tipo de "
-    "verificación y la transición de estado), consultar **No Conformidades y Causas**, "
-    "y gestionar los **Verificadores** habilitados (Anexo 1)."
+registro = st.Page(
+    "views/registro_verificacion.py", title="Registro de verificación", icon="✅",
+    default=(st.session_state.rol == "Operario"),
 )
+inicio = st.Page(
+    "views/inicio.py", title="Inicio", icon="🛞",
+    default=(st.session_state.rol == "Técnico"),
+)
+maquinas = st.Page("views/maquinas_dimensiones.py", title="Máquinas y Dimensiones", icon="🏭")
+no_conformidades = st.Page("views/no_conformidades.py", title="No Conformidades y Causas", icon="⚠️")
+verificadores = st.Page("views/verificadores.py", title="Verificadores", icon="🧑‍🔧")
+importar = st.Page("views/importar_catalogos.py", title="Importar Catálogos", icon="📥")
+
+if st.session_state.rol == "Operario":
+    paginas = [registro]
+else:
+    paginas = [inicio, maquinas, registro, no_conformidades, verificadores, importar]
+
+pg = st.navigation(paginas)
+pg.run()

@@ -5,7 +5,6 @@ import streamlit as st
 
 import db
 
-st.set_page_config(page_title="Verificadores", page_icon="🧑‍🔧", layout="wide")
 st.title("🧑‍🔧 Calificación de verificadores (Anexo 1)")
 st.caption(
     "Umbrales de calificación: Test en sala ≥ 90% de respuestas correctas · "
@@ -63,7 +62,7 @@ with tab_lista:
                 "alerta_vigencia": alerta or "OK",
             })
         df = pd.DataFrame(filas)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True)
 
         st.divider()
         st.subheader("Registrar reciclaje")

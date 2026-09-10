@@ -4,14 +4,13 @@ import streamlit as st
 
 import db
 
-st.set_page_config(page_title="Registro de verificación", page_icon="✅", layout="wide")
 st.title("✅ Registro de verificación")
 
-asignaciones = db.list_asignaciones(solo_activas=True)
+maquinas = db.list_maquinas()
 verificadores = db.list_verificadores()
 
-if not asignaciones:
-    st.warning("Primero crea una máquina, una dimensión y su asignación en la página **Máquinas y Dimensiones**.")
+if not maquinas:
+    st.warning("Todavía no hay ninguna máquina configurada. Pide a un Técnico que la cree.")
     st.stop()
 
 if "cq_rows" not in st.session_state:
@@ -19,34 +18,45 @@ if "cq_rows" not in st.session_state:
 if "transicion" not in st.session_state:
     st.session_state.transicion = None
 
-opciones_asig = {
-    f"{a['maquina_codigo']} / {a['dimension_codigo']} — "
-    f"E:{a['estado_maq']} D:{a['estado_dim']}": a["id"]
-    for a in asignaciones
-}
-sel_label = st.selectbox("Máquina / Dimensión *", list(opciones_asig.keys()))
-asignacion_id = opciones_asig[sel_label]
+# --- Máquina y Dimensión (dos campos separados, como en el Excel) ---------
+opciones_maq = {m["codigo"]: m["id"] for m in maquinas}
+c1, c2 = st.columns(2)
+maquina_sel = c1.selectbox("Máquina *", list(opciones_maq.keys()))
+maquina_id = opciones_maq[maquina_sel]
+
+asignaciones_maquina = [a for a in db.list_asignaciones(solo_activas=True) if a["maquina_id"] == maquina_id]
+if not asignaciones_maquina:
+    c2.selectbox("Dimensión *", ["— sin dimensiones activas —"], disabled=True)
+    st.warning(
+        "Esta dimensión no está activa en esta máquina: no hay ninguna dimensión asignada. "
+        "Pide a un Técnico que la configure en Máquinas y Dimensiones."
+    )
+    st.stop()
+
+opciones_dim = {a["dimension_codigo"]: a["id"] for a in asignaciones_maquina}
+dim_sel = c2.selectbox("Dimensión *", list(opciones_dim.keys()))
+asignacion_id = opciones_dim[dim_sel]
 asig = db.get_asignacion(asignacion_id)
 
 opciones_verif = {"— sin asignar —": None}
 opciones_verif.update({f"{v['nombre']} (id {v['id']})": v["id"] for v in verificadores})
 
 c1, c2 = st.columns(2)
-c1.info(f"Estado MÁQUINA: **{asig['estado_maq']} - {db.ESTADOS_MAQ[asig['estado_maq']]}**")
-c2.info(f"Estado DIMENSIÓN: **{asig['estado_dim']} - {db.ESTADOS_DIM[asig['estado_dim']]}**")
+c1.info(f"Estado máquina: **{db.ESTADOS_MAQ[asig['estado_maq']]}**")
+c2.info(f"Estado dimensión: **{db.ESTADOS_DIM[asig['estado_dim']]}**")
 
 tipos_aplicables = db.tipos_verificacion_aplicables(asig["estado_maq"], asig["estado_dim"])
 if not tipos_aplicables:
     st.warning(
-        "No hay ningún tipo de verificación definido para esta combinación de estados "
-        "(por ejemplo D5 - Fin de campaña). Cambia el estado en Máquinas y Dimensiones si procede."
+        "No hay ninguna verificación pendiente para esta dimensión ahora mismo "
+        "(por ejemplo, campaña finalizada). Pide a un Técnico que revise su estado."
     )
     st.stop()
 
 tipo_verificacion = st.radio(
     "Tipo de verificación a realizar *",
     tipos_aplicables,
-    format_func=lambda v: f"{v} · {db.TIPOS_VERIFICACION[v]}",
+    format_func=lambda v: db.TIPOS_VERIFICACION[v],
     horizontal=True,
 )
 
@@ -70,7 +80,7 @@ if cantidad_fija:
     # y la cantidad se calculan solas.
     c1, c2 = st.columns(2)
     mat_inicial = c1.text_input("Matrícula inicial *")
-    st.info(f"Cantidad a verificar (según tipo {tipo_verificacion}): **{cantidad_fija} unidades**.")
+    st.info(f"Cantidad a verificar: **{cantidad_fija} unidades**.")
     mat_final_auto = db.calcular_matricula_final(mat_inicial, cantidad_fija) if mat_inicial else ""
     mat_final = c2.text_input(
         "Matrícula final (calculada automáticamente, editable si hace falta corregirla)",
@@ -78,8 +88,8 @@ if cantidad_fija:
     )
     cantidad = cantidad_fija
 else:
-    # V1 - TRI: se verifica el 100% del lote, no hay cantidad fija.
-    st.caption("TRI: verificación del 100% del lote. Indica matrícula inicial y final.")
+    # TRI: se verifica el 100% del lote, no hay cantidad fija.
+    st.caption("Verificación del 100% del lote. Indica matrícula inicial y final.")
     c1, c2, c3 = st.columns(3)
     mat_inicial = c1.text_input("Matrícula inicial *")
     mat_final = c2.text_input("Matrícula final *")
@@ -163,9 +173,15 @@ if transicion:
     st.info(f"**Resultado del sistema:** {transicion['comentario']}")
     cambios = []
     if transicion["nuevo_estado_maq"] != asig["estado_maq"]:
-        cambios.append(f"Máquina: {asig['estado_maq']} → **{transicion['nuevo_estado_maq']}**")
+        cambios.append(
+            f"Máquina: {db.ESTADOS_MAQ[asig['estado_maq']]} → "
+            f"**{db.ESTADOS_MAQ[transicion['nuevo_estado_maq']]}**"
+        )
     if transicion["nuevo_estado_dim"] != asig["estado_dim"]:
-        cambios.append(f"Dimensión: {asig['estado_dim']} → **{transicion['nuevo_estado_dim']}**")
+        cambios.append(
+            f"Dimensión: {db.ESTADOS_DIM[asig['estado_dim']]} → "
+            f"**{db.ESTADOS_DIM[transicion['nuevo_estado_dim']]}**"
+        )
     if cambios:
         st.warning(" · ".join(cambios))
     else:
