@@ -540,7 +540,7 @@ def _touch_verificador(verificador_id, fecha):
 # Motor de transición de estados (equivalente a Principal.MENSAJES / RECO_EST)
 # ---------------------------------------------------------------------------
 
-def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados,
+def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantidad=0,
                            confirmar_fin_tri_maquina=False,
                            umbral_fin_tri_maquina=20):
     """Aplica las reglas de transición de estado tras una verificación.
@@ -549,6 +549,11 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados,
         de la máquina y de la dimensión).
     cqs_detectados: lista de dicts {codigo_cq, familia} detectados en ESTA
         verificación (familia = 'NCNA' o 'H2').
+    cantidad: nº de carcasas/bandages verificados en ESTA sesión de control.
+        Se usa para acumular, en unidades (no en número de controles), las
+        verificadas sin encontrar el CQ que desencadenó un Tri Dirigido de
+        máquina (la MDV pide "verificar 20 carcasas consecutivas", no 20
+        controles).
     confirmar_fin_tri_maquina: cuando la máquina está en Tri Dirigido (E2) y
         ya se acumulan suficientes unidades sin encontrar el CQ que lo
         desencadenó, el operario confirma si se da por concluida la
@@ -589,7 +594,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados,
         sigue_apareciendo = disparador_maq in todos_codigos if disparador_maq else False
         if not sigue_apareciendo:
             resultado["pendiente_confirmacion"] = True
-            resultado["nuevo_contador_maq"] = contador_maq + 1
+            resultado["nuevo_contador_maq"] = contador_maq + (cantidad or 0)
             if confirmar_fin_tri_maquina:
                 resultado["nuevo_estado_maq"] = "E3"
                 resultado["cq_disparador_maq"] = None
@@ -598,8 +603,9 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados,
             else:
                 resultado["comentario"] = (
                     f"{texto_accion('T_FIN_TRI_MAQ_PENDIENTE')} "
-                    f"(llevas {resultado['nuevo_contador_maq']} verificaciones sin encontrar "
-                    f"el CQ {disparador_maq}; objetivo orientativo: {umbral_fin_tri_maquina})."
+                    f"(llevas {resultado['nuevo_contador_maq']} carcasas/bandages verificados sin "
+                    f"encontrar el CQ {disparador_maq}; objetivo: {umbral_fin_tri_maquina} unidades "
+                    f"consecutivas)."
                 )
         else:
             resultado["comentario"] = texto_accion("T20", balancelas=balancelas)

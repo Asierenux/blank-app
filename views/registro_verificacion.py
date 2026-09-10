@@ -109,8 +109,9 @@ else:
 confirmar_fin_tri_maq = False
 if tipo_verificacion in ("V2", "V3") and asig["estado_maq"] == "E2":
     st.caption(
-        f"Esta máquina lleva **{asig['contador_maq'] or 0}** verificaciones sin encontrar el "
-        f"CQ que desencadenó el Tri Dirigido (**{asig['cq_disparador_maq'] or '—'}**)."
+        f"Esta máquina lleva **{asig['contador_maq'] or 0}** carcasas/bandages verificados sin "
+        f"encontrar el CQ que desencadenó el Tri Dirigido (**{asig['cq_disparador_maq'] or '—'}**) "
+        f"(objetivo: 20 unidades consecutivas)."
     )
     confirmar_fin_tri_maq = st.checkbox(
         "Confirmo que se puede dar por concluida la verificación de Tri Dirigido de máquina "
@@ -163,7 +164,7 @@ if st.button("🔎 Calcular transición de estado", type="secondary"):
         st.error("Indica la matrícula final (verificación TRI).")
     else:
         st.session_state.transicion = db.procesar_verificacion(
-            asig, tipo_verificacion, st.session_state.cq_rows,
+            asig, tipo_verificacion, st.session_state.cq_rows, cantidad=int(cantidad),
             confirmar_fin_tri_maquina=confirmar_fin_tri_maq,
         )
 
