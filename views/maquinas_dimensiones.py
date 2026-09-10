@@ -17,19 +17,15 @@ tab_maq, tab_dim, tab_asig, tab_guia = st.tabs(
 # --- Máquinas --------------------------------------------------------------
 with tab_maq:
     with st.form("nueva_maquina"):
-        c1, c2, c3 = st.columns(3)
+        c1, c2 = st.columns(2)
         codigo = c1.text_input("Código de máquina * (ej. MAC-1)")
         proceso = c2.selectbox("Proceso", db.PROCESOS)
-        balancelas = c3.checkbox(
-            "Tiene Balancelas / descargador (típico MAC-1 a MAC-4)",
-            help="Añade avisos extra al conductor/descargador y remontado en Balancelas de 20 en 20.",
-        )
         submitted = st.form_submit_button("Crear máquina", type="primary")
         if submitted:
             if not codigo.strip():
                 st.error("El código es obligatorio.")
             else:
-                db.add_maquina(codigo.strip(), proceso, balancelas)
+                db.add_maquina(codigo.strip(), proceso)
                 st.success(f"Máquina '{codigo}' creada en estado **SONDEO**.")
                 st.rerun()
 

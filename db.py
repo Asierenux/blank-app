@@ -115,9 +115,7 @@ def calcular_matricula_final(mat_inicial: str, cantidad: int) -> str:
     return f"{prefijo}{nuevo_numero:0{ancho}d}"
 
 
-# Textos de acción (TAB_MAE!Z3:AA16, códigos T10-T70). Para MAC-1 a MAC-4
-# (máquinas con "Balancelas"), la MDV exige avisar además al conductor y
-# remontar en Balancelas de 20 en 20 unidades (comentarios T1-T4 del Excel).
+# Textos de acción (TAB_MAE!Z3:AA16, códigos T10-T70).
 ACCIONES = {
     "T10": "Pasar a TRI DIRIGIDO a el/los CQ NCNA: @@@. Buscar causa y acción correctora. "
            "Alertar a etapas de fabricación posteriores. Buscar lotes anteriores hasta encontrar "
@@ -136,18 +134,11 @@ ACCIONES = {
            "consecutivas sin encontrar el CQ que la desencadenó).",
 }
 
-BALANCELAS_EXTRA = (
-    " [MAC-1 a MAC-4]: avisar también al conductor/descargador para que busque la causa, y "
-    "remontar en Balancelas de 20 en 20 unidades hasta encontrar una secuencia sin CQ."
-)
 
-
-def texto_accion(codigo: str, cqs: list[str] | None = None, balancelas: bool = False) -> str:
+def texto_accion(codigo: str, cqs: list[str] | None = None) -> str:
     texto = ACCIONES.get(codigo, "")
     if cqs:
         texto = texto.replace("@@@", ", ".join(cqs))
-    if balancelas and codigo in ("T10", "T20", "T40"):
-        texto += BALANCELAS_EXTRA
     return texto
 
 
@@ -228,7 +219,6 @@ def init_db(conn):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             codigo TEXT NOT NULL UNIQUE,
             proceso TEXT NOT NULL,
-            balancelas INTEGER NOT NULL DEFAULT 0,
             estado_maq TEXT NOT NULL DEFAULT 'E3',
             cq_disparador_maq TEXT,
             contador_maq INTEGER NOT NULL DEFAULT 0,
@@ -387,12 +377,12 @@ def import_verificadores_codigos(codigos):
 # Máquinas
 # ---------------------------------------------------------------------------
 
-def add_maquina(codigo, proceso, balancelas=False):
+def add_maquina(codigo, proceso):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO maquinas (codigo, proceso, balancelas, estado_maq, fecha_cambio_estado_maq) "
-        "VALUES (?, ?, ?, 'E3', ?)",
-        (codigo, proceso, int(balancelas), date.today().isoformat()),
+        "INSERT INTO maquinas (codigo, proceso, estado_maq, fecha_cambio_estado_maq) "
+        "VALUES (?, ?, 'E3', ?)",
+        (codigo, proceso, date.today().isoformat()),
     )
     conn.commit()
 
@@ -451,7 +441,7 @@ def list_asignaciones(solo_activas=True):
     conn = get_conn()
     q = (
         "SELECT a.*, m.codigo AS maquina_codigo, m.proceso AS maquina_proceso, "
-        "m.balancelas AS maquina_balancelas, m.estado_maq AS estado_maq, "
+        "m.estado_maq AS estado_maq, "
         "m.cq_disparador_maq AS cq_disparador_maq, m.contador_maq AS contador_maq, "
         "d.codigo AS dimension_codigo, d.tipo AS dimension_tipo "
         "FROM asignaciones a "
@@ -468,7 +458,7 @@ def get_asignacion(asignacion_id):
     conn = get_conn()
     return conn.execute(
         "SELECT a.*, m.codigo AS maquina_codigo, m.proceso AS maquina_proceso, "
-        "m.balancelas AS maquina_balancelas, m.estado_maq AS estado_maq, "
+        "m.estado_maq AS estado_maq, "
         "m.cq_disparador_maq AS cq_disparador_maq, m.contador_maq AS contador_maq, "
         "d.codigo AS dimension_codigo, d.tipo AS dimension_tipo "
         "FROM asignaciones a "
@@ -567,7 +557,6 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
     """
     estado_maq = asignacion["estado_maq"]
     estado_dim = asignacion["estado_dim"]
-    balancelas = bool(asignacion["maquina_balancelas"])
     disparador_maq = asignacion["cq_disparador_maq"]
     disparador_dim = asignacion["cq_disparador_dim"]
     contador_maq = asignacion["contador_maq"] or 0
@@ -608,7 +597,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
                     f"consecutivas)."
                 )
         else:
-            resultado["comentario"] = texto_accion("T20", balancelas=balancelas)
+            resultado["comentario"] = texto_accion("T20")
             resultado["requiere_causa_accion"] = [disparador_maq]
 
     elif tipo_verificacion in ("V4", "V7", "V8") and estado_dim == "D3":
@@ -616,7 +605,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
             resultado["nuevo_estado_maq"] = "E2"
             resultado["cq_disparador_maq"] = codigos_ncna[0]
             resultado["nuevo_contador_maq"] = 0
-            resultado["comentario"] = texto_accion("T10", codigos_ncna, balancelas)
+            resultado["comentario"] = texto_accion("T10", codigos_ncna)
             resultado["requiere_causa_accion"] = codigos_ncna
         elif len(codigos_otros) == 1:
             resultado["nuevo_estado_dim"] = "D1"
@@ -625,7 +614,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
         elif len(codigos_otros) > 1:
             resultado["nuevo_estado_dim"] = "D2"
             resultado["cq_disparador_dim"] = codigos_otros[0]
-            resultado["comentario"] = texto_accion("T40", codigos_otros, balancelas)
+            resultado["comentario"] = texto_accion("T40", codigos_otros)
             resultado["requiere_causa_accion"] = codigos_otros
         else:
             resultado["comentario"] = texto_accion("T50")
@@ -635,12 +624,12 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
             resultado["nuevo_estado_maq"] = "E2"
             resultado["cq_disparador_maq"] = codigos_ncna[0]
             resultado["nuevo_contador_maq"] = 0
-            resultado["comentario"] = texto_accion("T10", codigos_ncna, balancelas)
+            resultado["comentario"] = texto_accion("T10", codigos_ncna)
             resultado["requiere_causa_accion"] = codigos_ncna
         elif codigos_otros:
             resultado["nuevo_estado_dim"] = "D2"
             resultado["cq_disparador_dim"] = disparador_dim or codigos_otros[0]
-            resultado["comentario"] = texto_accion("T40", codigos_otros, balancelas)
+            resultado["comentario"] = texto_accion("T40", codigos_otros)
             resultado["requiere_causa_accion"] = codigos_otros
         else:
             resultado["nuevo_estado_dim"] = "D3"
@@ -654,7 +643,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
             resultado["cq_disparador_dim"] = None
             resultado["comentario"] = texto_accion("T50")
         else:
-            resultado["comentario"] = texto_accion("T40", [disparador_dim], balancelas)
+            resultado["comentario"] = texto_accion("T40", [disparador_dim])
             resultado["requiere_causa_accion"] = [disparador_dim]
 
     else:
