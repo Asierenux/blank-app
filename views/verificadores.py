@@ -4,12 +4,13 @@ import pandas as pd
 import streamlit as st
 
 import db
+import ui
 
-st.title(":material/engineering: Calificación de verificadores (Anexo 1)")
-st.caption(
+ui.page_header(
+    "engineering", "Calificación de verificadores (Anexo 1)",
     "Umbrales de calificación: Test en sala ≥ 90% de respuestas correctas · "
     "CQ NCNA: Aceptado = 0, Rechazado = 1 · Otros CQ: Aceptado = 6, Rechazado = 7 "
-    "(evaluación media sobre 500 productos)."
+    "(evaluación media sobre 500 productos).",
 )
 
 tab_alta, tab_lista = st.tabs([":material/add: Nuevo verificador / evaluación", ":material/checklist: Listado y vigencia"])
@@ -61,7 +62,8 @@ with tab_lista:
                 "Alerta": alerta or "OK",
             })
         df = pd.DataFrame(filas)
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        df.index = [""] * len(df)
+        st.table(df)
 
         st.divider()
         st.subheader("Registrar reciclaje")

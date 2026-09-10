@@ -4,13 +4,14 @@ import io
 import streamlit as st
 
 import db
+import ui
 
-st.title(":material/upload_file: Importar catálogos")
-st.caption(
+ui.page_header(
+    "upload_file", "Importar catálogos",
     "Carga aquí los catálogos maestros exportados de vuestro Excel (TAB_MAE de "
     "MDV_EPQL.xlsm): códigos CQ, dimensiones y códigos de operario. Los ficheros "
     "se procesan localmente en tu propia instancia; esta app no envía ni almacena "
-    "estos datos en ningún sitio fuera de tu base de datos local."
+    "estos datos en ningún sitio fuera de tu base de datos local.",
 )
 
 tab_cq, tab_dim, tab_op = st.tabs(
@@ -38,10 +39,9 @@ with tab_cq:
     st.metric("Códigos CQ en el catálogo", len(catalogo))
     if catalogo:
         import pandas as pd
-        st.dataframe(
-            pd.DataFrame([{"Código": c["codigo"], "Familia": c["familia"]} for c in catalogo]),
-            use_container_width=True, hide_index=True,
-        )
+        df_cq = pd.DataFrame([{"Código": c["codigo"], "Familia": c["familia"]} for c in catalogo])
+        df_cq.index = [""] * len(df_cq)
+        st.table(df_cq)
 
 with tab_dim:
     st.markdown(

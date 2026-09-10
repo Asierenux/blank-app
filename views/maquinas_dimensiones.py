@@ -2,12 +2,13 @@ import pandas as pd
 import streamlit as st
 
 import db
+import ui
 
-st.title(":material/factory: Máquinas y Dimensiones")
-st.caption(
-    "La malla de gestión real de la MDV es el código Carcasa/Bandage **por máquina** "
+ui.page_header(
+    "factory", "Máquinas y Dimensiones",
+    "La malla de gestión real de la MDV es el código Carcasa/Bandage por máquina "
     "de fabricación. Cada máquina tiene su propio estado de muestreo, y cada "
-    "combinación máquina+dimensión tiene el suyo."
+    "combinación máquina+dimensión tiene el suyo.",
 )
 
 tab_maq, tab_dim, tab_asig, tab_guia = st.tabs(
@@ -33,13 +34,12 @@ with tab_maq:
     if not maquinas:
         st.info("Sin máquinas todavía. Crea al menos una (ej. MAC-1 ... MAC-6).")
     else:
-        st.dataframe(
-            pd.DataFrame([
-                {"Código": m["codigo"], "Proceso": m["proceso"], "Estado": db.ESTADOS_MAQ.get(m["estado_maq"], m["estado_maq"])}
-                for m in maquinas
-            ]),
-            use_container_width=True, hide_index=True,
-        )
+        df_maq = pd.DataFrame([
+            {"Código": m["codigo"], "Proceso": m["proceso"], "Estado": db.ESTADOS_MAQ.get(m["estado_maq"], m["estado_maq"])}
+            for m in maquinas
+        ])
+        df_maq.index = [""] * len(df_maq)
+        st.table(df_maq)
 
         st.divider()
         st.subheader(":material/edit: Editar o eliminar una máquina")
@@ -92,13 +92,12 @@ with tab_dim:
     if not dimensiones:
         st.info("Sin dimensiones todavía.")
     else:
-        st.dataframe(
-            pd.DataFrame([
-                {"Código": d["codigo"], "Tipo": d["tipo"], "Notas": d["notas"] or ""}
-                for d in dimensiones
-            ]),
-            use_container_width=True, hide_index=True,
-        )
+        df_dim = pd.DataFrame([
+            {"Código": d["codigo"], "Tipo": d["tipo"], "Notas": d["notas"] or ""}
+            for d in dimensiones
+        ])
+        df_dim.index = [""] * len(df_dim)
+        st.table(df_dim)
 
         st.divider()
         st.subheader(":material/edit: Editar o eliminar una dimensión")
@@ -175,7 +174,9 @@ with tab_asig:
                     "CQ disparador (dimensión)": a["cq_disparador_dim"] or "—",
                     "Activa": "Sí" if a["activa"] else "No",
                 })
-            st.dataframe(pd.DataFrame(filas), use_container_width=True, hide_index=True)
+            df_asig = pd.DataFrame(filas)
+            df_asig.index = [""] * len(df_asig)
+            st.table(df_asig)
 
             st.divider()
             st.subheader("Forzar estado manualmente")

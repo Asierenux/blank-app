@@ -4,9 +4,12 @@ import pandas as pd
 import streamlit as st
 
 import db
+import ui
 
-st.title(":material/report_problem: No conformidades, causas y seguimiento")
-st.caption("Histórico generado automáticamente al registrar cada verificación.")
+ui.page_header(
+    "report_problem", "No conformidades, causas y seguimiento",
+    "Histórico generado automáticamente al registrar cada verificación.",
+)
 
 tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
     [":material/error: CQ detectados", ":material/build: Causas y acciones correctoras",

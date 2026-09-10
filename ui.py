@@ -1,138 +1,195 @@
 """
-Identidad visual de la app: paleta propia, tipografía y retoques de estilo
-sobre los componentes de Streamlit. Se apoya únicamente en selectores
-oficiales y estables (data-testid documentados por Streamlit), nunca en
-clases internas generadas dinámicamente (st-emotion-cache-...), para que
-sobreviva a actualizaciones de Streamlit dentro del rango fijado en
-requirements.txt.
+Identidad visual de la app: panel corporativo tipo ERP industrial (paleta
+sólida, paneles con cabecera de icono, insignias de estado en pastilla,
+tablas con franjas alternas). Se apoya únicamente en selectores oficiales y
+estables (data-testid documentados por Streamlit), nunca en clases internas
+generadas dinámicamente (st-emotion-cache-...), para que sobreviva a
+actualizaciones de Streamlit dentro del rango fijado en requirements.txt.
 """
 import streamlit as st
 
-NAVY = "#1B2A4A"
-NAVY_DARK = "#101B30"
-GOLD = "#B8873B"
-INK = "#1C1F26"
-PAPER = "#FBFAF7"
+# --- Paleta -----------------------------------------------------------------
+BRAND = "#0B5FA5"
+BRAND_DARK = "#08447A"
+SHELL = "#1D2939"
+SHELL_HOVER = "#28374A"
+INK = "#1C232E"
+MUTED = "#5B6472"
+BG = "#F4F5F7"
 CARD = "#FFFFFF"
-BORDER = "rgba(28, 31, 38, 0.10)"
+BORDER = "#D8DCE1"
+BORDER_STRONG = "#C1C7D0"
+
+DANGER = "#B3261E"
+WARNING = "#B7791F"
+SUCCESS = "#1B7F4C"
+INFO = BRAND
+NEUTRAL = "#5B6472"
+
+FONT = "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif"
 
 CUSTOM_CSS = f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500&display=swap');
 
 html, body, .stApp {{
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-family: {FONT};
+    background: {BG};
+}}
+[data-testid="stMainBlockContainer"] {{
+    padding-top: 2rem;
 }}
 
-/* Titulares con la tipografía de marca */
+/* Titulares: neutros, sin la calidez "app" de antes */
 [data-testid="stHeading"] h1,
 [data-testid="stHeading"] h2,
 [data-testid="stHeading"] h3 {{
-    font-family: 'Manrope', 'Inter', sans-serif;
-    color: {NAVY};
-    letter-spacing: -0.01em;
+    font-family: {FONT};
+    color: {INK};
+    letter-spacing: 0;
 }}
-[data-testid="stHeading"] h1 {{ font-weight: 800; }}
-[data-testid="stHeading"] h3 {{ font-weight: 700; }}
+[data-testid="stHeading"] h1 {{ font-weight: 700; font-size: 1.7rem; }}
+[data-testid="stHeading"] h3 {{ font-weight: 600; font-size: 1.05rem; }}
 
-/* Barra lateral */
+/* Barra lateral: color sólido, sin degradado */
 [data-testid="stSidebar"] {{
-    background: linear-gradient(180deg, {NAVY} 0%, {NAVY_DARK} 100%);
-    border-right: 1px solid {BORDER};
+    background: {SHELL};
+    border-right: 1px solid rgba(255,255,255,0.08);
 }}
 [data-testid="stSidebar"] * {{
-    color: #EDEFF3 !important;
+    color: #E8EAED !important;
+}}
+[data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) {{
+    font-family: {FONT};
 }}
 [data-testid="stSidebarNavLink"] {{
-    border-radius: 8px;
-    margin: 2px 8px;
+    border-radius: 4px;
+    margin: 1px 8px;
+}}
+[data-testid="stSidebarNavLink"]:hover {{
+    background: {SHELL_HOVER} !important;
 }}
 [data-testid="stSidebarNavLink"][aria-current="page"] {{
-    background: rgba(184, 135, 59, 0.22) !important;
-    border-left: 3px solid {GOLD};
+    background: {BRAND} !important;
+    border-left: 3px solid #fff;
 }}
-[data-testid="stSidebar"] hr {{ border-color: rgba(255,255,255,0.15); }}
+[data-testid="stSidebar"] hr {{ border-color: rgba(255,255,255,0.12); }}
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"] {{
-    background: rgba(255,255,255,0.06);
-    border: 1px solid rgba(255,255,255,0.25);
-    color: #EDEFF3 !important;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 4px;
+    color: #E8EAED !important;
 }}
 [data-testid="stSidebar"] [data-testid="stBaseButton-secondary"]:hover {{
-    background: rgba(255,255,255,0.14);
-    border-color: {GOLD};
+    background: {SHELL_HOVER};
+    border-color: #fff;
 }}
 
-/* Botones */
+/* Botones: planos, esquina recta, sin sombra decorativa */
 [data-testid="stBaseButton-primary"],
 [data-testid="stBaseButton-primaryFormSubmit"] {{
-    background: {NAVY};
-    border: 1px solid {NAVY};
-    border-radius: 10px;
+    background: {BRAND};
+    border: 1px solid {BRAND};
+    border-radius: 4px;
     font-weight: 600;
-    box-shadow: 0 2px 6px rgba(27, 42, 74, 0.25);
-    transition: transform .05s ease, box-shadow .15s ease, background .15s ease;
+    box-shadow: none;
 }}
 [data-testid="stBaseButton-primary"]:hover,
 [data-testid="stBaseButton-primaryFormSubmit"]:hover {{
-    background: {NAVY_DARK};
-    box-shadow: 0 4px 10px rgba(27, 42, 74, 0.32);
+    background: {BRAND_DARK};
+    border-color: {BRAND_DARK};
 }}
 [data-testid="stBaseButton-secondary"],
 [data-testid="stBaseButton-secondaryFormSubmit"] {{
-    border-radius: 10px;
-    border: 1px solid rgba(27, 42, 74, 0.35);
+    border-radius: 4px;
+    border: 1px solid {BORDER_STRONG};
     font-weight: 600;
-    color: {NAVY};
+    color: {INK};
+    background: {CARD};
 }}
 [data-testid="stBaseButton-secondary"]:hover,
 [data-testid="stBaseButton-secondaryFormSubmit"]:hover {{
-    border-color: {GOLD};
-    color: {NAVY_DARK};
+    border-color: {BRAND};
+    color: {BRAND};
 }}
 
-/* Formularios y tarjetas */
+/* Formularios y paneles: recuadro neto, sin sombra suave */
 [data-testid="stForm"] {{
     background: {CARD};
-    border-radius: 14px;
+    border-radius: 4px;
     border: 1px solid {BORDER};
-    box-shadow: 0 1px 3px rgba(28, 31, 38, 0.06);
-    padding: 1.4rem 1.4rem 1rem 1.4rem;
+    padding: 1.25rem 1.25rem .9rem 1.25rem;
 }}
 
-/* Métricas como pequeñas tarjetas */
+/* Métricas como paneles de indicador (KPI tile) */
 [data-testid="stMetric"] {{
     background: {CARD};
     border: 1px solid {BORDER};
-    border-radius: 12px;
-    padding: 0.9rem 1rem;
-    box-shadow: 0 1px 3px rgba(28, 31, 38, 0.05);
+    border-left: 3px solid {BRAND};
+    border-radius: 2px;
+    padding: .8rem 1rem;
 }}
-[data-testid="stMetricLabel"] {{ color: rgba(28,31,38,0.65); }}
+[data-testid="stMetricLabel"] {{ color: {MUTED}; font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; }}
+[data-testid="stMetricValue"] {{ font-family: {FONT}; font-weight: 700; }}
 
-/* Alertas más redondeadas */
+/* Alertas: barra de color a la izquierda, esquina recta */
 [data-testid="stAlert"] {{
-    border-radius: 10px;
+    border-radius: 2px;
 }}
 
-/* Pestañas */
-[data-baseweb="tab-list"] {{
-    gap: 4px;
-}}
+/* Pestañas: subrayado sólido, tipografía en mayúsculas discretas */
+[data-baseweb="tab-list"] {{ gap: 4px; border-bottom: 1px solid {BORDER}; }}
 [data-baseweb="tab-highlight"] {{
-    background-color: {GOLD} !important;
-    height: 3px !important;
+    background-color: {BRAND} !important;
+    height: 2px !important;
+}}
+button[data-baseweb="tab"] p {{
+    font-weight: 600;
+    font-size: .85rem;
 }}
 
-/* Tablas */
+/* Tablas (contenedor de st.dataframe: el interior se pinta en canvas y no
+   admite CSS por fila; las listas de referencia usan st.table, que sí es
+   HTML real y se peina más abajo). */
 [data-testid="stDataFrame"] {{
-    border-radius: 10px;
+    border-radius: 2px;
     overflow: hidden;
     border: 1px solid {BORDER};
 }}
 
-/* Contenedores con borde (tarjetas de pasos) */
+/* st.table: tabla HTML real -> franjas alternas y cabecera sólida, como un
+   listado de ERP */
+[data-testid="stTable"] table {{
+    border-collapse: collapse;
+    width: 100%;
+    font-size: .88rem;
+}}
+[data-testid="stTable"] thead th {{
+    background: {SHELL};
+    color: #fff !important;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: .72rem;
+    letter-spacing: .04em;
+    padding: .5rem .7rem;
+    text-align: left;
+    border: none;
+}}
+[data-testid="stTable"] tbody td {{
+    padding: .45rem .7rem;
+    border-bottom: 1px solid {BORDER};
+    color: {INK};
+}}
+[data-testid="stTable"] tbody tr:nth-child(even) {{
+    background: {BG};
+}}
+[data-testid="stTable"] tbody tr:hover {{
+    background: #E9F0F8;
+}}
+
+/* Contenedores con borde (paneles de paso): esquina recta */
 div[data-testid="stVerticalBlock"] > div[data-testid="stElementContainer"] {{
-    border-radius: 14px;
+    border-radius: 4px;
 }}
 </style>
 """
@@ -142,16 +199,23 @@ def inject():
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 
-def _icon_span(name: str, size: int = 20, color: str = "currentColor") -> str:
+def _icon_span(name: str, size: int = 18, color: str = "currentColor") -> str:
     """Icono de Material Symbols vía la fuente que Streamlit ya carga por
     defecto ('Material Symbols Rounded'), para usarlo embebido dentro de
     HTML propio (donde el atajo :material/nombre: de Streamlit no se
     procesa). Fuera de HTML propio, usa siempre :material/nombre: en el
-    texto normal de st.title/subheader/button/tabs/alertas, que Streamlit
-    ya convierte solo."""
+    texto normal de st.button/tabs/alertas, que Streamlit ya convierte solo."""
     return (
         f'<span style="font-family:\'Material Symbols Rounded\'; font-size:{size}px; '
         f'color:{color}; vertical-align:middle; line-height:1;">{name}</span>'
+    )
+
+
+def _icon_tile(icon_name: str, size: int = 34, bg: str = BRAND, icon_size: int = 18) -> str:
+    return (
+        f'<div style="width:{size}px; height:{size}px; min-width:{size}px; border-radius:4px; '
+        f'background:{bg}; display:flex; align-items:center; justify-content:center;">'
+        f'{_icon_span(icon_name, icon_size, "#fff")}</div>'
     )
 
 
@@ -159,54 +223,85 @@ def marca(texto: str = "Control de Verificación"):
     """Cabecera de marca compacta, para la pantalla de login."""
     st.markdown(
         f"""
-        <div style="display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;">
-            <div style="width:40px; height:40px; border-radius:10px; background:{NAVY};
-                        display:flex; align-items:center; justify-content:center;
-                        box-shadow:0 2px 8px rgba(27,42,74,.3);">{_icon_span("precision_manufacturing", 22, "#fff")}</div>
-            <span style="font-family:'Manrope',sans-serif; font-weight:800; font-size:1.05rem;
-                         color:{NAVY}; letter-spacing:-.01em;">{texto}</span>
+        <div style="display:flex; align-items:center; gap:.65rem; margin-bottom:.3rem;">
+            {_icon_tile("precision_manufacturing", 38, BRAND, 20)}
+            <span style="font-family:{FONT}; font-weight:700; font-size:1.05rem;
+                         color:{INK};">{texto}</span>
         </div>
         """,
+        unsafe_allow_html=True,
+    )
+
+
+def page_header(icon_name: str, titulo: str, subtitulo: str = None):
+    """Cabecera de página: chapa de icono en color sólido + título, al estilo
+    de un panel de registro de un ERP (en vez de st.title con emoji).
+
+    Ojo: no dejar líneas en blanco (ni sólo con espacios) dentro del HTML de
+    st.markdown. Una línea en blanco corta el bloque para el parser de
+    Markdown, y la siguiente línea indentada (p.ej. un `</div>` de cierre)
+    pasa a interpretarse como un bloque de código en vez de HTML."""
+    sub_html = (
+        f'<div style="color:{MUTED}; font-size:.88rem; margin-top:.15rem;">{subtitulo}</div>'
+        if subtitulo else ""
+    )
+    st.markdown(
+        f'<div style="display:flex; align-items:flex-start; gap:.7rem; margin-bottom:1rem; '
+        f'padding-bottom:.9rem; border-bottom:1px solid {BORDER};">'
+        f'{_icon_tile(icon_name, 38, BRAND, 20)}'
+        f'<div>'
+        f'<div style="font-family:{FONT}; font-weight:700; font-size:1.4rem; color:{INK}; '
+        f'line-height:1.2;">{titulo}</div>'
+        f'{sub_html}'
+        f'</div>'
+        f'</div>',
         unsafe_allow_html=True,
     )
 
 
 def step_badge(numero: int, texto: str):
-    """Cabecera de paso con una insignia circular numerada (sustituye a los
-    emoji de teclado 1️⃣2️⃣3️⃣ por un diseño propio)."""
+    """Cabecera de paso con una insignia numerada cuadrada, estilo asistente
+    de formulario ERP."""
     st.markdown(
         f"""
         <div style="display:flex; align-items:center; gap:.6rem; margin:.1rem 0 .8rem 0;">
-            <div style="width:30px; height:30px; min-width:30px; border-radius:50%; background:{NAVY};
+            <div style="width:26px; height:26px; min-width:26px; border-radius:4px; background:{BRAND};
                         display:flex; align-items:center; justify-content:center;
-                        color:#fff; font-family:'Manrope',sans-serif; font-weight:800; font-size:.95rem;">
+                        color:#fff; font-family:{FONT}; font-weight:700; font-size:.85rem;">
                 {numero}
             </div>
-            <span style="font-family:'Manrope',sans-serif; font-weight:700; font-size:1.25rem;
-                         color:{NAVY};">{texto}</span>
+            <span style="font-family:{FONT}; font-weight:600; font-size:1.05rem;
+                         color:{INK};">{texto}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
 
-FAMILIA_COLOR = {"NCNA": "#C0392B", "H2": "#B8873B"}
+_BADGE_COLOR = {
+    "danger": DANGER, "warning": WARNING, "success": SUCCESS,
+    "info": INFO, "neutral": NEUTRAL,
+}
+FAMILIA_KIND = {"NCNA": "danger", "H2": "warning"}
 
 
-def dot(color: str) -> str:
-    """Punto de color plano (sin depender de ninguna fuente de iconos)."""
+def badge(texto: str, kind: str = "neutral") -> str:
+    """Insignia de estado en pastilla sólida (patrón habitual de ERP/CRM:
+    Salesforce, Jira, etc.) en vez de un punto de color."""
+    color = _BADGE_COLOR.get(kind, NEUTRAL)
     return (
-        f'<span style="display:inline-block; width:9px; height:9px; border-radius:50%; '
-        f'background:{color}; margin-right:.4rem; vertical-align:middle;"></span>'
+        f'<span style="display:inline-block; background:{color}; color:#fff; '
+        f'font-family:{FONT}; font-weight:600; font-size:.72rem; text-transform:uppercase; '
+        f'letter-spacing:.03em; padding:.15rem .55rem; border-radius:10px; white-space:nowrap;">'
+        f'{texto}</span>'
     )
 
 
 def familia_badge(familia: str) -> str:
-    color = FAMILIA_COLOR.get(familia, "#6B7280")
-    return dot(color) + familia
+    return badge(familia, FAMILIA_KIND.get(familia, "neutral"))
 
 
-def icon_line(icon_name: str, texto: str, size: int = 18, color: str = None) -> str:
+def icon_line(icon_name: str, texto: str, size: int = 16, color: str = None) -> str:
     """Icono + texto en una misma línea, para insertar dentro de un
     st.markdown(unsafe_allow_html=True) propio."""
-    return f'{_icon_span(icon_name, size, color or NAVY)} {texto}'
+    return f'{_icon_span(icon_name, size, color or MUTED)} {texto}'

@@ -5,7 +5,7 @@ import streamlit as st
 import db
 import ui
 
-st.title(":material/fact_check: Registro de verificación")
+ui.page_header("fact_check", "Registro de verificación")
 
 maquinas = db.list_maquinas()
 verificadores = db.list_verificadores()

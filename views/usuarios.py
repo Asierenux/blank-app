@@ -2,11 +2,12 @@ import pandas as pd
 import streamlit as st
 
 import db
+import ui
 
-st.title(":material/admin_panel_settings: Usuarios")
-st.caption(
+ui.page_header(
+    "admin_panel_settings", "Usuarios",
     "Gestión de accesos: cada usuario tiene un rol (Operario/Técnico) que determina "
-    "qué páginas ve. Las contraseñas se guardan con hash + sal, nunca en texto plano."
+    "qué páginas ve. Las contraseñas se guardan con hash + sal, nunca en texto plano.",
 )
 
 tab_alta, tab_lista = st.tabs([":material/add: Nuevo usuario", ":material/checklist: Usuarios existentes"])
@@ -40,13 +41,12 @@ with tab_lista:
     if not usuarios:
         st.info("No hay usuarios.")
     else:
-        st.dataframe(
-            pd.DataFrame([
-                {"Usuario": u["username"], "Rol": u["rol"], "Fecha de alta": u["fecha_creacion"]}
-                for u in usuarios
-            ]),
-            use_container_width=True, hide_index=True,
-        )
+        df_usr = pd.DataFrame([
+            {"Usuario": u["username"], "Rol": u["rol"], "Fecha de alta": u["fecha_creacion"]}
+            for u in usuarios
+        ])
+        df_usr.index = [""] * len(df_usr)
+        st.table(df_usr)
 
         st.divider()
         st.subheader("Cambiar rol / contraseña / eliminar")

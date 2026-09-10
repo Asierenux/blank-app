@@ -1,11 +1,11 @@
 [theme]
 base = "light"
-primaryColor = "#1B2A4A"
-backgroundColor = "#FBFAF7"
-secondaryBackgroundColor = "#F1ECE1"
-textColor = "#1C1F26"
+primaryColor = "#0B5FA5"
+backgroundColor = "#F4F5F7"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#1C232E"
 font = "sans serif"
-chartCategoricalColors = ["#1B2A4A", "#B8873B", "#5A7CA6", "#8C6A2F", "#3E5675"]
+chartCategoricalColors = ["#0B5FA5", "#1D2939", "#B7791F", "#1B7F4C", "#5B6472", "#B3261E"]
 
 [browser]
 gatherUsageStats = false

@@ -4,12 +4,12 @@ import pandas as pd
 import streamlit as st
 
 import db
+import ui
 
-
-st.title(":material/precision_manufacturing: Control de Verificación de Carcasas y Bandages")
-st.caption(
+ui.page_header(
+    "precision_manufacturing", "Control de Verificación de Carcasas y Bandages",
     "Digitalización de la MDV de verificación (sustituye a MDV_MAC.xlsm): estado de "
-    "muestreo por máquina y por dimensión en esa máquina."
+    "muestreo por máquina y por dimensión en esa máquina.",
 )
 
 maquinas = db.list_maquinas()
