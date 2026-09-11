@@ -8,6 +8,16 @@ actualizaciones de Streamlit dentro del rango fijado en requirements.txt.
 """
 import streamlit as st
 
+
+def boton_descarga_csv(df, nombre_archivo: str, label: str = "Descargar CSV", key: str = None):
+    """Botón de descarga de un DataFrame como CSV (utf-8-sig para que Excel
+    respete los acentos/ñ al abrirlo directamente)."""
+    csv_bytes = df.to_csv(index=False).encode("utf-8-sig")
+    st.download_button(
+        f":material/download: {label}", data=csv_bytes, file_name=nombre_archivo,
+        mime="text/csv", key=key,
+    )
+
 # --- Paleta -----------------------------------------------------------------
 BRAND = "#0B5FA5"
 BRAND_DARK = "#08447A"
@@ -63,6 +73,10 @@ html, body, .stApp {{
 }}
 [data-testid="stSidebar"] *:not([data-testid="stIconMaterial"]) {{
     font-family: {FONT};
+    font-size: .82rem;
+}}
+[data-testid="stSidebarNavLink"] p {{
+    font-size: .82rem;
 }}
 [data-testid="stSidebarNavLink"] {{
     border-radius: 4px;

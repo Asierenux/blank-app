@@ -9,13 +9,9 @@ ui.page_header(
     "Últimas verificaciones registradas, más recientes primero.",
 )
 
-verificaciones = db.list_verificaciones(limit=30)
 
-if not verificaciones:
-    st.info("Todavía no se ha registrado ninguna verificación.")
-else:
+def _tabla_verificaciones(verificaciones):
     cqs_por_verificacion = db.no_conformidades_por_verificacion([v["id"] for v in verificaciones])
-
     filas = []
     for v in verificaciones:
         cqs = cqs_por_verificacion.get(v["id"], [])
@@ -34,6 +30,23 @@ else:
             "CQ detectado (carcasa afectada)": cq_texto,
             "Resultado": v["comentario_sistema"] or "—",
         })
-    df = pd.DataFrame(filas)
-    df.index = [""] * len(df)
-    st.table(df)
+    return pd.DataFrame(filas)
+
+
+verificaciones = db.list_verificaciones(limit=30)
+
+if not verificaciones:
+    st.info("Todavía no se ha registrado ninguna verificación.")
+else:
+    df = _tabla_verificaciones(verificaciones)
+    df_vista = df.copy()
+    df_vista.index = [""] * len(df_vista)
+    st.table(df_vista)
+
+    st.divider()
+    total = db.list_verificaciones(limit=5000)
+    st.caption(f"La tabla muestra las últimas {len(verificaciones)} de {len(total)} verificaciones registradas en total.")
+    ui.boton_descarga_csv(
+        _tabla_verificaciones(total), "historial_verificaciones.csv",
+        "Descargar historial completo (CSV)",
+    )

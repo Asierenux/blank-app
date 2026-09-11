@@ -31,6 +31,7 @@ with tab_cq:
             "matricula": "Matrícula", "verificador_nombre": "Verificador",
         })
         st.dataframe(tabla, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(tabla, "cq_detectados.csv", "Descargar CQ detectados (CSV)", key="csv_cq")
         c1, c2 = st.columns(2)
         c1.metric("Total CQ", len(df))
         c2.metric("CQ NCNA", int((df["familia"] == "NCNA").sum()))
@@ -51,6 +52,7 @@ with tab_causas:
             }
         )
         st.dataframe(tabla, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(tabla, "causas_acciones.csv", "Descargar causas y acciones (CSV)", key="csv_causas")
 
 with tab_informe:
     st.subheader("Movimientos por máquina / dimensión")
@@ -83,6 +85,7 @@ with tab_informe:
             }
         )
         st.dataframe(tabla, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(tabla, "informe_verificaciones.csv", "Descargar detalle (CSV)", key="csv_informe")
 
         st.divider()
         st.subheader("Histórico de cambios de estado")
@@ -98,6 +101,9 @@ with tab_informe:
                 }
             )
             st.dataframe(tabla_c, use_container_width=True, hide_index=True)
+            ui.boton_descarga_csv(
+                tabla_c, "historico_cambios_estado.csv", "Descargar histórico de cambios (CSV)", key="csv_cambios",
+            )
 
 with tab_ncf:
     st.caption(
@@ -120,6 +126,7 @@ with tab_ncf:
             "no_conformes": "No conformes",
         })
         st.dataframe(tabla_ncf, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(tabla_ncf, "ncf_por_maquina.csv", "Descargar % NCF por máquina (CSV)", key="csv_ncf_maq")
 
     st.divider()
     st.subheader("Por operario")
@@ -133,6 +140,7 @@ with tab_ncf:
             "operario": "Operario", "verificadas": "Verificadas", "no_conformes": "No conformes",
         })
         st.dataframe(tabla_op, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(tabla_op, "ncf_por_operario.csv", "Descargar % NCF por operario (CSV)", key="csv_ncf_op")
         st.caption(
             "Un % NCF alto y sostenido por operario es señal para revisar su "
             "calificación (Anexo 1) en la página Verificadores."
