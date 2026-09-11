@@ -365,6 +365,27 @@ def init_db(conn):
         """
     )
     conn.commit()
+    _seed_maquinas_dimensiones_mac(conn)
+
+
+def _seed_maquinas_dimensiones_mac(conn):
+    """Máquinas y dimensiones predefinidas del proceso MAC: máquinas MAC-2 a
+    MAC-6, y dimensiones (códigos numéricos) del 1 al 99. Sólo se crean la
+    primera vez (si la tabla está vacía), para no resucitar registros que un
+    Técnico haya borrado a propósito más adelante."""
+    hoy = date.today().isoformat()
+    if not conn.execute("SELECT 1 FROM maquinas LIMIT 1").fetchone():
+        conn.executemany(
+            "INSERT INTO maquinas (codigo, proceso, estado_maq, fecha_cambio_estado_maq) "
+            "VALUES (?, 'MAC', 'E3', ?)",
+            [(f"MAC-{n}", hoy) for n in range(2, 7)],
+        )
+    if not conn.execute("SELECT 1 FROM dimensiones LIMIT 1").fetchone():
+        conn.executemany(
+            "INSERT INTO dimensiones (codigo, tipo, notas) VALUES (?, 'Carcasa', '')",
+            [(str(n),) for n in range(1, 100)],
+        )
+    conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -623,6 +644,21 @@ def add_verificador(nombre, fecha_test_sala, test_sala_pct, fecha_test_puesto,
         "VALUES (?, ?, ?, ?, ?, ?, ?)",
         (nombre, fecha_test_sala, test_sala_pct, fecha_test_puesto,
          errores_ncna, errores_otros_cq, notas),
+    )
+    conn.commit()
+
+
+def actualizar_evaluacion_verificador(verificador_id, fecha_test_sala, test_sala_pct,
+                                       fecha_test_puesto, errores_ncna, errores_otros_cq, notas=""):
+    """Registra una nueva evaluación/reciclaje sobre un verificador YA
+    existente (por ejemplo, uno importado por código en Importar Catálogos),
+    en vez de crear un duplicado con el mismo nombre/código."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE verificadores SET fecha_test_sala = ?, test_sala_pct = ?, fecha_test_puesto = ?, "
+        "errores_ncna = ?, errores_otros_cq = ?, notas = ? WHERE id = ?",
+        (fecha_test_sala, test_sala_pct, fecha_test_puesto, errores_ncna, errores_otros_cq,
+         notas, verificador_id),
     )
     conn.commit()
 

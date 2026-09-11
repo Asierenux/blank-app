@@ -16,8 +16,22 @@ ui.page_header(
 tab_alta, tab_lista = st.tabs([":material/add: Nuevo verificador / evaluación", ":material/checklist: Listado y vigencia"])
 
 with tab_alta:
+    verificadores_existentes = db.list_verificadores()
+    NUEVO = "+ Nuevo verificador"
+    opciones_alta = [NUEVO] + [v["nombre"] for v in verificadores_existentes]
+    seleccion = st.selectbox(
+        "Verificador", opciones_alta,
+        help="Si ya existe (por ejemplo, importado por código en Importar Catálogos), "
+             "selecciónalo aquí para registrarle una evaluación nueva en vez de duplicarlo.",
+    )
+    es_nuevo = seleccion == NUEVO
+
     with st.form("nuevo_verificador"):
-        nombre = st.text_input("Nombre del verificador *")
+        if es_nuevo:
+            nombre = st.text_input("Nombre/código del verificador *")
+        else:
+            nombre = seleccion
+            st.caption(f"Registrando una nueva evaluación para **{nombre}**.")
         c1, c2 = st.columns(2)
         fecha_test_sala = c1.date_input("Fecha test en sala", value=date.today())
         test_sala_pct = c2.number_input("% respuestas correctas (test en sala)", min_value=0.0, max_value=100.0, value=90.0, step=1.0)
@@ -28,13 +42,20 @@ with tab_alta:
         notas = st.text_area("Notas")
         submitted = st.form_submit_button("Guardar verificador", type="primary")
         if submitted:
-            if not nombre.strip():
-                st.error("El nombre es obligatorio.")
+            if es_nuevo and not nombre.strip():
+                st.error("El nombre/código es obligatorio.")
             else:
-                db.add_verificador(
-                    nombre.strip(), fecha_test_sala.isoformat(), test_sala_pct,
-                    fecha_test_puesto.isoformat(), int(errores_ncna), int(errores_otros), notas,
-                )
+                if es_nuevo:
+                    db.add_verificador(
+                        nombre.strip(), fecha_test_sala.isoformat(), test_sala_pct,
+                        fecha_test_puesto.isoformat(), int(errores_ncna), int(errores_otros), notas,
+                    )
+                else:
+                    verificador_id = next(v["id"] for v in verificadores_existentes if v["nombre"] == nombre)
+                    db.actualizar_evaluacion_verificador(
+                        verificador_id, fecha_test_sala.isoformat(), test_sala_pct,
+                        fecha_test_puesto.isoformat(), int(errores_ncna), int(errores_otros), notas,
+                    )
                 estado = db.calcula_estado_verificador(test_sala_pct, errores_ncna, errores_otros)
                 if estado == "Calificado":
                     st.success(f"Verificador registrado. Estado calculado: **{estado}**.")
