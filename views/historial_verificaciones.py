@@ -13,6 +13,7 @@ ui.page_header(
 def _tabla_verificaciones(verificaciones):
     cqs_por_verificacion = db.no_conformidades_por_verificacion([v["id"] for v in verificaciones])
     filas = []
+    severidades = []
     for v in verificaciones:
         cqs = cqs_por_verificacion.get(v["id"], [])
         cq_texto = (
@@ -30,7 +31,8 @@ def _tabla_verificaciones(verificaciones):
             "CQ detectado (carcasa afectada)": cq_texto,
             "Resultado": v["comentario_sistema"] or "—",
         })
-    return pd.DataFrame(filas)
+        severidades.append(db.severidad_por_cqs(cqs))
+    return pd.DataFrame(filas), severidades
 
 
 verificaciones = db.list_verificaciones(limit=30)
@@ -38,15 +40,20 @@ verificaciones = db.list_verificaciones(limit=30)
 if not verificaciones:
     st.info("Todavía no se ha registrado ninguna verificación.")
 else:
-    df = _tabla_verificaciones(verificaciones)
-    df_vista = df.copy()
-    df_vista.index = [""] * len(df_vista)
-    st.table(df_vista)
+    df, severidades = _tabla_verificaciones(verificaciones)
+    st.caption(
+        f"{ui.badge('Limpia', 'success')} sin CQ · "
+        f"{ui.badge('H2', 'warning')} defecto leve · "
+        f"{ui.badge('NCNA', 'danger')} defecto crítico",
+        unsafe_allow_html=True,
+    )
+    st.table(ui.tabla_coloreada_por_severidad(df, severidades))
 
     st.divider()
-    total = db.list_verificaciones(limit=5000)
-    st.caption(f"La tabla muestra las últimas {len(verificaciones)} de {len(total)} verificaciones registradas en total.")
-    ui.boton_descarga_csv(
-        _tabla_verificaciones(total), "historial_verificaciones.csv",
-        "Descargar historial completo (CSV)",
+    total_verificaciones = db.list_verificaciones(limit=5000)
+    st.caption(
+        f"La tabla muestra las últimas {len(verificaciones)} de {len(total_verificaciones)} "
+        f"verificaciones registradas en total."
     )
+    df_total, _ = _tabla_verificaciones(total_verificaciones)
+    ui.boton_descarga_csv(df_total, "historial_verificaciones.csv", "Descargar historial completo (CSV)")

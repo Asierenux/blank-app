@@ -939,6 +939,19 @@ def no_conformidades_por_verificacion(verificacion_ids):
     return resultado
 
 
+def severidad_por_cqs(cqs: list) -> str:
+    """'danger' si hay algún CQ NCNA, 'warning' si hay algún CQ H2 (sin
+    NCNA), 'success' si la verificación no encontró ningún CQ. Para marcar
+    de un vistazo, en listados como el Historial, si una verificación tuvo
+    un defecto crítico, uno leve, o fue limpia."""
+    familias = {c["familia"] for c in cqs}
+    if "NCNA" in familias:
+        return "danger"
+    if "H2" in familias:
+        return "warning"
+    return "success"
+
+
 def list_no_conformidades(solo_ncna=False):
     conn = get_conn()
     q = (

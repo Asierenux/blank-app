@@ -329,6 +329,24 @@ _BADGE_COLOR = {
 }
 FAMILIA_KIND = {"NCNA": "danger", "H2": "warning"}
 
+_TINT_COLOR = {"danger": "#FBEAE9", "warning": "#FDF2E2", "success": "#EAF6EE"}
+
+
+def tabla_coloreada_por_severidad(df, severidades: list):
+    """df + una lista 'danger'/'warning'/'success' (una por fila, mismo
+    orden) -> pandas Styler con esa fila en rojo/ámbar/verde muy suave, para
+    ver de un vistazo en un listado si una verificación tuvo un defecto
+    crítico (NCNA), uno leve (H2), o fue limpia (ver
+    db.severidad_por_cqs). Pásalo a st.table(...)."""
+    df = df.reset_index(drop=True)
+
+    def _fila(row):
+        color = _TINT_COLOR.get(severidades[row.name])
+        estilo = f"background-color: {color};" if color else ""
+        return [estilo] * len(row)
+
+    return df.style.apply(_fila, axis=1).hide(axis="index")
+
 
 def badge(texto: str, kind: str = "neutral") -> str:
     """Insignia de estado en pastilla sólida (patrón habitual de ERP/CRM:
