@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 
 import streamlit as st
 
@@ -228,10 +228,13 @@ with st.container(border=True):
         st.success(":material/check_circle: Sin defectos detectados en esta sesión.")
 
 # ---------------------------------------------------------------------------
-# Detalles opcionales (fecha, notas) — plegado por defecto
+# Detalles opcionales (notas) — plegado por defecto
 # ---------------------------------------------------------------------------
-with st.expander("Más detalles (fecha, notas)"):
-    fecha = st.date_input("Fecha", value=date.today(), key=k("rv_fecha"))
+with st.expander("Más detalles (notas)"):
+    st.caption(
+        f":material/schedule: Fecha y hora: **{datetime.now().strftime('%d/%m/%Y %H:%M')}** "
+        f"(la registra el sistema automáticamente; el operario no puede editarla)."
+    )
     notas = st.text_area("Notas de la verificación", key=k("rv_notas"))
 
 # ---------------------------------------------------------------------------
@@ -293,7 +296,7 @@ with st.container(border=True):
 
     if st.button(":material/save: Confirmar y guardar", type="primary", use_container_width=True):
         verificacion_id = db.registrar_verificacion(
-            fecha=fecha.isoformat(), asignacion_id=asignacion_id, verificador_id=verificador_id,
+            asignacion_id=asignacion_id, verificador_id=verificador_id,
             tipo_verificacion=tipo_verificacion, mat_inicial=mat_inicial, mat_final=mat_final,
             cantidad=int(cantidad), cqs_detectados=st.session_state.cq_rows,
             causas_acciones=causas_input, notas=notas, resultado_transicion=transicion,

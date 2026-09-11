@@ -318,6 +318,7 @@ def init_db(conn):
         CREATE TABLE IF NOT EXISTS verificaciones (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             fecha TEXT NOT NULL,
+            hora TEXT,
             asignacion_id INTEGER NOT NULL REFERENCES asignaciones(id),
             verificador_id INTEGER REFERENCES verificadores(id),
             tipo_verificacion TEXT NOT NULL,
@@ -374,7 +375,19 @@ def init_db(conn):
         """
     )
     conn.commit()
+    _migrar_columna_hora(conn)
     _seed_maquinas_dimensiones_mac(conn)
+
+
+def _migrar_columna_hora(conn):
+    """Bases de datos creadas antes de que existiera el registro automático
+    de hora no tienen la columna 'hora' en verificaciones (CREATE TABLE IF
+    NOT EXISTS no la añade sola a una tabla que ya existía). La añadimos a
+    mano si hace falta, sin tocar los datos ya guardados."""
+    columnas = {row["name"] for row in conn.execute("PRAGMA table_info(verificaciones)").fetchall()}
+    if "hora" not in columnas:
+        conn.execute("ALTER TABLE verificaciones ADD COLUMN hora TEXT")
+        conn.commit()
 
 
 def _seed_maquinas_dimensiones_mac(conn):
@@ -844,19 +857,27 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
     return resultado
 
 
-def registrar_verificacion(fecha, asignacion_id, verificador_id, tipo_verificacion,
+def registrar_verificacion(asignacion_id, verificador_id, tipo_verificacion,
                             mat_inicial, mat_final, cantidad, cqs_detectados,
                             causas_acciones, notas, resultado_transicion):
     """Guarda la verificación, sus CQ, las causas/acciones y aplica la
-    transición de estado calculada por procesar_verificacion()."""
+    transición de estado calculada por procesar_verificacion().
+
+    La fecha y la hora se capturan aquí, en el momento de guardar, con el
+    reloj del sistema: no se reciben como parámetro para que el operario no
+    pueda escribirlas ni editarlas a mano."""
+    ahora = datetime.now()
+    fecha = ahora.date().isoformat()
+    hora = ahora.isoformat(timespec="seconds")
+
     conn = get_conn()
     asignacion = get_asignacion(asignacion_id)
 
     cur = conn.execute(
-        "INSERT INTO verificaciones (fecha, asignacion_id, verificador_id, tipo_verificacion, "
+        "INSERT INTO verificaciones (fecha, hora, asignacion_id, verificador_id, tipo_verificacion, "
         "estado_maq_en_momento, estado_dim_en_momento, mat_inicial, mat_final, cantidad, "
-        "comentario_sistema, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (fecha, asignacion_id, verificador_id, tipo_verificacion,
+        "comentario_sistema, notas) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (fecha, hora, asignacion_id, verificador_id, tipo_verificacion,
          asignacion["estado_maq"], asignacion["estado_dim"], mat_inicial, mat_final,
          cantidad, resultado_transicion["comentario"], notas),
     )
@@ -937,6 +958,42 @@ def no_conformidades_por_verificacion(verificacion_ids):
     for fila in filas:
         resultado.setdefault(fila["verificacion_id"], []).append(dict(fila))
     return resultado
+
+
+MARGEN_CADENCIA_V4_MIN = 90
+
+
+def verificaciones_fuera_de_cadencia_v4(margen_minutos=MARGEN_CADENCIA_V4_MIN) -> set:
+    """IDs de verificaciones V4 ("8 PRODUCTOS/HORA") que llegaron tarde:
+    compara cada V4 con la V4 inmediatamente anterior de la MISMA máquina +
+    dimensión (mismo asignacion_id) y marca la actual si han pasado más de
+    `margen_minutos` (60 min + margen) desde la anterior.
+
+    Al comparar solo contra la V4 anterior de la misma asignación, un cambio
+    de dimensión o cualquier otro tipo de verificación de por medio no cuenta
+    como fallo: sencillamente no interrumpen esta secuencia. La primera V4 de
+    cada asignación nunca se marca (no hay anterior con la que comparar), y
+    las verificaciones sin hora registrada (guardadas antes de que existiera
+    este campo) tampoco se marcan."""
+    conn = get_conn()
+    filas = conn.execute(
+        "SELECT id, asignacion_id, hora FROM verificaciones "
+        "WHERE tipo_verificacion = 'V4' AND hora IS NOT NULL AND hora != '' "
+        "ORDER BY asignacion_id, hora"
+    ).fetchall()
+
+    fuera_de_cadencia = set()
+    hora_anterior_por_asignacion = {}
+    for fila in filas:
+        hora_actual = datetime.fromisoformat(fila["hora"])
+        hora_previa = hora_anterior_por_asignacion.get(fila["asignacion_id"])
+        if hora_previa is not None:
+            gap_minutos = (hora_actual - hora_previa).total_seconds() / 60
+            if gap_minutos > margen_minutos:
+                fuera_de_cadencia.add(fila["id"])
+        hora_anterior_por_asignacion[fila["asignacion_id"]] = hora_actual
+
+    return fuera_de_cadencia
 
 
 def severidad_por_cqs(cqs: list) -> str:

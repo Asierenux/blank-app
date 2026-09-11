@@ -100,6 +100,7 @@ WARNING = "#B7791F"
 SUCCESS = "#1B7F4C"
 INFO = BRAND
 NEUTRAL = "#5B6472"
+CADENCIA = "#6B3FA0"
 
 FONT = "'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif"
 
@@ -400,11 +401,11 @@ def step_badge(numero: int, texto: str):
 
 _BADGE_COLOR = {
     "danger": DANGER, "warning": WARNING, "success": SUCCESS,
-    "info": INFO, "neutral": NEUTRAL,
+    "info": INFO, "neutral": NEUTRAL, "cadencia": CADENCIA,
 }
 FAMILIA_KIND = {"NCNA": "danger", "H2": "warning"}
 
-_TINT_COLOR = {"danger": "#FBEAE9", "warning": "#FDF2E2", "success": "#EAF6EE"}
+_TINT_COLOR = {"danger": "#FBEAE9", "warning": "#FDF2E2", "success": "#EAF6EE", "cadencia": "#F1EAF7"}
 
 
 def tabla_coloreada_por_severidad(df, severidades: list):
