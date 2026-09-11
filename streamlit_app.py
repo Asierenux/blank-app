@@ -8,11 +8,15 @@ import ui
 # código (compáralo con el commit más reciente en GitHub).
 VERSION = "v9 · entrada directa como operario (11/09/2026)"
 
-st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
+_logo = ui.logo_path()
+st.set_page_config(
+    page_title="Control Verificación Carcasas/Bandages",
+    page_icon=str(_logo) if _logo else "🛞",
+    layout="wide",
+)
 ui.inject()
 ui.inject_marca_agua()
 
-_logo = ui.logo_path()
 if _logo:
     st.logo(str(_logo), size="large")
 
