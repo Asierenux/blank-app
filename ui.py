@@ -87,6 +87,27 @@ html, body, .stApp {{
     border-color: #fff;
 }}
 
+/* El formulario "Acceso técnico" vive en una tarjeta blanca dentro de la
+   barra lateral oscura: su texto y su botón deben verse oscuros sobre
+   blanco, como en el resto de la app, no heredar el estilo claro pensado
+   para el fondo oscuro de alrededor. */
+[data-testid="stSidebar"] [data-testid="stForm"],
+[data-testid="stSidebar"] [data-testid="stForm"] * {{
+    color: {INK} !important;
+}}
+[data-testid="stSidebar"] [data-testid="stForm"] [data-testid="stBaseButton-secondary"],
+[data-testid="stSidebar"] [data-testid="stForm"] [data-testid="stBaseButton-secondaryFormSubmit"] {{
+    background: {CARD};
+    border: 1px solid {BORDER_STRONG};
+    color: {INK} !important;
+}}
+[data-testid="stSidebar"] [data-testid="stForm"] [data-testid="stBaseButton-secondary"]:hover,
+[data-testid="stSidebar"] [data-testid="stForm"] [data-testid="stBaseButton-secondaryFormSubmit"]:hover {{
+    background: {CARD};
+    border-color: {BRAND};
+    color: {BRAND} !important;
+}}
+
 /* Botones: planos, esquina recta, sin sombra decorativa */
 [data-testid="stBaseButton-primary"],
 [data-testid="stBaseButton-primaryFormSubmit"] {{

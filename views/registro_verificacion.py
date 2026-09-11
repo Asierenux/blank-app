@@ -131,22 +131,16 @@ with st.container(border=True):
     ui.step_badge(3, "¿Has detectado algún defecto (CQ)?")
     st.caption("No pares en el primer defecto: termina siempre todo el ciclo de verificación.")
 
-    catalogo_importado = [c["codigo"] for c in db.list_catalogo_cq()]
-    if catalogo_importado:
-        catalogo = catalogo_importado
-    else:
-        catalogo = db.CQ_NCNA_CARCASA if asig["dimension_tipo"] == "Carcasa" else db.CQ_NCNA_BANDAGE
-
     with st.form("add_cq_row", clear_on_submit=True):
-        cc1, cc2, cc3 = st.columns([1, 1, 2])
-        codigo_cq = cc1.selectbox("Código CQ", catalogo + ["Otro..."])
-        codigo_cq_manual = cc2.text_input("Código manual (si 'Otro...')")
-        matricula = cc3.text_input("Matrícula del producto con el defecto")
+        cc1, cc2 = st.columns([1, 2])
+        codigo_cq = cc1.text_input("Código CQ")
+        matricula = cc2.text_input("Matrícula del producto con el defecto")
         add_cq = st.form_submit_button(":material/add: Añadir defecto", use_container_width=True)
         if add_cq:
-            codigo_final = codigo_cq_manual.strip() if codigo_cq == "Otro..." and codigo_cq_manual.strip() else codigo_cq
-            familia = db.familia_cq(asig["dimension_tipo"], codigo_final)
-            st.session_state.cq_rows.append({"codigo_cq": codigo_final, "familia": familia, "matricula": matricula})
+            codigo_final = codigo_cq.strip()
+            if codigo_final:
+                familia = db.familia_cq(asig["dimension_tipo"], codigo_final)
+                st.session_state.cq_rows.append({"codigo_cq": codigo_final, "familia": familia, "matricula": matricula})
 
     if st.session_state.cq_rows:
         for i, row in enumerate(st.session_state.cq_rows):
