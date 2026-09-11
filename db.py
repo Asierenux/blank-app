@@ -96,6 +96,15 @@ CANTIDAD_FIJA_POR_TIPO = {
 }
 
 
+MATRICULA_LONGITUD = 8
+
+
+def matricula_valida(matricula: str) -> bool:
+    """Las matrículas son siempre un código numérico de 8 dígitos."""
+    matricula = (matricula or "").strip()
+    return matricula.isdigit() and len(matricula) == MATRICULA_LONGITUD
+
+
 def calcular_matricula_final(mat_inicial: str, cantidad: int) -> str:
     """A partir de la matrícula inicial y la cantidad a verificar, calcula la
     matrícula final sumando (cantidad - 1) a la parte numérica final de la

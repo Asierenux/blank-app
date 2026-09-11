@@ -87,6 +87,7 @@ registro = st.Page(
     "views/registro_verificacion.py", title="Registro de verificación", icon=":material/fact_check:",
     default=(auth_user["rol"] == "Operario"),
 )
+historial = st.Page("views/historial_verificaciones.py", title="Historial", icon=":material/history:")
 inicio = st.Page(
     "views/inicio.py", title="Inicio", icon=":material/dashboard:",
     default=(auth_user["rol"] == "Técnico"),
@@ -98,9 +99,9 @@ importar = st.Page("views/importar_catalogos.py", title="Importar Catálogos", i
 usuarios = st.Page("views/usuarios.py", title="Usuarios", icon=":material/admin_panel_settings:")
 
 if auth_user["rol"] == "Operario":
-    paginas = [registro]
+    paginas = [registro, historial]
 else:
-    paginas = [inicio, maquinas, registro, no_conformidades, verificadores, importar, usuarios]
+    paginas = [inicio, maquinas, registro, historial, no_conformidades, verificadores, importar, usuarios]
 
 pg = st.navigation(paginas)
 pg.run()
