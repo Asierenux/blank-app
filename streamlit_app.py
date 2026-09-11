@@ -6,36 +6,37 @@ import ui
 # Identificador de versión visible en pantalla, para poder comprobar de un
 # vistazo si una instalación está actualizada a la última versión del
 # código (compáralo con el commit más reciente en GitHub).
-VERSION = "v8 · identidad visual propia (10/09/2026)"
+VERSION = "v9 · entrada directa como operario (11/09/2026)"
 
 st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
 ui.inject()
+
+# Sesión anónima de Operario: no hace falta usuario/contraseña para verificar
+# en el PC de planta. Sólo hace falta identificarse para acceder al resto
+# (rol Técnico), desde el propio panel lateral.
+OPERARIO_ANONIMO = {"id": None, "username": "Operario", "rol": "Operario"}
 
 if "auth_user" not in st.session_state:
     st.session_state.auth_user = None
 
 
-def pantalla_login():
+def pantalla_alta_primer_tecnico():
+    """Arranque inicial: hace falta al menos un Técnico dado de alta antes de
+    poder usar la app (para poder configurar máquinas, dimensiones, etc.)."""
     _, col, _ = st.columns([1, 1.3, 1])
     with col:
         st.markdown("<div style='height:8vh'></div>", unsafe_allow_html=True)
         ui.marca("Control de Verificación de Carcasas y Bandages")
         st.caption(f"Versión: {VERSION}")
-        _pantalla_login_form()
-
-
-def _pantalla_login_form():
-
-    if db.count_usuarios() == 0:
         st.info(
-            "No hay ningún usuario creado todavía. Crea el primero: quedará como **Técnico** "
-            "y podrá dar de alta al resto desde la página Usuarios."
+            "No hay ningún usuario Técnico creado todavía. Crea el primero: podrá dar de "
+            "alta al resto desde la página Usuarios y configurar máquinas y dimensiones."
         )
         with st.form("primer_usuario"):
             username = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
             password2 = st.text_input("Repite la contraseña", type="password")
-            submitted = st.form_submit_button("Crear usuario y entrar", type="primary")
+            submitted = st.form_submit_button("Crear usuario Técnico", type="primary")
             if submitted:
                 if not username.strip() or not password:
                     st.error("Usuario y contraseña son obligatorios.")
@@ -47,32 +48,39 @@ def _pantalla_login_form():
                     db.add_usuario(username, password, "Técnico")
                     st.session_state.auth_user = db.verificar_usuario(username, password)
                     st.rerun()
-    else:
-        with st.form("login"):
-            username = st.text_input("Usuario")
-            password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("Entrar", type="primary")
-            if submitted:
-                user = db.verificar_usuario(username, password)
-                if user:
-                    st.session_state.auth_user = user
-                    st.rerun()
-                else:
-                    st.error("Usuario o contraseña incorrectos.")
 
 
-if not st.session_state.auth_user:
-    pantalla_login()
+if db.count_usuarios() == 0:
+    pantalla_alta_primer_tecnico()
     st.stop()
 
+if st.session_state.auth_user is None:
+    st.session_state.auth_user = OPERARIO_ANONIMO
+
 auth_user = st.session_state.auth_user
+es_operario_anonimo = auth_user["id"] is None
 
 with st.sidebar:
     st.divider()
-    st.markdown(ui.icon_line("person", f"**{auth_user['username']}** · {auth_user['rol']}", color="#EDEFF3"), unsafe_allow_html=True)
-    if st.button(":material/logout: Cerrar sesión"):
-        st.session_state.auth_user = None
-        st.rerun()
+    if es_operario_anonimo:
+        st.markdown(ui.icon_line("person", "**Operario** (sin identificar)", color="#EDEFF3"), unsafe_allow_html=True)
+        with st.expander(":material/admin_panel_settings: Acceso técnico"):
+            with st.form("elevar_acceso"):
+                username = st.text_input("Usuario")
+                password = st.text_input("Contraseña", type="password")
+                submitted = st.form_submit_button("Entrar")
+                if submitted:
+                    user = db.verificar_usuario(username, password)
+                    if user:
+                        st.session_state.auth_user = user
+                        st.rerun()
+                    else:
+                        st.error("Usuario o contraseña incorrectos.")
+    else:
+        st.markdown(ui.icon_line("person", f"**{auth_user['username']}** · {auth_user['rol']}", color="#EDEFF3"), unsafe_allow_html=True)
+        if st.button(":material/logout: Volver a modo Operario"):
+            st.session_state.auth_user = OPERARIO_ANONIMO
+            st.rerun()
     st.caption(VERSION)
 
 registro = st.Page(
