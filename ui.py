@@ -27,6 +27,53 @@ def logo_path():
     return None
 
 
+@st.cache_data(show_spinner=False)
+def _marca_agua_data_uri(ruta_logo: str, opacidad: float = 0.04) -> str | None:
+    """El logo propio, muy transparente, listo para usar como fondo CSS.
+    Se recalcula solo si cambia el archivo del logo (cacheado por ruta)."""
+    from io import BytesIO
+
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        imagen = Image.open(ruta_logo).convert("RGBA")
+    except (UnidentifiedImageError, OSError):
+        return None  # p.ej. un .svg: no es un formato de mapa de bits
+    alpha = imagen.getchannel("A").point(lambda a: int(a * opacidad))
+    imagen.putalpha(alpha)
+    buffer = BytesIO()
+    imagen.save(buffer, format="PNG")
+    import base64
+    b64 = base64.b64encode(buffer.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{b64}"
+
+
+def inject_marca_agua():
+    """Marca de agua muy tenue del logo propio (si hay uno) de fondo en el
+    área de contenido principal. No hace nada si no hay logo, si es un
+    .svg (no es una imagen de mapa de bits), o si algo falla al leerlo."""
+    logo = logo_path()
+    if not logo:
+        return
+    data_uri = _marca_agua_data_uri(str(logo))
+    if not data_uri:
+        return
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stMain"] {{
+            background-image: url('{data_uri}');
+            background-repeat: no-repeat;
+            background-position: center 45%;
+            background-size: min(50%, 460px);
+            background-attachment: fixed;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def boton_descarga_csv(df, nombre_archivo: str, label: str = "Descargar CSV", key: str = None):
     """Botón de descarga de un DataFrame como CSV (utf-8-sig para que Excel
     respete los acentos/ñ al abrirlo directamente)."""
@@ -37,8 +84,8 @@ def boton_descarga_csv(df, nombre_archivo: str, label: str = "Descargar CSV", ke
     )
 
 # --- Paleta -----------------------------------------------------------------
-BRAND = "#0B5FA5"
-BRAND_DARK = "#08447A"
+BRAND = "#0055A4"
+BRAND_DARK = "#003D7A"
 SHELL = "#1D2939"
 SHELL_HOVER = "#28374A"
 INK = "#1C232E"

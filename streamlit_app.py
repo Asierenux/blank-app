@@ -10,6 +10,7 @@ VERSION = "v9 · entrada directa como operario (11/09/2026)"
 
 st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
 ui.inject()
+ui.inject_marca_agua()
 
 _logo = ui.logo_path()
 if _logo:
