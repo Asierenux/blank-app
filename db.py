@@ -919,6 +919,26 @@ def list_verificaciones(limit=200):
     ).fetchall()
 
 
+def no_conformidades_por_verificacion(verificacion_ids):
+    """Devuelve {verificacion_id: [{codigo_cq, familia, matricula}, ...]}
+    para pintar, junto a cada verificación, qué CQ se detectaron y en qué
+    carcasa/bandage concreto (matrícula), sin una consulta por fila."""
+    verificacion_ids = list(verificacion_ids)
+    if not verificacion_ids:
+        return {}
+    conn = get_conn()
+    placeholders = ",".join("?" * len(verificacion_ids))
+    filas = conn.execute(
+        f"SELECT verificacion_id, codigo_cq, familia, matricula FROM no_conformidades "
+        f"WHERE verificacion_id IN ({placeholders})",
+        verificacion_ids,
+    ).fetchall()
+    resultado = {}
+    for fila in filas:
+        resultado.setdefault(fila["verificacion_id"], []).append(dict(fila))
+    return resultado
+
+
 def list_no_conformidades(solo_ncna=False):
     conn = get_conn()
     q = (

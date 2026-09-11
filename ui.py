@@ -181,10 +181,16 @@ button[data-baseweb="tab"] p {{
 }}
 
 /* st.table: tabla HTML real -> franjas alternas y cabecera sólida, como un
-   listado de ERP */
+   listado de ERP. Con scroll horizontal propio: una tabla con muchas
+   columnas (o contenido largo) no debe romper el ancho de la página ni
+   apretujar el resto de columnas hasta hacerlas ilegibles. */
+[data-testid="stTable"] {{
+    overflow-x: auto;
+}}
 [data-testid="stTable"] table {{
     border-collapse: collapse;
-    width: 100%;
+    width: max-content;
+    min-width: 100%;
     font-size: .88rem;
 }}
 [data-testid="stTable"] thead th {{
@@ -197,11 +203,13 @@ button[data-baseweb="tab"] p {{
     padding: .5rem .7rem;
     text-align: left;
     border: none;
+    white-space: nowrap;
 }}
 [data-testid="stTable"] tbody td {{
     padding: .45rem .7rem;
     border-bottom: 1px solid {BORDER};
     color: {INK};
+    white-space: nowrap;
 }}
 [data-testid="stTable"] tbody tr:nth-child(even) {{
     background: {BG};
