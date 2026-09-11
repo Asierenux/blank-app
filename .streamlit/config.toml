@@ -2,7 +2,7 @@
 base = "light"
 primaryColor = "#0B5FA5"
 backgroundColor = "#F4F5F7"
-secondaryBackgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#EEF0F3"
 textColor = "#1C232E"
 font = "sans serif"
 chartCategoricalColors = ["#0B5FA5", "#1D2939", "#B7791F", "#1B7F4C", "#5B6472", "#B3261E"]

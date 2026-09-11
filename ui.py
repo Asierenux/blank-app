@@ -37,7 +37,9 @@ html, body, .stApp {{
     background: {BG};
 }}
 [data-testid="stMainBlockContainer"] {{
-    padding-top: 2rem;
+    /* La cabecera fija de Streamlit mide ~60px; menos que eso aquí y el
+       título de la página queda cortado debajo de ella. */
+    padding-top: 5rem;
 }}
 
 /* Titulares: neutros, sin la calidez "app" de antes */

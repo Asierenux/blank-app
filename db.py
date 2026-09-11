@@ -714,6 +714,12 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
                 resultado["cq_disparador_maq"] = None
                 resultado["nuevo_contador_maq"] = 0
                 resultado["comentario"] = texto_accion("T70")
+            elif resultado["nuevo_contador_maq"] >= umbral_fin_tri_maquina:
+                resultado["comentario"] = (
+                    f"Ya no aparece el CQ {disparador_maq} y llevas {resultado['nuevo_contador_maq']} "
+                    f"unidades consecutivas sin encontrarlo (objetivo: {umbral_fin_tri_maquina}). "
+                    f"Marca la casilla de arriba para confirmar el fin del Tri Dirigido de máquina."
+                )
             else:
                 resultado["comentario"] = (
                     f"{texto_accion('T_FIN_TRI_MAQ_PENDIENTE')} "
