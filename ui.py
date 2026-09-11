@@ -6,7 +6,25 @@ estables (data-testid documentados por Streamlit), nunca en clases internas
 generadas dinámicamente (st-emotion-cache-...), para que sobreviva a
 actualizaciones de Streamlit dentro del rango fijado en requirements.txt.
 """
+from pathlib import Path
+
 import streamlit as st
+
+_LOGO_DIR = Path(__file__).parent / "assets" / "branding"
+_LOGO_EXTENSIONES = (".png", ".jpg", ".jpeg", ".webp", ".svg")
+
+
+def logo_path():
+    """Ruta al logo propio si alguien lo ha colocado en assets/branding/
+    (ver su README): None si no hay ninguno, y entonces se usa el icono
+    genérico de la app. Esa carpeta está excluida de git a propósito, para
+    poder usar el logo real de la empresa sin subirlo al repositorio
+    público."""
+    for extension in _LOGO_EXTENSIONES:
+        candidato = _LOGO_DIR / f"logo{extension}"
+        if candidato.exists():
+            return candidato
+    return None
 
 
 def boton_descarga_csv(df, nombre_archivo: str, label: str = "Descargar CSV", key: str = None):
@@ -265,17 +283,27 @@ def _icon_tile(icon_name: str, size: int = 34, bg: str = BRAND, icon_size: int =
 
 
 def marca(texto: str = "Control de Verificación"):
-    """Cabecera de marca compacta, para la pantalla de login."""
-    st.markdown(
-        f"""
-        <div style="display:flex; align-items:center; gap:.65rem; margin-bottom:.3rem;">
-            {_icon_tile("precision_manufacturing", 38, BRAND, 20)}
-            <span style="font-family:{FONT}; font-weight:700; font-size:1.05rem;
-                         color:{INK};">{texto}</span>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    """Cabecera de marca compacta, para la pantalla de login. Usa el logo
+    propio (assets/branding/) si hay uno; si no, el icono genérico."""
+    logo = logo_path()
+    if logo:
+        st.image(str(logo), width=180)
+        st.markdown(
+            f'<span style="font-family:{FONT}; font-weight:700; font-size:1.05rem; '
+            f'color:{INK};">{texto}</span>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            f"""
+            <div style="display:flex; align-items:center; gap:.65rem; margin-bottom:.3rem;">
+                {_icon_tile("precision_manufacturing", 38, BRAND, 20)}
+                <span style="font-family:{FONT}; font-weight:700; font-size:1.05rem;
+                             color:{INK};">{texto}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
 
 def page_header(icon_name: str, titulo: str, subtitulo: str = None):

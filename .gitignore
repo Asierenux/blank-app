@@ -3,6 +3,11 @@
 # Base de datos local de la app (no versionar datos)
 data/*.db
 
+# Logo propio de la empresa (ver assets/branding/README.md): se queda en la
+# copia local de cada PC, nunca se sube al repositorio público.
+assets/branding/*
+!assets/branding/README.md
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

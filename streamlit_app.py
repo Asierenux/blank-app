@@ -11,6 +11,10 @@ VERSION = "v9 · entrada directa como operario (11/09/2026)"
 st.set_page_config(page_title="Control Verificación Carcasas/Bandages", page_icon="🛞", layout="wide")
 ui.inject()
 
+_logo = ui.logo_path()
+if _logo:
+    st.logo(str(_logo), size="large")
+
 # Sesión anónima de Operario: no hace falta usuario/contraseña para verificar
 # en el PC de planta. Sólo hace falta identificarse para acceder al resto
 # (rol Técnico), desde el propio panel lateral.
