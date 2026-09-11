@@ -336,3 +336,81 @@ def icon_line(icon_name: str, texto: str, size: int = 16, color: str = None) -> 
     """Icono + texto en una misma línea, para insertar dentro de un
     st.markdown(unsafe_allow_html=True) propio."""
     return f'{_icon_span(icon_name, size, color or MUTED)} {texto}'
+
+
+CHART_FONT = "IBM Plex Sans, sans-serif"
+
+
+def grafico_barras(datos: list, campo_categoria: str, campo_valor: str,
+                    color: str = BRAND, color_por_categoria: dict | None = None) -> dict:
+    """Spec de Vega-Lite para un gráfico de barras horizontales (categorías
+    en el eje Y): evita las etiquetas giradas 90º que salen con las barras
+    verticales por defecto de Streamlit en cuanto una categoría es larga
+    ("TRI DIRIGIDO 20 UD", etc.). Barras finas con la punta redondeada,
+    valor pegado a la barra (no hace falta leyenda ni eje de rejilla denso),
+    y tooltip al pasar el ratón. Pásalo a st.vega_lite_chart(spec,
+    use_container_width=True).
+
+    color_por_categoria: {valor_de_categoria: color_hex} para pintar cada
+    barra según su significado real (p.ej. NCNA en rojo, H2 en ámbar) en vez
+    de un único color de marca — úsalo cuando las categorías ya tienen un
+    color de estado establecido en el resto de la app (ver FAMILIA_KIND).
+    """
+    alto = max(110, 34 * len(datos) + 30)
+
+    if color_por_categoria:
+        color_encoding = {
+            "field": campo_categoria, "type": "nominal", "legend": None,
+            "scale": {
+                "domain": list(color_por_categoria.keys()),
+                "range": list(color_por_categoria.values()),
+            },
+        }
+    else:
+        color_encoding = {"value": color}
+
+    return {
+        "data": {"values": datos},
+        "height": alto,
+        "layer": [
+            {
+                "mark": {"type": "bar", "size": 16, "cornerRadiusTopRight": 4, "cornerRadiusBottomRight": 4},
+                "encoding": {
+                    "y": {
+                        "field": campo_categoria, "type": "nominal", "sort": None,
+                        "axis": {
+                            "title": None, "domain": False, "ticks": False,
+                            "labelColor": MUTED, "labelFontSize": 11, "labelLimit": 200,
+                            "labelPadding": 8,
+                        },
+                    },
+                    "x": {
+                        "field": campo_valor, "type": "quantitative",
+                        "axis": {
+                            "title": None, "grid": True, "gridColor": BORDER, "domain": False,
+                            "tickMinStep": 1, "labelColor": MUTED, "labelFontSize": 10,
+                        },
+                    },
+                    "color": color_encoding,
+                    "tooltip": [
+                        {"field": campo_categoria, "type": "nominal", "title": "Estado"},
+                        {"field": campo_valor, "type": "quantitative", "title": "Cantidad"},
+                    ],
+                },
+            },
+            {
+                "mark": {"type": "text", "align": "left", "dx": 6, "fontSize": 11, "fontWeight": 600},
+                "encoding": {
+                    "y": {"field": campo_categoria, "type": "nominal", "sort": None},
+                    "x": {"field": campo_valor, "type": "quantitative"},
+                    "text": {"field": campo_valor, "type": "quantitative"},
+                    "color": {"value": INK},
+                },
+            },
+        ],
+        "config": {
+            "view": {"stroke": "transparent"},
+            "font": CHART_FONT,
+            "background": None,
+        },
+    }

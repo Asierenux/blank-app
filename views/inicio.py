@@ -72,8 +72,8 @@ with c1:
     if maquinas:
         df_m = pd.DataFrame([dict(m) for m in maquinas])
         conteo = df_m["estado_maq"].value_counts().reindex(db.ESTADOS_MAQ.keys(), fill_value=0)
-        conteo.index = [db.ESTADOS_MAQ[k] for k in conteo.index]
-        st.bar_chart(conteo)
+        datos = [{"estado": db.ESTADOS_MAQ[k], "cantidad": int(v)} for k, v in conteo.items()]
+        st.vega_lite_chart(ui.grafico_barras(datos, "estado", "cantidad"), use_container_width=True)
     else:
         st.info("Todavía no hay máquinas registradas. Ve a **Máquinas y Dimensiones**.")
 
@@ -82,8 +82,8 @@ with c2:
     if asignaciones:
         df_a = pd.DataFrame([dict(a) for a in asignaciones])
         conteo = df_a["estado_dim"].value_counts().reindex(db.ESTADOS_DIM.keys(), fill_value=0)
-        conteo.index = [db.ESTADOS_DIM[k] for k in conteo.index]
-        st.bar_chart(conteo)
+        datos = [{"estado": db.ESTADOS_DIM[k], "cantidad": int(v)} for k, v in conteo.items()]
+        st.vega_lite_chart(ui.grafico_barras(datos, "estado", "cantidad"), use_container_width=True)
     else:
         st.info("Todavía no hay asignaciones máquina/dimensión.")
 
@@ -95,12 +95,14 @@ c1, c2 = st.columns(2)
 with c1:
     st.subheader(":material/fact_check: Últimas verificaciones")
     if verificaciones:
-        df_v = pd.DataFrame([dict(v) for v in verificaciones[:15]])
-        df_v["tipo"] = df_v["tipo_verificacion"].map(lambda v: db.TIPOS_VERIFICACION.get(v, v))
-        st.dataframe(
-            df_v[["fecha", "maquina_codigo", "dimension_codigo", "tipo", "cantidad", "verificador_nombre"]],
-            use_container_width=True, hide_index=True,
-        )
+        filas = [{
+            "Fecha": v["fecha"], "Máquina": v["maquina_codigo"], "Dimensión": v["dimension_codigo"],
+            "Tipo": db.TIPOS_VERIFICACION.get(v["tipo_verificacion"], v["tipo_verificacion"]),
+            "Cantidad": v["cantidad"], "Verificador": v["verificador_nombre"] or "—",
+        } for v in verificaciones[:15]]
+        df_v = pd.DataFrame(filas)
+        df_v.index = [""] * len(df_v)
+        st.table(df_v)
     else:
         st.info("Aún no se han registrado verificaciones.")
 
@@ -108,7 +110,13 @@ with c2:
     st.subheader(":material/report_problem: No conformidades por familia (CQ)")
     if no_conformidades:
         df_cq = pd.DataFrame([dict(c) for c in no_conformidades])
-        st.bar_chart(df_cq["familia"].value_counts())
+        conteo = df_cq["familia"].value_counts()
+        datos = [{"familia": k, "cantidad": int(v)} for k, v in conteo.items()]
+        colores = {"NCNA": ui.DANGER, "H2": ui.WARNING}
+        st.vega_lite_chart(
+            ui.grafico_barras(datos, "familia", "cantidad", color_por_categoria=colores),
+            use_container_width=True,
+        )
     else:
         st.info("No se han registrado detecciones de CQ.")
 
