@@ -9,8 +9,8 @@ ui.page_header("fact_check", "Registro de verificación")
 
 if st.session_state.get("ultima_verificacion_guardada"):
     st.success(
-        f":material/check_circle: Verificación #{st.session_state.pop('ultima_verificacion_guardada')} "
-        f"guardada correctamente."
+        f":material/check_circle: Verificación de la dimensión "
+        f"{st.session_state.pop('ultima_verificacion_guardada')} guardada correctamente."
     )
 
 maquinas = db.list_maquinas()
@@ -292,5 +292,5 @@ with st.container(border=True):
         )
         st.session_state.cq_rows = []
         st.session_state.rv_version += 1
-        st.session_state.ultima_verificacion_guardada = verificacion_id
+        st.session_state.ultima_verificacion_guardada = dim_sel
         st.rerun()

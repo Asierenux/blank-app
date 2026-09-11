@@ -379,21 +379,34 @@ def init_db(conn):
 
 def _seed_maquinas_dimensiones_mac(conn):
     """Máquinas y dimensiones predefinidas del proceso MAC: máquinas MAC-2 a
-    MAC-6, y dimensiones (códigos numéricos) del 1 al 99. Sólo se crean la
-    primera vez (si la tabla está vacía), para no resucitar registros que un
-    Técnico haya borrado a propósito más adelante."""
+    MAC-6, y dimensiones (códigos numéricos) del 1 al 99. Se comprueba cada
+    código por separado (no basta con "la tabla está vacía": una base de
+    datos con otras máquinas/dimensiones de prueba ya creadas a mano
+    impediría que estas aparecieran nunca), así que sólo se insertan los
+    códigos que todavía no existan; nunca se tocan ni se borran los demás."""
     hoy = date.today().isoformat()
-    if not conn.execute("SELECT 1 FROM maquinas LIMIT 1").fetchone():
+
+    existentes_maq = {
+        row["codigo"] for row in conn.execute("SELECT codigo FROM maquinas").fetchall()
+    }
+    faltantes_maq = [f"MAC-{n}" for n in range(2, 7) if f"MAC-{n}" not in existentes_maq]
+    if faltantes_maq:
         conn.executemany(
             "INSERT INTO maquinas (codigo, proceso, estado_maq, fecha_cambio_estado_maq) "
             "VALUES (?, 'MAC', 'E3', ?)",
-            [(f"MAC-{n}", hoy) for n in range(2, 7)],
+            [(codigo, hoy) for codigo in faltantes_maq],
         )
-    if not conn.execute("SELECT 1 FROM dimensiones LIMIT 1").fetchone():
+
+    existentes_dim = {
+        row["codigo"] for row in conn.execute("SELECT codigo FROM dimensiones").fetchall()
+    }
+    faltantes_dim = [str(n) for n in range(1, 100) if str(n) not in existentes_dim]
+    if faltantes_dim:
         conn.executemany(
             "INSERT INTO dimensiones (codigo, tipo, notas) VALUES (?, 'Carcasa', '')",
-            [(str(n),) for n in range(1, 100)],
+            [(codigo,) for codigo in faltantes_dim],
         )
+
     conn.commit()
 
 
