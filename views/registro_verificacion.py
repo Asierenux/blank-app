@@ -144,7 +144,15 @@ with st.container(border=True):
             db.calcular_matricula_final(mat_inicial, cantidad_fija)
             if db.matricula_valida(mat_inicial) else ""
         )
-        mat_final = c2.text_input("Matrícula final (calculada sola)", value=mat_final_auto, key=k("rv_mat_final"))
+        # La key incluye mat_inicial: un text_input con key fija conserva su
+        # valor mostrado aunque cambie "value" en el siguiente rerun (por
+        # eso antes se quedaba en blanco al escribir la matrícula inicial).
+        # Al cambiar mat_inicial, esto fuerza un widget nuevo con el valor
+        # recién calculado.
+        mat_final = c2.text_input(
+            "Matrícula final (calculada sola)", value=mat_final_auto,
+            key=k(f"rv_mat_final_{mat_inicial}"),
+        )
         st.caption(f"Cantidad a verificar: **{cantidad_fija} unidades**.")
         cantidad = cantidad_fija
     else:
