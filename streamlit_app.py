@@ -10,7 +10,7 @@ VERSION = "v9 · entrada directa como operario (11/09/2026)"
 
 _logo = ui.logo_path()
 st.set_page_config(
-    page_title="Control Verificación Carcasas/Bandages",
+    page_title="Control Verificación Carcasas",
     page_icon=str(_logo) if _logo else "🛞",
     layout="wide",
 )
@@ -35,7 +35,7 @@ def pantalla_alta_primer_tecnico():
     _, col, _ = st.columns([1, 1.3, 1])
     with col:
         st.markdown("<div style='height:8vh'></div>", unsafe_allow_html=True)
-        ui.marca("Control de Verificación de Carcasas y Bandages")
+        ui.marca("Control de Verificación de Carcasas")
         st.caption(f"Versión: {VERSION}")
         st.info(
             "No hay ningún usuario Técnico creado todavía. Crea el primero: podrá dar de "

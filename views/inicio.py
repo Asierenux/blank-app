@@ -7,7 +7,7 @@ import db
 import ui
 
 ui.page_header(
-    "precision_manufacturing", "Control de Verificación de Carcasas y Bandages",
+    "precision_manufacturing", "Control de Verificación de Carcasas",
     "Digitalización de la MDV de verificación (sustituye a MDV_MAC.xlsm): estado de "
     "muestreo por máquina y por dimensión en esa máquina.",
 )

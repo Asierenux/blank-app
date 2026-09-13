@@ -1,5 +1,5 @@
 """
-Capa de datos y reglas de negocio de la MDV de verificación de carcasas/bandages.
+Capa de datos y reglas de negocio de la MDV de verificación de carcasas.
 
 Reconstruye, en Python + SQLite, el autómata de estados que ya usa la planta en
 `MDV_MAC.xlsm` (hojas TAB_MAE, TRAZA_VER, TRAZA_NO_CONF y las macros VBA
@@ -32,7 +32,6 @@ DB_PATH = Path(__file__).parent / "data" / "mdv.db"
 # ---------------------------------------------------------------------------
 
 PROCESOS = ["MAC", "BNS.Auto"]
-TIPOS_PRODUCTO = ["Carcasa", "Bandage"]
 
 ESTADOS_MAQ = {
     "E1": "TRI DIRIGIDO",
@@ -127,12 +126,16 @@ def calcular_matricula_final(mat_inicial: str, cantidad: int) -> str:
     return f"{prefijo}{nuevo_numero:0{ancho}d}"
 
 
+# Umbral de unidades consecutivas sin encontrar el CQ para poder dar por
+# concluido un Tri Dirigido de máquina (TAB_MAE).
+UMBRAL_FIN_TRI_MAQ = 20
+
 # Textos de acción (TAB_MAE!Z3:AA16, códigos T10-T70).
 ACCIONES = {
     "T10": "Pasar a TRI DIRIGIDO a el/los CQ NCNA: @@@. Buscar causa y acción correctora. "
            "Alertar a etapas de fabricación posteriores. Buscar lotes anteriores hasta encontrar "
            "una secuencia sin CQ y registrar la calidad verificada. Cuando se corrija la causa, "
-           "verificar 20 carcasas/bandages consecutivos. Si se repite el CQ, repetir el proceso "
+           "verificar 20 carcasas consecutivas. Si se repite el CQ, repetir el proceso "
            "con otra causa; si no aparece, se pasa a sondeo.",
     "T20": "Se continúa en TRI DIRIGIDO sobre el mismo CQ NCNA. Buscar nueva causa y repetir el proceso.",
     "T30": "Verificar un nuevo lote de 8 productos y registrar la calidad verificada.",
@@ -165,14 +168,22 @@ def guia_estado_actual(asignacion) -> list[dict]:
     if asignacion["estado_maq"] == "E2":
         cq = asignacion["cq_disparador_maq"]
         contador = asignacion["contador_maq"] or 0
-        guias.append({
-            "nivel": "error",
-            "texto": (
+        if contador >= UMBRAL_FIN_TRI_MAQ:
+            # Ya se cumplió el objetivo: no tiene sentido repetir aquí el
+            # texto de "cómo entrar en Tri Dirigido" (T10) — lo que hace
+            # falta ahora es confirmar que se da por concluido.
+            texto = (
+                f"Máquina en Tri Dirigido por el CQ {cq or '—'}: ya no aparece y llevas "
+                f"{contador} unidades consecutivas sin encontrarlo (objetivo: {UMBRAL_FIN_TRI_MAQ}). "
+                f"En la próxima verificación, marca la casilla para confirmar el fin del Tri Dirigido de máquina."
+            )
+        else:
+            texto = (
                 f"Máquina en Tri Dirigido por el CQ {cq or '—'} "
-                f"(llevas {contador} de 20 unidades consecutivas sin encontrarlo). "
+                f"(llevas {contador} de {UMBRAL_FIN_TRI_MAQ} unidades consecutivas sin encontrarlo). "
                 f"{texto_accion('T10', [cq] if cq else None)}"
-            ),
-        })
+            )
+        guias.append({"nivel": "error", "texto": texto})
 
     if asignacion["estado_dim"] == "D2":
         cq = asignacion["cq_disparador_dim"]
@@ -206,13 +217,9 @@ CQ_NCNA_CARCASA = [
     "57.20", "57.22", "57.23", "57.26", "57.28", "57.31", "57.39", "57.79",
     "57.94", "13.98",
 ]
-CQ_NCNA_BANDAGE = [
-    "57.20", "57.22", "57.23", "57.26", "57.28", "57.31", "57.39", "57.79",
-    "57.94", "57.50", "57.55", "57.87", "46.50", "31.39", "13.99",
-]
 
 
-def familia_cq(tipo_producto: str, codigo_cq: str) -> str:
+def familia_cq(codigo_cq: str) -> str:
     """Devuelve 'NCNA' o 'H2'. Si el código está en el catálogo importado
     (tabla catalogo_cq, ver Importar Catálogos) se usa esa clasificación
     real; si no, se aplica la regla del Anexo 5 de la MDV como reserva."""
@@ -221,8 +228,7 @@ def familia_cq(tipo_producto: str, codigo_cq: str) -> str:
     row = conn.execute("SELECT familia FROM catalogo_cq WHERE codigo = ?", (codigo,)).fetchone()
     if row:
         return row["familia"]
-    catalogo = CQ_NCNA_CARCASA if tipo_producto == "Carcasa" else CQ_NCNA_BANDAGE
-    return "NCNA" if codigo in catalogo else "H2"
+    return "NCNA" if codigo in CQ_NCNA_CARCASA else "H2"
 
 
 # Anexo 1 - Umbrales de calificación / descalificación de verificadores
@@ -376,7 +382,17 @@ def init_db(conn):
     )
     conn.commit()
     _migrar_columna_hora(conn)
+    _migrar_solo_carcasas(conn)
     _seed_maquinas_dimensiones_mac(conn)
+
+
+def _migrar_solo_carcasas(conn):
+    """La app ya sólo gestiona carcasas (se quitó "Bandage" como tipo de
+    producto). Normaliza a 'Carcasa' cualquier dimensión que se hubiera
+    creado con otro tipo en una versión anterior, para que no queden
+    registros con un tipo que ya no existe en ningún desplegable."""
+    conn.execute("UPDATE dimensiones SET tipo = 'Carcasa' WHERE tipo != 'Carcasa'")
+    conn.commit()
 
 
 def _migrar_columna_hora(conn):
@@ -728,14 +744,14 @@ def _touch_verificador(verificador_id, fecha):
 
 def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantidad=0,
                            confirmar_fin_tri_maquina=False,
-                           umbral_fin_tri_maquina=20):
+                           umbral_fin_tri_maquina=UMBRAL_FIN_TRI_MAQ):
     """Aplica las reglas de transición de estado tras una verificación.
 
     asignacion: fila de get_asignacion()/list_asignaciones() (incluye estado
         de la máquina y de la dimensión).
     cqs_detectados: lista de dicts {codigo_cq, familia} detectados en ESTA
         verificación (familia = 'NCNA' o 'H2').
-    cantidad: nº de carcasas/bandages verificados en ESTA sesión de control.
+    cantidad: nº de carcasas verificadas en ESTA sesión de control.
         Se usa para acumular, en unidades (no en número de controles), las
         verificadas sin encontrar el CQ que desencadenó un Tri Dirigido de
         máquina (la MDV pide "verificar 20 carcasas consecutivas", no 20
@@ -794,7 +810,7 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
             else:
                 resultado["comentario"] = (
                     f"{texto_accion('T_FIN_TRI_MAQ_PENDIENTE')} "
-                    f"(llevas {resultado['nuevo_contador_maq']} carcasas/bandages verificados sin "
+                    f"(llevas {resultado['nuevo_contador_maq']} carcasas verificadas sin "
                     f"encontrar el CQ {disparador_maq}; objetivo: {umbral_fin_tri_maquina} unidades "
                     f"consecutivas)."
                 )
@@ -943,7 +959,7 @@ def list_verificaciones(limit=200):
 def no_conformidades_por_verificacion(verificacion_ids):
     """Devuelve {verificacion_id: [{codigo_cq, familia, matricula}, ...]}
     para pintar, junto a cada verificación, qué CQ se detectaron y en qué
-    carcasa/bandage concreto (matrícula), sin una consulta por fila."""
+    carcasa concreta (matrícula), sin una consulta por fila."""
     verificacion_ids = list(verificacion_ids)
     if not verificacion_ids:
         return {}

@@ -4,7 +4,7 @@ title Instalando - Control de Verificacion
 cd /d "%~dp0"
 
 echo ============================================================
-echo   INSTALACION - Control de Verificacion de Carcasas/Bandages
+echo   INSTALACION - Control de Verificacion de Carcasas
 echo ============================================================
 echo.
 echo Esto solo hay que hacerlo UNA VEZ en este PC.

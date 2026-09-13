@@ -124,8 +124,8 @@ with st.container(border=True):
     confirmar_fin_tri_maq = False
     if tipo_verificacion in ("V2", "V3") and asig["estado_maq"] == "E2":
         st.caption(
-            f"Esta máquina lleva **{asig['contador_maq'] or 0}** carcasas/bandages verificados sin "
-            f"encontrar el CQ **{asig['cq_disparador_maq'] or '—'}** (objetivo: 20 unidades consecutivas)."
+            f"Esta máquina lleva **{asig['contador_maq'] or 0}** carcasas verificadas sin "
+            f"encontrar el CQ **{asig['cq_disparador_maq'] or '—'}** (objetivo: {db.UMBRAL_FIN_TRI_MAQ} unidades consecutivas)."
         )
         confirmar_fin_tri_maq = st.checkbox(
             ":material/check_circle: Ya no aparece el CQ: dar por concluido el Tri Dirigido de máquina",
@@ -211,7 +211,7 @@ with st.container(border=True):
             elif not db.matricula_valida(matricula):
                 st.error(f"La matrícula debe ser un código numérico de {db.MATRICULA_LONGITUD} dígitos.")
             else:
-                familia = db.familia_cq(asig["dimension_tipo"], codigo_final)
+                familia = db.familia_cq(codigo_final)
                 st.session_state.cq_rows.append({"codigo_cq": codigo_final, "familia": familia, "matricula": matricula})
 
     if st.session_state.cq_rows:

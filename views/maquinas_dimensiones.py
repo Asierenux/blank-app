@@ -6,7 +6,7 @@ import ui
 
 ui.page_header(
     "factory", "Máquinas y Dimensiones",
-    "La malla de gestión real de la MDV es el código Carcasa/Bandage por máquina "
+    "La malla de gestión real de la MDV es el código de carcasa por máquina "
     "de fabricación. Cada máquina tiene su propio estado de muestreo, y cada "
     "combinación máquina+dimensión tiene el suyo.",
 )
@@ -75,16 +75,14 @@ with tab_maq:
 # --- Dimensiones ---------------------------------------------------------------
 with tab_dim:
     with st.form("nueva_dimension"):
-        c1, c2 = st.columns(2)
-        codigo = c1.text_input("Código de dimensión (carcasa/bandage) *")
-        tipo = c2.selectbox("Tipo de producto", db.TIPOS_PRODUCTO)
+        codigo = st.text_input("Código de dimensión (carcasa) *")
         notas = st.text_area("Notas (marca, mercado, observaciones)")
         submitted = st.form_submit_button(":material/add: Crear dimensión", type="primary")
         if submitted:
             if not codigo.strip():
                 st.error("El código es obligatorio.")
             else:
-                db.add_dimension(codigo.strip(), tipo, notas)
+                db.add_dimension(codigo.strip(), "Carcasa", notas)
                 st.success(f"Dimensión '{codigo}' creada.")
                 st.rerun()
 
@@ -93,7 +91,7 @@ with tab_dim:
         st.info("Sin dimensiones todavía.")
     else:
         df_dim = pd.DataFrame([
-            {"Código": d["codigo"], "Tipo": d["tipo"], "Notas": d["notas"] or ""}
+            {"Código": d["codigo"], "Notas": d["notas"] or ""}
             for d in dimensiones
         ])
         df_dim.index = [""] * len(df_dim)
@@ -106,16 +104,14 @@ with tab_dim:
         dimension_sel = db.get_dimension(opciones_dim_editar[sel_dim_editar])
 
         with st.form("editar_dimension"):
-            c1, c2 = st.columns(2)
-            nuevo_codigo_dim = c1.text_input("Código", value=dimension_sel["codigo"])
-            nuevo_tipo = c2.selectbox("Tipo de producto", db.TIPOS_PRODUCTO, index=db.TIPOS_PRODUCTO.index(dimension_sel["tipo"]))
+            nuevo_codigo_dim = st.text_input("Código", value=dimension_sel["codigo"])
             nuevas_notas = st.text_area("Notas", value=dimension_sel["notas"] or "")
             guardar_dim = st.form_submit_button(":material/save: Guardar cambios", type="primary")
             if guardar_dim:
                 if not nuevo_codigo_dim.strip():
                     st.error("El código es obligatorio.")
                 else:
-                    db.update_dimension(dimension_sel["id"], nuevo_codigo_dim.strip(), nuevo_tipo, nuevas_notas)
+                    db.update_dimension(dimension_sel["id"], nuevo_codigo_dim.strip(), "Carcasa", nuevas_notas)
                     st.success("Dimensión actualizada.")
                     st.rerun()
 
@@ -142,7 +138,7 @@ with tab_asig:
         with st.form("nueva_asignacion"):
             c1, c2, c3 = st.columns(3)
             opciones_maq = {f"{m['codigo']} ({m['proceso']})": m["id"] for m in maquinas}
-            opciones_dim = {f"{d['codigo']} ({d['tipo']})": d["id"] for d in dimensiones}
+            opciones_dim = {d["codigo"]: d["id"] for d in dimensiones}
             sel_maq = c1.selectbox("Máquina", list(opciones_maq.keys()))
             sel_dim = c2.selectbox("Dimensión", list(opciones_dim.keys()))
             estado_inicial = c3.selectbox(
@@ -167,7 +163,6 @@ with tab_asig:
                 filas.append({
                     "Máquina": a["maquina_codigo"],
                     "Dimensión": a["dimension_codigo"],
-                    "Tipo": a["dimension_tipo"],
                     "Estado máquina": db.ESTADOS_MAQ.get(a["estado_maq"], a["estado_maq"]),
                     "Estado dimensión": db.ESTADOS_DIM.get(a["estado_dim"], a["estado_dim"]),
                     "CQ disparador (máquina)": a["cq_disparador_maq"] or "—",

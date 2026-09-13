@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-title Control de Verificacion de Carcasas/Bandages
+title Control de Verificacion de Carcasas
 cd /d "%~dp0"
 
 if not exist ".venv\Scripts\activate.bat" (
@@ -15,7 +15,7 @@ if not exist ".venv\Scripts\activate.bat" (
 call .venv\Scripts\activate.bat
 
 echo ============================================================
-echo   Control de Verificacion de Carcasas/Bandages
+echo   Control de Verificacion de Carcasas
 echo ============================================================
 echo.
 echo Abriendo la aplicacion en el navegador...

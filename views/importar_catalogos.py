@@ -46,9 +46,8 @@ with tab_cq:
 with tab_dim:
     st.markdown(
         "CSV con columnas **`codigo,designacion`**. Se crean como dimensiones nuevas "
-        "(tipo por defecto *Carcasa*, editable después); los códigos ya existentes se omiten."
+        "de carcasa; los códigos ya existentes se omiten."
     )
-    tipo_defecto = st.selectbox("Tipo por defecto para las dimensiones importadas", db.TIPOS_PRODUCTO)
     file = st.file_uploader("Fichero CSV de dimensiones", type=["csv"], key="up_dim")
     if file is not None:
         content = file.getvalue().decode("utf-8-sig")
@@ -56,7 +55,7 @@ with tab_dim:
         filas = [(row.get("codigo", ""), row.get("designacion", "")) for row in reader]
         st.write(f"Se han leído **{len(filas)}** filas del CSV.")
         if st.button("Importar dimensiones", type="primary"):
-            n = db.import_dimensiones(filas, tipo_por_defecto=tipo_defecto)
+            n = db.import_dimensiones(filas)
             st.success(f"Importadas {n} dimensiones nuevas (se omiten códigos ya existentes).")
             st.rerun()
 

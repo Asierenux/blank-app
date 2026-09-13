@@ -1,6 +1,6 @@
-# 🛞 Control de Verificación de Carcasas y Bandages
+# 🛞 Control de Verificación de Carcasas
 
-App para digitalizar la MDV de verificación de carcasas y bandages (sustituye a
+App para digitalizar la MDV de verificación de carcasas (sustituye a
 `MDV_MAC.xlsm`): estado de muestreo por máquina y por dimensión, registro de
 verificaciones, no conformidades y calificación de verificadores.
 
