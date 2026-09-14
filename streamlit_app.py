@@ -1,3 +1,8 @@
+import os
+import sqlite3
+from datetime import datetime
+from pathlib import Path
+
 import streamlit as st
 
 import db
@@ -19,6 +24,45 @@ ui.inject_marca_agua()
 
 if _logo:
     st.logo(str(_logo), size="large")
+
+# ---------------------------------------------------------------------------
+# Modo consulta remota: la MISMA app, pero abriendo de solo lectura una
+# copia de otro PC (ver db.copiar_base_datos_a_red()) en vez de la base de
+# datos local. Se activa arrancando la app con la variable de entorno
+# MDV_MODO_REMOTO puesta a cualquier valor (ver "Ver en remoto.bat").
+# ---------------------------------------------------------------------------
+MODO_REMOTO = bool(os.environ.get("MDV_MODO_REMOTO"))
+
+if MODO_REMOTO:
+    try:
+        carpeta_copias = Path(st.secrets["copia_red"]["carpeta_destino"])
+    except (KeyError, FileNotFoundError):
+        st.error(
+            ":material/cloud_off: Modo consulta remota: falta configurar la carpeta de red en "
+            "`.streamlit/secrets.toml` (sección `[copia_red]`, clave `carpeta_destino`)."
+        )
+        st.stop()
+
+    copias = sorted(carpeta_copias.glob("mdv_*.db")) if carpeta_copias.exists() else []
+    if not copias:
+        st.warning(f"Todavía no hay ninguna copia en `{carpeta_copias}`.")
+        st.stop()
+
+    opciones_copia = {ruta.stem.replace("mdv_", "", 1): ruta for ruta in copias}
+    pc_elegido = st.selectbox("¿Qué PC / máquina quieres consultar?", list(opciones_copia.keys()))
+    ruta_elegida = opciones_copia[pc_elegido]
+
+    if db.DB_PATH != ruta_elegida or not db.MODO_SOLO_LECTURA:
+        db.DB_PATH = ruta_elegida
+        db.MODO_SOLO_LECTURA = True
+        db.get_conn.clear()
+
+    fecha_copia = datetime.fromtimestamp(ruta_elegida.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
+    st.info(
+        f":material/lock: **Modo consulta remota** — viendo la copia de **{pc_elegido}**, "
+        f"actualizada el {fecha_copia}. Aquí no se pueden guardar cambios."
+    )
+    st.divider()
 
 # Sesión anónima de Operario: no hace falta usuario/contraseña para verificar
 # en el PC de planta. Sólo hace falta identificarse para acceder al resto
@@ -113,4 +157,17 @@ else:
     paginas = [inicio, maquinas, registro, historial, no_conformidades, verificadores, importar, usuarios]
 
 pg = st.navigation(paginas)
-pg.run()
+
+if MODO_REMOTO:
+    try:
+        pg.run()
+    except sqlite3.OperationalError as exc:
+        if "readonly database" in str(exc):
+            st.error(
+                ":material/lock: Modo consulta remota: esta es una copia de solo lectura, "
+                "no se pueden guardar cambios aquí."
+            )
+        else:
+            raise
+else:
+    pg.run()

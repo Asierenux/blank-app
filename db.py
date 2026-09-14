@@ -27,6 +27,13 @@ import streamlit as st
 
 DB_PATH = Path(__file__).parent / "data" / "mdv.db"
 
+# "Modo consulta remota" (ver streamlit_app.py y MDV_MODO_REMOTO): en vez de
+# la base de datos local de este PC, se abre — de SOLO LECTURA — una copia
+# de otro PC traída por copiar_base_datos_a_red(). Cambiar DB_PATH y este
+# flag sin volver a llamar a get_conn.clear() no tiene efecto: get_conn()
+# está cacheada por Streamlit y sólo relee estos valores al reconstruirse.
+MODO_SOLO_LECTURA = False
+
 # ---------------------------------------------------------------------------
 # Catálogos de estados (TAB_MAE: columnas E-J, Q-Y)
 # ---------------------------------------------------------------------------
@@ -290,6 +297,15 @@ def alerta_vigencia_verificador(fecha_ultima_verificacion: str | None) -> str | 
 
 @st.cache_resource
 def get_conn():
+    if MODO_SOLO_LECTURA:
+        # Copia de otro PC: se abre de solo lectura (por si el fichero
+        # sigue siendo escrito por su dueño en ese instante, y para que
+        # aquí no se pueda "guardar" nada por error) y sin init_db(), que
+        # haría ALTER/INSERT — la copia ya trae su esquema completo.
+        uri = f"file:{DB_PATH.resolve().as_posix()}?mode=ro"
+        conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
+        conn.row_factory = sqlite3.Row
+        return conn
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
     conn.execute("PRAGMA foreign_keys = ON")
