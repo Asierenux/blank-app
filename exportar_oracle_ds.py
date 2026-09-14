@@ -14,7 +14,18 @@ Uso:
         --service-name RFDWVIT0 --usuario M_J069068_RO --dias 90
 
 Pide la contraseña de forma interactiva (no se guarda en ningún sitio ni se
-pasa como argumento, para no dejarla en el historial de la terminal).
+pasa como argumento, para no dejarla en el historial de la terminal). Al
+escribirla no se ve nada en pantalla, ni siquiera asteriscos ni el cursor
+moviéndose: es normal, sigue escribiendo y pulsa Enter.
+
+Si tu terminal no admite ese prompt (algunos entornos dan problemas), pon
+la contraseña antes en una variable de entorno y el script la usará sin
+preguntar:
+
+    Windows (cmd):       set ORACLE_DS_PASSWORD=tu_contraseña
+    Windows (PowerShell): $env:ORACLE_DS_PASSWORD = "tu_contraseña"
+
+y luego ejecuta el script igual que siempre.
 
 No hace falta ningún catálogo de CQ propio para ejecutar este script: se
 exportan TODAS las clasificaciones del rango de fechas pedido, y la propia
@@ -25,6 +36,7 @@ procesos posteriores a esta MDV se descartan ahí, no aquí).
 import argparse
 import csv
 import getpass
+import os
 import sys
 from datetime import date, timedelta
 
@@ -45,7 +57,9 @@ def main():
         print("Falta instalar la librería: pip install oracledb", file=sys.stderr)
         sys.exit(1)
 
-    password = getpass.getpass(f"Contraseña para {args.usuario}: ")
+    password = os.environ.get("ORACLE_DS_PASSWORD")
+    if not password:
+        password = getpass.getpass(f"Contraseña para {args.usuario}: ")
 
     print(f"Conectando a {args.host}:{args.puerto}/{args.service_name}...")
     conn = oracledb.connect(
