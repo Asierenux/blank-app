@@ -18,9 +18,10 @@ st.caption(
 )
 st.divider()
 
-tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
+tab_cq, tab_causas, tab_informe, tab_ncf, tab_fugas = st.tabs(
     [":material/error: CQ detectados", ":material/build: Causas y acciones correctoras",
-     ":material/bar_chart: Informe de seguimiento", ":material/trending_up: % No Conformes (NCF)"]
+     ":material/bar_chart: Informe de seguimiento", ":material/trending_up: % No Conformes (NCF)",
+     ":material/report: Fugas de fabricación"]
 )
 
 with tab_cq:
@@ -156,3 +157,76 @@ with tab_ncf:
             "Un % NCF alto y sostenido por operario es señal para revisar su "
             "calificación (Anexo 1) en la página Verificadores."
         )
+
+with tab_fugas:
+    st.caption(
+        "CQ clasificados en la línea de fabricación (base de datos Oracle 'DS') que "
+        "esta MDV no detectó, dentro de lo que sí llegó a verificar. Sólo cuentan los "
+        "CQ que están en nuestro propio catálogo (página Importar Catálogos) y las "
+        "matrículas que caían en el rango de alguna verificación nuestra: si nunca "
+        "verificamos esa matrícula, no es una fuga, simplemente no la miramos."
+    )
+
+    ultima = db.ultima_sincronizacion_fugas()
+    if ultima:
+        st.caption(
+            f":material/history: Última sincronización: **{ultima['fecha_sincronizacion']}** — "
+            f"{ultima['total_oracle']} clasificaciones de Oracle revisadas, "
+            f"{ultima['total_fugas']} fugas encontradas."
+        )
+    else:
+        st.info("Todavía no se ha sincronizado nunca con Oracle.")
+
+    col_sync, col_csv = st.columns(2)
+    with col_sync:
+        st.markdown("**Opción A: este PC tiene acceso a la red de Oracle**")
+        if st.button(":material/sync: Sincronizar con Oracle ahora"):
+            with st.spinner("Consultando Oracle y cruzando con nuestras verificaciones..."):
+                resultado = db.sincronizar_fugas_fabricacion()
+            if resultado["error"]:
+                st.error(resultado["error"])
+            else:
+                st.success(
+                    f"Sincronizado: {resultado['total_oracle']} clasificaciones revisadas, "
+                    f"{resultado['en_rango_propio']} dentro de algo que verificamos, "
+                    f"{resultado['fugas']} fugas encontradas."
+                )
+                st.rerun()
+
+    with col_csv:
+        st.markdown("**Opción B: importar un fichero exportado desde otro PC**")
+        st.caption(
+            "Si este PC no llega a la red de Oracle, genera el CSV con "
+            "`exportar_oracle_ds.py` desde un PC que sí tenga acceso, y súbelo aquí."
+        )
+        fichero = st.file_uploader("Fichero CSV exportado", type=["csv"], key="up_fugas_csv")
+        if fichero is not None:
+            contenido = fichero.getvalue().decode("utf-8-sig")
+            if st.button(":material/upload_file: Importar y cruzar"):
+                with st.spinner("Cruzando con nuestras verificaciones..."):
+                    resultado = db.importar_clasificaciones_fabricacion_csv(contenido)
+                if resultado["error"]:
+                    st.error(resultado["error"])
+                else:
+                    st.success(
+                        f"Importado: {resultado['total_oracle']} clasificaciones revisadas, "
+                        f"{resultado['en_rango_propio']} dentro de algo que verificamos, "
+                        f"{resultado['fugas']} fugas encontradas."
+                    )
+                    st.rerun()
+
+    st.divider()
+    fugas = db.list_fugas_fabricacion()
+    if not fugas:
+        st.info("No hay ninguna fuga registrada (o todavía no se ha sincronizado).")
+    else:
+        df_fugas = pd.DataFrame([{
+            "Fecha clasificación": f["fecha_clasificacion"],
+            "Máquina": f["maquina_codigo"],
+            "Dimensión": f["dimension_codigo"],
+            "Matrícula": f["matricula"],
+            "CQ": f["cq_code"],
+            "Tipo": f["tipo_clasificacion"],
+        } for f in fugas])
+        st.dataframe(df_fugas, use_container_width=True, hide_index=True)
+        ui.boton_descarga_csv(df_fugas, "fugas_fabricacion.csv", "Descargar fugas (CSV)", key="csv_fugas")

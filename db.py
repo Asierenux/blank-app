@@ -378,6 +378,24 @@ def init_db(conn):
             rol TEXT NOT NULL DEFAULT 'Operario',
             fecha_creacion TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS fugas_fabricacion (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            matricula TEXT NOT NULL,
+            cq_code TEXT NOT NULL,
+            tipo_clasificacion TEXT,
+            fecha_clasificacion TEXT,
+            verificacion_id INTEGER REFERENCES verificaciones(id),
+            asignacion_id INTEGER NOT NULL REFERENCES asignaciones(id),
+            fecha_sincronizacion TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS fugas_fabricacion_sync (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            fecha_sincronizacion TEXT NOT NULL,
+            total_oracle INTEGER NOT NULL,
+            total_fugas INTEGER NOT NULL
+        );
         """
     )
     conn.commit()
@@ -1240,3 +1258,192 @@ def eliminar_usuario(usuario_id: int):
     conn = get_conn()
     conn.execute("DELETE FROM usuarios WHERE id = ?", (usuario_id,))
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Fugas de fabricación: CQ clasificados en la línea de fabricación (base de
+# datos Oracle "DS", ver oracle_ds.py) que la MDV no detectó, dentro de lo
+# que sí verificó. No se consulta Oracle en vivo desde el flujo del
+# Operario: un Técnico sincroniza cuando quiere con sincronizar_fugas_
+# fabricacion(), y el resultado se guarda aquí para consultarlo al vuelo.
+# ---------------------------------------------------------------------------
+
+def _normalizar_matricula_oracle(valor):
+    """El origen Oracle puede traer la matrícula con más dígitos que los 8
+    que usa esta MDV (p.ej. con un prefijo delante). Nos quedamos con los
+    últimos 8 dígitos, que es la parte que debería coincidir con nuestro
+    propio formato de matrícula. Devuelve None si no hay dígitos suficientes."""
+    if valor is None:
+        return None
+    digitos = "".join(ch for ch in str(valor) if ch.isdigit())
+    if len(digitos) < MATRICULA_LONGITUD:
+        return None
+    return digitos[-MATRICULA_LONGITUD:]
+
+
+def sincronizar_fugas_fabricacion():
+    """Trae de Oracle EN VIVO los CQ clasificados en fabricación (requiere
+    que este PC tenga conectividad hasta el servidor). Si este PC no la
+    tiene, usa importar_clasificaciones_fabricacion_csv() con un fichero
+    exportado desde otro PC que sí la tenga (ver exportar_oracle_ds.py).
+
+    Devuelve un dict con el resultado o con "error" si no se ha podido
+    completar (falta catálogo, o Oracle no está disponible)."""
+    codigos_catalogo = [r["codigo"] for r in list_catalogo_cq()]
+    if not codigos_catalogo:
+        return {
+            "error": "No hay ningún código CQ importado en el catálogo (página "
+                     "Importar Catálogos). Sin catálogo no se puede distinguir "
+                     "un CQ de esta MDV de uno de un proceso posterior.",
+        }
+
+    import oracle_ds
+    try:
+        filas_oracle = oracle_ds.clasificaciones_cq(codigos_catalogo)
+    except oracle_ds.OracleDSNoDisponible as exc:
+        return {"error": str(exc)}
+
+    return _procesar_clasificaciones_fabricacion(filas_oracle)
+
+
+def importar_clasificaciones_fabricacion_csv(contenido: str):
+    """Alternativa cuando este PC (el de planta) no tiene acceso a la red de
+    Oracle: procesa un CSV con columnas matricula,cq_code,tipo_clasificacion,
+    fecha, exportado desde OTRO PC que sí tenga esa conectividad (ver
+    exportar_oracle_ds.py, pensado para ejecutarse desde ese otro PC). El
+    fichero se sube aquí mismo (como en Importar Catálogos), sin tener que
+    tocar carpetas a mano."""
+    import csv
+    import io
+
+    reader = csv.DictReader(io.StringIO(contenido))
+    columnas_esperadas = {"matricula", "cq_code"}
+    if not columnas_esperadas.issubset(set(reader.fieldnames or [])):
+        return {
+            "error": "El CSV debe tener al menos las columnas 'matricula' y 'cq_code' "
+                     "(y opcionalmente 'tipo_clasificacion' y 'fecha'). Revisa que sea "
+                     "un fichero generado por exportar_oracle_ds.py.",
+        }
+    filas = [
+        {
+            "matricula": row.get("matricula"),
+            "cq_code": row.get("cq_code"),
+            "tipo_clasificacion": row.get("tipo_clasificacion"),
+            "fecha": row.get("fecha"),
+        }
+        for row in reader
+    ]
+    return _procesar_clasificaciones_fabricacion(filas)
+
+
+def _procesar_clasificaciones_fabricacion(filas_clasificacion):
+    """Núcleo común del cruce, venga de Oracle en vivo o de un CSV
+    importado: sólo se queda con los CQ que están en nuestro propio
+    catálogo (catalogo_cq: los de procesos posteriores no nos incumben), y
+    los cruza contra nuestras propias verificaciones:
+
+    - Si la matrícula cae dentro del rango mat_inicial-mat_final de alguna
+      verificación nuestra Y ese CQ no está en no_conformidades para esa
+      verificación -> es una fuga real: lo verificamos y no lo vimos.
+    - Si la matrícula no cae en ningún rango nuestro -> no la miramos
+      (normal: la MDV muestrea, no verifica el 100% salvo en TRI), así que
+      no cuenta como fuga."""
+    codigos_catalogo = {r["codigo"] for r in list_catalogo_cq()}
+    if not codigos_catalogo:
+        return {
+            "error": "No hay ningún código CQ importado en el catálogo (página "
+                     "Importar Catálogos). Sin catálogo no se puede distinguir "
+                     "un CQ de esta MDV de uno de un proceso posterior.",
+        }
+    filas_clasificacion = [f for f in filas_clasificacion if f.get("cq_code") in codigos_catalogo]
+
+    conn = get_conn()
+    rangos = []
+    for v in conn.execute(
+        "SELECT id, asignacion_id, mat_inicial, mat_final FROM verificaciones "
+        "WHERE mat_inicial IS NOT NULL AND mat_final IS NOT NULL"
+    ).fetchall():
+        if not (matricula_valida(v["mat_inicial"]) and matricula_valida(v["mat_final"])):
+            continue
+        ini, fin = int(v["mat_inicial"]), int(v["mat_final"])
+        rangos.append((min(ini, fin), max(ini, fin), v["id"], v["asignacion_id"]))
+
+    detectadas = {
+        (row["verificacion_id"], row["codigo_cq"])
+        for row in conn.execute("SELECT verificacion_id, codigo_cq FROM no_conformidades").fetchall()
+    }
+
+    hoy = datetime.now().isoformat(timespec="seconds")
+    en_rango_propio = 0
+    fugas_nuevas = []
+    for fila in filas_clasificacion:
+        matricula_norm = _normalizar_matricula_oracle(fila["matricula"])
+        if matricula_norm is None:
+            continue
+        num = int(matricula_norm)
+        coincidencias = [r for r in rangos if r[0] <= num <= r[1]]
+        if not coincidencias:
+            continue
+        en_rango_propio += 1
+        detectada = any((verif_id, fila["cq_code"]) in detectadas for _, _, verif_id, _ in coincidencias)
+        if not detectada:
+            _, _, verificacion_id, asignacion_id = coincidencias[0]
+            fecha = fila["fecha"]
+            fugas_nuevas.append((
+                matricula_norm, fila["cq_code"], fila["tipo_clasificacion"],
+                fecha.isoformat() if hasattr(fecha, "isoformat") else (str(fecha) if fecha else None),
+                verificacion_id, asignacion_id, hoy,
+            ))
+
+    conn.execute("DELETE FROM fugas_fabricacion")
+    if fugas_nuevas:
+        conn.executemany(
+            "INSERT INTO fugas_fabricacion (matricula, cq_code, tipo_clasificacion, "
+            "fecha_clasificacion, verificacion_id, asignacion_id, fecha_sincronizacion) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            fugas_nuevas,
+        )
+    conn.execute(
+        "INSERT INTO fugas_fabricacion_sync (id, fecha_sincronizacion, total_oracle, total_fugas) "
+        "VALUES (1, ?, ?, ?) "
+        "ON CONFLICT(id) DO UPDATE SET fecha_sincronizacion = excluded.fecha_sincronizacion, "
+        "total_oracle = excluded.total_oracle, total_fugas = excluded.total_fugas",
+        (hoy, len(filas_clasificacion), len(fugas_nuevas)),
+    )
+    conn.commit()
+
+    return {
+        "error": None,
+        "fecha_sincronizacion": hoy,
+        "total_oracle": len(filas_clasificacion),
+        "en_rango_propio": en_rango_propio,
+        "fugas": len(fugas_nuevas),
+    }
+
+
+def ultima_sincronizacion_fugas():
+    conn = get_conn()
+    return conn.execute("SELECT * FROM fugas_fabricacion_sync WHERE id = 1").fetchone()
+
+
+def list_fugas_fabricacion():
+    conn = get_conn()
+    return conn.execute(
+        "SELECT f.*, m.codigo AS maquina_codigo, d.codigo AS dimension_codigo "
+        "FROM fugas_fabricacion f "
+        "JOIN asignaciones a ON a.id = f.asignacion_id "
+        "JOIN maquinas m ON m.id = a.maquina_id "
+        "JOIN dimensiones d ON d.id = a.dimension_id "
+        "ORDER BY f.fecha_clasificacion DESC"
+    ).fetchall()
+
+
+def fugas_de_asignacion(asignacion_id):
+    """CQ de fabricación que se escaparon en esta combinación máquina+
+    dimensión (según la última sincronización), para avisar al Operario al
+    elegirla en Registro de verificación."""
+    conn = get_conn()
+    return conn.execute(
+        "SELECT * FROM fugas_fabricacion WHERE asignacion_id = ? ORDER BY fecha_clasificacion DESC",
+        (asignacion_id,),
+    ).fetchall()

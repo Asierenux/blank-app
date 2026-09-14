@@ -73,6 +73,14 @@ with st.container(border=True):
         else:
             st.info(f":material/info: {guia['texto']}")
 
+    fugas = db.fugas_de_asignacion(asignacion_id)
+    if fugas:
+        codigos_fuga = ", ".join(sorted({f["cq_code"] for f in fugas}))
+        st.warning(
+            f":material/report: Esta dimensión ha tenido **{len(fugas)}** CQ detectados en "
+            f"fabricación que no vimos en el MDV ({codigos_fuga}). Presta especial atención."
+        )
+
     st.divider()
     SIN_VERIFICADOR = "— Selecciona quién verifica —"
     opciones_verif = {SIN_VERIFICADOR: None}
