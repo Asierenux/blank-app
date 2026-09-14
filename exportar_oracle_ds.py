@@ -47,6 +47,7 @@ def main():
     parser.add_argument("--puerto", type=int, default=1521)
     parser.add_argument("--service-name", required=True, help="Service name (ej. RFDWVIT0)")
     parser.add_argument("--usuario", required=True)
+    parser.add_argument("--esquema", default="DS_GRQ2_TC", help="Esquema propietario de PDO_F_MATRICULE_CLASIF")
     parser.add_argument("--dias", type=int, default=90, help="Cuántos días hacia atrás exportar (por defecto 90)")
     parser.add_argument("--salida", default="fugas_fabricacion_export.csv", help="Fichero CSV de salida")
     args = parser.parse_args()
@@ -68,12 +69,12 @@ def main():
     )
 
     desde = (date.today() - timedelta(days=args.dias)).isoformat()
-    print(f"Consultando PDO_F_MATRICULE_CLASIF desde {desde}...")
+    print(f"Consultando {args.esquema}.PDO_F_MATRICULE_CLASIF desde {desde}...")
     cur = conn.cursor()
     cur.execute(
-        "SELECT MATRICULE, MATRICULE_COMPLT, CQ_CODE, TYPE_OF_CLASSIFICATION, "
-        "CLASSIFICATION_TIMESTAMP FROM PDO_F_MATRICULE_CLASIF "
-        "WHERE CLASSIFICATION_PRODUCTION_DATE >= TO_DATE(:desde, 'YYYY-MM-DD')",
+        f"SELECT MATRICULE, MATRICULE_COMPLT, CQ_CODE, TYPE_OF_CLASSIFICATION, "
+        f"CLASSIFICATION_TIMESTAMP FROM {args.esquema}.PDO_F_MATRICULE_CLASIF "
+        f"WHERE CLASSIFICATION_PRODUCTION_DATE >= TO_DATE(:desde, 'YYYY-MM-DD')",
         {"desde": desde},
     )
     filas = cur.fetchall()

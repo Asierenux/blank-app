@@ -17,6 +17,11 @@ mensaje claro en vez de reventar con un traceback de la librería Oracle.
 
 import streamlit as st
 
+# Esquema propietario de PDO_F_MATRICULE_CLASIF en RFDWVIT0. El usuario de
+# sólo lectura no la tiene como tabla propia, así que hay que cualificarla
+# explícitamente (si no, Oracle da ORA-00942: table or view does not exist).
+ESQUEMA_TABLA = "DS_GRQ2_TC"
+
 
 class OracleDSNoDisponible(Exception):
     """La conexión a la base de datos Oracle no está disponible: falta
@@ -85,7 +90,7 @@ def clasificaciones_cq(codigos_cq):
         parametros = {f"c{i}": codigo for i, codigo in enumerate(codigos_cq)}
         cur.execute(
             f"SELECT MATRICULE, MATRICULE_COMPLT, CQ_CODE, TYPE_OF_CLASSIFICATION, "
-            f"CLASSIFICATION_TIMESTAMP FROM PDO_F_MATRICULE_CLASIF "
+            f"CLASSIFICATION_TIMESTAMP FROM {ESQUEMA_TABLA}.PDO_F_MATRICULE_CLASIF "
             f"WHERE CQ_CODE IN ({placeholders})",
             parametros,
         )
