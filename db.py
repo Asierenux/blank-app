@@ -130,6 +130,20 @@ def calcular_matricula_final(mat_inicial: str, cantidad: int) -> str:
 # concluido un Tri Dirigido de máquina (TAB_MAE).
 UMBRAL_FIN_TRI_MAQ = 20
 
+# Fase 1 "Fase de validación" (INS_001_CYT_DOMF_OEU1_VIT_FOR_01, apdo. 3.1):
+# lote de verificación al 100% para calificar una dimensión (D0 "TRI" o D4
+# "ARRANQUE CAMPAÑA") y poder pasarla a Sondeo. El tamaño del lote depende
+# del proceso de la máquina, y el lote se acepta o se rechaza según cuántos
+# CQ NCNA y cuántos "otros" CQ (H2/retocados) aparecieron en él:
+#   NCNA:  A(ceptación) = 0   R(echazo) = 1  -> cualquier NCNA rechaza el lote
+#   Otros: A(ceptación) = 5   R(echazo) = 6  -> más de 5 rechaza el lote
+# Si se rechaza, se define un plan de acción y se empieza un lote nuevo
+# (se reinician los contadores); no pasa a Tri Dirigido de máquina por esto
+# solo (durante la Fase 1, la respuesta a un CQ es "continuación del TRI").
+UMBRAL_VALIDACION_UNIDADES = {"MAC": 125, "BNS.Auto": 80}
+UMBRAL_VALIDACION_NCNA_MAX = 0
+UMBRAL_VALIDACION_H2_MAX = 5
+
 # Textos de acción (TAB_MAE!Z3:AA16, códigos T10-T70).
 ACCIONES = {
     "T10": "Pasar a TRI DIRIGIDO a el/los CQ NCNA: @@@. Buscar causa y acción correctora. "
@@ -193,15 +207,22 @@ def guia_estado_actual(asignacion) -> list[dict]:
         })
     elif asignacion["estado_dim"] == "D1":
         guias.append({"nivel": "info", "texto": texto_accion("T30")})
-    elif asignacion["estado_dim"] == "D0":
+    elif asignacion["estado_dim"] in ("D0", "D4"):
+        umbral_unidades = UMBRAL_VALIDACION_UNIDADES.get(
+            asignacion["maquina_proceso"], UMBRAL_VALIDACION_UNIDADES["MAC"]
+        )
+        unidades = asignacion["contador_val_unidades"] or 0
+        ncna = asignacion["contador_val_ncna"] or 0
+        h2 = asignacion["contador_val_h2"] or 0
+        prefijo = "Fase TRI" if asignacion["estado_dim"] == "D0" else "Arranque de campaña (TRI)"
         guias.append({
             "nivel": "info",
-            "texto": "Fase TRI: verificación del 100% del lote hasta calificar esta dimensión en esta máquina.",
-        })
-    elif asignacion["estado_dim"] == "D4":
-        guias.append({
-            "nivel": "info",
-            "texto": "Arranque de campaña: verificación del 100% del lote (TRI) hasta que un Técnico la pase a Sondeo.",
+            "texto": (
+                f"{prefijo}: verificación del 100% del lote. Lote de validación en curso: "
+                f"{unidades}/{umbral_unidades} unidades, {ncna} CQ NCNA y {h2} otros CQ hasta ahora "
+                f"(el lote se acepta con 0 NCNA y máximo {UMBRAL_VALIDACION_H2_MAX} otros CQ; si no, se "
+                f"empieza un lote nuevo)."
+            ),
         })
     elif asignacion["estado_dim"] == "D5":
         guias.append({
@@ -305,7 +326,10 @@ def init_db(conn):
             cq_disparador_dim TEXT,
             fecha_cambio_estado_dim TEXT,
             activa INTEGER NOT NULL DEFAULT 1,
-            fecha_creacion TEXT NOT NULL
+            fecha_creacion TEXT NOT NULL,
+            contador_val_unidades INTEGER NOT NULL DEFAULT 0,
+            contador_val_ncna INTEGER NOT NULL DEFAULT 0,
+            contador_val_h2 INTEGER NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS verificadores (
@@ -401,6 +425,7 @@ def init_db(conn):
     conn.commit()
     _migrar_columna_hora(conn)
     _migrar_solo_carcasas(conn)
+    _migrar_contadores_validacion(conn)
     _seed_maquinas_dimensiones_mac(conn)
     _crear_asignaciones_faltantes(conn)
 
@@ -422,6 +447,18 @@ def _migrar_columna_hora(conn):
     columnas = {row["name"] for row in conn.execute("PRAGMA table_info(verificaciones)").fetchall()}
     if "hora" not in columnas:
         conn.execute("ALTER TABLE verificaciones ADD COLUMN hora TEXT")
+        conn.commit()
+
+
+def _migrar_contadores_validacion(conn):
+    """Bases de datos creadas antes del lote de validación (Fase 1 / TRI)
+    no tienen las columnas de contador en asignaciones. Las añadimos a
+    mano si hace falta, empezando en 0 (un lote nuevo)."""
+    columnas = {row["name"] for row in conn.execute("PRAGMA table_info(asignaciones)").fetchall()}
+    faltan = {"contador_val_unidades", "contador_val_ncna", "contador_val_h2"} - columnas
+    for columna in faltan:
+        conn.execute(f"ALTER TABLE asignaciones ADD COLUMN {columna} INTEGER NOT NULL DEFAULT 0")
+    if faltan:
         conn.commit()
 
 
@@ -724,6 +761,20 @@ def set_activa_asignacion(asignacion_id, activa: bool):
     conn.commit()
 
 
+def set_contador_validacion_dim(asignacion_id, unidades: int, ncna: int, h2: int):
+    """Progreso del lote de validación (Fase 1 / TRI) en curso para esta
+    dimensión: unidades verificadas, CQ NCNA y otros CQ encontrados en el
+    lote. Se reinician a 0 en procesar_verificacion() cuando el lote se
+    cierra (se acepte o no)."""
+    conn = get_conn()
+    conn.execute(
+        "UPDATE asignaciones SET contador_val_unidades = ?, contador_val_ncna = ?, "
+        "contador_val_h2 = ? WHERE id = ?",
+        (unidades, ncna, h2, asignacion_id),
+    )
+    conn.commit()
+
+
 # ---------------------------------------------------------------------------
 # Verificadores (Anexo 1, sin cambios respecto al modelo anterior)
 # ---------------------------------------------------------------------------
@@ -825,13 +876,61 @@ def procesar_verificacion(asignacion, tipo_verificacion, cqs_detectados, cantida
         "cq_disparador_maq": disparador_maq,
         "cq_disparador_dim": disparador_dim,
         "nuevo_contador_maq": contador_maq,
+        "nuevo_contador_val_unidades": asignacion["contador_val_unidades"] or 0,
+        "nuevo_contador_val_ncna": asignacion["contador_val_ncna"] or 0,
+        "nuevo_contador_val_h2": asignacion["contador_val_h2"] or 0,
         "comentario": "",
         "requiere_causa_accion": [],
         "pendiente_confirmacion": False,
     }
 
     if tipo_verificacion == "V1":
-        resultado["comentario"] = "Verificación TRI (100%) registrada."
+        if todos_codigos:
+            # "Reglas de acción en caso de aparición de un CQ (en TRI o en
+            # Fase de validación)": cada CQ que aparece durante el lote de
+            # validación pide su causa/acción (o tratamiento) en el momento,
+            # continuando el TRI — no espera a que se cierre el lote.
+            resultado["requiere_causa_accion"] = sorted(todos_codigos)
+
+        if estado_dim in ("D0", "D4"):
+            umbral_unidades = UMBRAL_VALIDACION_UNIDADES.get(
+                asignacion["maquina_proceso"], UMBRAL_VALIDACION_UNIDADES["MAC"]
+            )
+            nuevo_unidades = resultado["nuevo_contador_val_unidades"] + (cantidad or 0)
+            nuevo_ncna = resultado["nuevo_contador_val_ncna"] + len(codigos_ncna)
+            nuevo_h2 = resultado["nuevo_contador_val_h2"] + len(codigos_otros)
+
+            if nuevo_unidades >= umbral_unidades:
+                aceptado = nuevo_ncna <= UMBRAL_VALIDACION_NCNA_MAX and nuevo_h2 <= UMBRAL_VALIDACION_H2_MAX
+                # El lote se cierra siempre al llegar al umbral, se acepte o
+                # no: si no se acepta, el siguiente es un lote nuevo (Fase de
+                # validación otra vez), nunca se arrastran unidades de más.
+                resultado["nuevo_contador_val_unidades"] = 0
+                resultado["nuevo_contador_val_ncna"] = 0
+                resultado["nuevo_contador_val_h2"] = 0
+                if aceptado:
+                    resultado["nuevo_estado_dim"] = "D3"
+                    resultado["cq_disparador_dim"] = None
+                    resultado["comentario"] = (
+                        f"Lote de validación de {umbral_unidades} unidades ACEPTADO ({nuevo_ncna} CQ NCNA, "
+                        f"{nuevo_h2} otros CQ): la dimensión pasa a SONDEO."
+                    )
+                else:
+                    resultado["comentario"] = (
+                        f"Lote de validación de {umbral_unidades} unidades NO ACEPTADO ({nuevo_ncna} CQ NCNA, "
+                        f"máx. {UMBRAL_VALIDACION_NCNA_MAX}; {nuevo_h2} otros CQ, máx. {UMBRAL_VALIDACION_H2_MAX}). "
+                        f"Define un plan de acción y empieza un lote de validación nuevo."
+                    )
+            else:
+                resultado["nuevo_contador_val_unidades"] = nuevo_unidades
+                resultado["nuevo_contador_val_ncna"] = nuevo_ncna
+                resultado["nuevo_contador_val_h2"] = nuevo_h2
+                resultado["comentario"] = (
+                    f"Verificación TRI (100%) registrada. Lote de validación: {nuevo_unidades}/{umbral_unidades} "
+                    f"unidades, {nuevo_ncna} CQ NCNA y {nuevo_h2} otros CQ hasta ahora."
+                )
+        else:
+            resultado["comentario"] = "Verificación TRI (100%) registrada."
 
     elif tipo_verificacion in ("V2", "V3") and estado_maq == "E2":
         sigue_apareciendo = disparador_maq in todos_codigos if disparador_maq else False
@@ -962,6 +1061,10 @@ def registrar_verificacion(asignacion_id, verificador_id, tipo_verificacion,
     set_estado_dimension(
         asignacion_id, resultado_transicion["nuevo_estado_dim"],
         resultado_transicion["cq_disparador_dim"],
+    )
+    set_contador_validacion_dim(
+        asignacion_id, resultado_transicion["nuevo_contador_val_unidades"],
+        resultado_transicion["nuevo_contador_val_ncna"], resultado_transicion["nuevo_contador_val_h2"],
     )
 
     conn.execute(
