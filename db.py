@@ -1550,3 +1550,48 @@ def fugas_de_asignacion(asignacion_id):
         "SELECT * FROM fugas_fabricacion WHERE asignacion_id = ? ORDER BY fecha_clasificacion DESC",
         (asignacion_id,),
     ).fetchall()
+
+
+# ---------------------------------------------------------------------------
+# Copia a una carpeta de red compartida (p.ej. la unidad "O:" donde antes
+# vivía el Excel): pensado para cuando cada PC de máquina tiene su propia
+# base de datos local y hace falta poder consolidarlas o consultarlas desde
+# fuera, sin montar un servidor central. Nunca debe romper el guardado de
+# una verificación: cualquier fallo (carpeta no configurada, red caída...)
+# se informa pero no interrumpe el flujo del Operario.
+# ---------------------------------------------------------------------------
+
+def copiar_base_datos_a_red():
+    """Copia la base de datos de este PC a la carpeta de red configurada en
+    .streamlit/secrets.toml (sección [copia_red], clave carpeta_destino),
+    con un nombre de fichero único por PC (el nombre del equipo) para que
+    varias máquinas puedan copiar ahí sin pisarse entre ellas.
+
+    Usa el propio backup de SQLite (Connection.backup), que hace una copia
+    consistente de una base de datos en uso, en vez de copiar el fichero a
+    pelo (que sí podría pillar una escritura a medias).
+
+    Devuelve {"ok": True, "destino": ruta} o {"ok": False, "motivo": texto}
+    — nunca lanza una excepción: un fallo aquí no debe impedir guardar la
+    verificación."""
+    import socket
+
+    try:
+        carpeta = st.secrets["copia_red"]["carpeta_destino"]
+    except (KeyError, FileNotFoundError):
+        return {"ok": False, "motivo": "no hay carpeta de red configurada (secrets.toml, sección [copia_red])"}
+
+    try:
+        destino_dir = Path(carpeta)
+        destino_dir.mkdir(parents=True, exist_ok=True)
+        destino = destino_dir / f"mdv_{socket.gethostname()}.db"
+
+        origen = get_conn()
+        destino_conn = sqlite3.connect(str(destino))
+        try:
+            origen.backup(destino_conn)
+        finally:
+            destino_conn.close()
+        return {"ok": True, "destino": str(destino)}
+    except Exception as exc:
+        return {"ok": False, "motivo": str(exc)}

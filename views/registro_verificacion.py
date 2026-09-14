@@ -309,6 +309,10 @@ with st.container(border=True):
             cantidad=int(cantidad), cqs_detectados=st.session_state.cq_rows,
             causas_acciones=causas_input, notas=notas, resultado_transicion=transicion,
         )
+        copia = db.copiar_base_datos_a_red()
+        if not copia["ok"] and "no hay carpeta de red configurada" not in copia["motivo"]:
+            st.toast(f":material/cloud_off: No se pudo copiar a la carpeta de red: {copia['motivo']}", icon="⚠️")
+
         st.session_state.cq_rows = []
         st.session_state.rv_version += 1
         st.session_state.ultima_verificacion_guardada = dim_sel
