@@ -12,10 +12,13 @@ ui.page_header(
     "muestreo por máquina y por dimensión en esa máquina.",
 )
 
+solo_activas_stats = ui.selector_ambito_estadisticas("inicio_ambito_stats")
+st.divider()
+
 maquinas = db.list_maquinas()
 asignaciones = db.list_asignaciones(solo_activas=True)
-verificaciones = db.list_verificaciones(limit=5000)
-no_conformidades = db.list_no_conformidades()
+verificaciones = db.list_verificaciones(limit=5000, solo_activas=solo_activas_stats)
+no_conformidades = db.list_no_conformidades(solo_activas=solo_activas_stats)
 verificadores = db.list_verificadores()
 
 # --- KPIs ---------------------------------------------------------------

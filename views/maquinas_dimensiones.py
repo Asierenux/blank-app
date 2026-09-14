@@ -12,7 +12,7 @@ ui.page_header(
 )
 
 tab_maq, tab_dim, tab_asig, tab_guia = st.tabs(
-    [":material/settings: Máquinas", ":material/inventory_2: Dimensiones", ":material/link: Asignaciones y estado", ":material/menu_book: Guía de estados"]
+    [":material/settings: Máquinas", ":material/inventory_2: Dimensiones", ":material/play_circle: En marcha y estado", ":material/menu_book: Guía de estados"]
 )
 
 # --- Máquinas ----------------------------------------------------------------
@@ -60,11 +60,11 @@ with tab_maq:
                     st.success("Máquina actualizada.")
                     st.rerun()
 
-        n_asig = db.count_asignaciones_de_maquina(maquina_sel["id"])
-        if n_asig:
+        if not db.maquina_eliminable(maquina_sel["id"]):
             st.caption(
-                f":material/lock: No se puede eliminar: tiene {n_asig} dimensión(es) asignada(s). "
-                "Elimínalas primero en la pestaña **Asignaciones y estado**."
+                ":material/lock: No se puede eliminar: tiene algún código en marcha o con "
+                "verificaciones registradas en esta máquina. Sácalo de marcha primero en la "
+                "pestaña **En marcha y estado**."
             )
         else:
             if st.button(":material/delete: Eliminar esta máquina"):
@@ -115,11 +115,11 @@ with tab_dim:
                     st.success("Dimensión actualizada.")
                     st.rerun()
 
-        n_asig_dim = db.count_asignaciones_de_dimension(dimension_sel["id"])
-        if n_asig_dim:
+        if not db.dimension_eliminable(dimension_sel["id"]):
             st.caption(
-                f":material/lock: No se puede eliminar: está asignada a {n_asig_dim} máquina(s). "
-                "Elimínala primero en la pestaña **Asignaciones y estado**."
+                ":material/lock: No se puede eliminar: está en marcha en alguna máquina o tiene "
+                "verificaciones registradas. Sácala de marcha primero en la pestaña "
+                "**En marcha y estado**."
             )
         else:
             if st.button(":material/delete: Eliminar esta dimensión"):
@@ -127,39 +127,111 @@ with tab_dim:
                 st.success("Dimensión eliminada.")
                 st.rerun()
 
-# --- Asignaciones (malla máquina x dimensión) y su estado ---------------------
+# --- En marcha (malla máquina x dimensión) y su estado ------------------------
 with tab_asig:
     maquinas = db.list_maquinas()
     dimensiones = db.list_dimensiones()
     if not maquinas or not dimensiones:
         st.warning("Crea antes al menos una máquina y una dimensión.")
     else:
-        st.subheader("Nueva asignación (código en una máquina)")
-        with st.form("nueva_asignacion"):
-            c1, c2, c3 = st.columns(3)
-            opciones_maq = {f"{m['codigo']} ({m['proceso']})": m["id"] for m in maquinas}
-            opciones_dim = {d["codigo"]: d["id"] for d in dimensiones}
-            sel_maq = c1.selectbox("Máquina", list(opciones_maq.keys()))
-            sel_dim = c2.selectbox("Dimensión", list(opciones_dim.keys()))
-            estado_inicial = c3.selectbox(
-                "Estado inicial de la dimensión en esta máquina", list(db.ESTADOS_DIM.keys()),
-                format_func=lambda k: db.ESTADOS_DIM[k],
-                help="TRI = arranque/fase de validación. Usa Sondeo si ya está calificada.",
+        st.caption(
+            "Todas las dimensiones existen ya en todas las máquinas: no hace falta crear "
+            "nada a mano. Actívalas aquí cuando un código **entra en marcha** (producción) "
+            "en una máquina, y desactívalas cuando **sale de marcha**. Sólo los códigos en "
+            "marcha aparecen para verificar y cuentan por defecto en las estadísticas."
+        )
+
+        opciones_maq = {f"{m['codigo']} ({m['proceso']})": m["id"] for m in maquinas}
+        sel_maq_marcha = st.selectbox("Máquina", list(opciones_maq.keys()), key="sel_maquina_marcha")
+        maquina_marcha = db.get_maquina(opciones_maq[sel_maq_marcha])
+
+        filtro_dim = st.text_input(":material/search: Buscar dimensión por código", key="filtro_dim_marcha")
+
+        asignaciones_maquina = [
+            a for a in db.list_asignaciones(solo_activas=False) if a["maquina_id"] == maquina_marcha["id"]
+        ]
+        asignaciones_filtradas = (
+            [a for a in asignaciones_maquina if filtro_dim.strip().lower() in a["dimension_codigo"].lower()]
+            if filtro_dim.strip() else asignaciones_maquina
+        )
+
+        if not asignaciones_filtradas:
+            st.info("Sin dimensiones que coincidan con la búsqueda.")
+        else:
+            df_marcha = pd.DataFrame([
+                {
+                    "id": a["id"],
+                    "Dimensión": a["dimension_codigo"],
+                    "Estado dimensión": db.ESTADOS_DIM.get(a["estado_dim"], a["estado_dim"]),
+                    "En marcha": bool(a["activa"]),
+                }
+                for a in asignaciones_filtradas
+            ])
+            editado = st.data_editor(
+                df_marcha,
+                key=f"editor_marcha_{maquina_marcha['id']}",
+                hide_index=True,
+                use_container_width=True,
+                disabled=["id", "Dimensión", "Estado dimensión"],
+                column_config={
+                    "id": None,
+                    "En marcha": st.column_config.CheckboxColumn("En marcha"),
+                },
             )
-            submitted = st.form_submit_button(":material/add: Crear asignación", type="primary")
-            if submitted:
-                db.add_asignacion(opciones_maq[sel_maq], opciones_dim[sel_dim], estado_inicial)
-                st.success("Asignación creada.")
+            if st.button(":material/save: Guardar cambios de marcha", type="primary"):
+                cambios = 0
+                originales = dict(zip(df_marcha["id"], df_marcha["En marcha"]))
+                for _, fila in editado.iterrows():
+                    if bool(fila["En marcha"]) != bool(originales[fila["id"]]):
+                        db.set_activa_asignacion(int(fila["id"]), bool(fila["En marcha"]))
+                        cambios += 1
+                if cambios:
+                    st.success(f"{cambios} código(s) actualizado(s).")
+                    st.rerun()
+                else:
+                    st.info("No hay cambios que guardar.")
+
+        st.divider()
+        st.subheader("Forzar estado manualmente")
+        st.caption(
+            "Úsalo para calificar manualmente un código (fin de Fase 1 → Sondeo) o para "
+            "corregir su estado, esté o no en marcha."
+        )
+        opciones_asig_maq = {a["dimension_codigo"]: a["id"] for a in asignaciones_maquina}
+        sel_dim_forzar = st.selectbox("Dimensión", list(opciones_asig_maq.keys()), key="sel_forzar_estado")
+        asig = db.get_asignacion(opciones_asig_maq[sel_dim_forzar])
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            nuevo_estado_maq = st.selectbox(
+                "Estado de la máquina", list(db.ESTADOS_MAQ.keys()),
+                index=list(db.ESTADOS_MAQ.keys()).index(asig["estado_maq"]),
+                format_func=lambda k: db.ESTADOS_MAQ[k],
+                key="force_estado_maq",
+            )
+            if st.button("Aplicar estado de máquina"):
+                db.set_estado_maquina(asig["maquina_id"], nuevo_estado_maq)
+                st.success("Estado de máquina actualizado.")
+                st.rerun()
+        with cc2:
+            nuevo_estado_dim = st.selectbox(
+                "Estado de la dimensión", list(db.ESTADOS_DIM.keys()),
+                index=list(db.ESTADOS_DIM.keys()).index(asig["estado_dim"]),
+                format_func=lambda k: db.ESTADOS_DIM[k],
+                key="force_estado_dim",
+            )
+            if st.button("Aplicar estado de dimensión"):
+                db.set_estado_dimension(asig["id"], nuevo_estado_dim)
+                st.success("Estado de dimensión actualizado.")
                 st.rerun()
 
         st.divider()
-        st.subheader("Estado actual de la malla máquina × dimensión")
-        asignaciones = db.list_asignaciones(solo_activas=False)
-        if not asignaciones:
-            st.info("Todavía no hay asignaciones.")
+        st.subheader("Códigos en marcha ahora mismo (todas las máquinas)")
+        asignaciones_activas = db.list_asignaciones(solo_activas=True)
+        if not asignaciones_activas:
+            st.info("Ningún código está en marcha todavía.")
         else:
             filas = []
-            for a in asignaciones:
+            for a in asignaciones_activas:
                 filas.append({
                     "Máquina": a["maquina_codigo"],
                     "Dimensión": a["dimension_codigo"],
@@ -167,64 +239,10 @@ with tab_asig:
                     "Estado dimensión": db.ESTADOS_DIM.get(a["estado_dim"], a["estado_dim"]),
                     "CQ disparador (máquina)": a["cq_disparador_maq"] or "—",
                     "CQ disparador (dimensión)": a["cq_disparador_dim"] or "—",
-                    "Activa": "Sí" if a["activa"] else "No",
                 })
             df_asig = pd.DataFrame(filas)
             df_asig.index = [""] * len(df_asig)
             st.table(df_asig)
-
-            st.divider()
-            st.subheader("Forzar estado manualmente")
-            st.caption(
-                "Úsalo para calificar manualmente una dimensión (fin de Fase 1 → Sondeo) "
-                "o para reactivarla."
-            )
-            opciones_asig = {
-                f"{a['maquina_codigo']} / {a['dimension_codigo']}": a["id"] for a in asignaciones
-            }
-            sel = st.selectbox("Asignación", list(opciones_asig.keys()))
-            asig = db.get_asignacion(opciones_asig[sel])
-            cc1, cc2, cc3 = st.columns(3)
-            with cc1:
-                nuevo_estado_maq = st.selectbox(
-                    "Estado de la máquina", list(db.ESTADOS_MAQ.keys()),
-                    index=list(db.ESTADOS_MAQ.keys()).index(asig["estado_maq"]),
-                    format_func=lambda k: db.ESTADOS_MAQ[k],
-                    key="force_estado_maq",
-                )
-                if st.button("Aplicar estado de máquina"):
-                    db.set_estado_maquina(asig["maquina_id"], nuevo_estado_maq)
-                    st.success("Estado de máquina actualizado.")
-                    st.rerun()
-            with cc2:
-                nuevo_estado_dim = st.selectbox(
-                    "Estado de la dimensión", list(db.ESTADOS_DIM.keys()),
-                    index=list(db.ESTADOS_DIM.keys()).index(asig["estado_dim"]),
-                    format_func=lambda k: db.ESTADOS_DIM[k],
-                    key="force_estado_dim",
-                )
-                if st.button("Aplicar estado de dimensión"):
-                    db.set_estado_dimension(asig["id"], nuevo_estado_dim)
-                    st.success("Estado de dimensión actualizado.")
-                    st.rerun()
-            with cc3:
-                activa = st.checkbox("Asignación activa", value=bool(asig["activa"]))
-                if st.button("Aplicar activa/inactiva"):
-                    db.set_activa_asignacion(asig["id"], activa)
-                    st.success("Actualizado.")
-                    st.rerun()
-
-            n_verif = db.count_verificaciones_de_asignacion(asig["id"])
-            if n_verif:
-                st.caption(
-                    f":material/lock: No se puede eliminar: tiene {n_verif} verificación(es) registradas. "
-                    "Desactívala en vez de eliminarla si ya no está en uso."
-                )
-            else:
-                if st.button(":material/delete: Eliminar esta asignación (sin verificaciones registradas)"):
-                    db.delete_asignacion(asig["id"])
-                    st.success("Asignación eliminada.")
-                    st.rerun()
 
 # --- Guía ----------------------------------------------------------------------
 with tab_guia:

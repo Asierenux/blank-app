@@ -11,6 +11,13 @@ ui.page_header(
     "Histórico generado automáticamente al registrar cada verificación.",
 )
 
+solo_activas_stats = ui.selector_ambito_estadisticas("noconf_ambito_stats")
+st.caption(
+    "Aplica a las pestañas **CQ detectados**, **Informe de seguimiento** y "
+    "**% No Conformes (NCF)**."
+)
+st.divider()
+
 tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
     [":material/error: CQ detectados", ":material/build: Causas y acciones correctoras",
      ":material/bar_chart: Informe de seguimiento", ":material/trending_up: % No Conformes (NCF)"]
@@ -18,7 +25,7 @@ tab_cq, tab_causas, tab_informe, tab_ncf = st.tabs(
 
 with tab_cq:
     solo_ncna = st.checkbox("Mostrar sólo CQ NCNA")
-    detecciones = db.list_no_conformidades(solo_ncna=solo_ncna)
+    detecciones = db.list_no_conformidades(solo_ncna=solo_ncna, solo_activas=solo_activas_stats)
     if not detecciones:
         st.info("No hay CQ registrados todavía.")
     else:
@@ -56,7 +63,7 @@ with tab_causas:
 
 with tab_informe:
     st.subheader("Movimientos por máquina / dimensión")
-    verificaciones = db.list_verificaciones(limit=5000)
+    verificaciones = db.list_verificaciones(limit=5000, solo_activas=solo_activas_stats)
     if not verificaciones:
         st.info("Aún no hay verificaciones registradas.")
     else:
@@ -115,7 +122,9 @@ with tab_ncf:
     fecha_hasta = c2.date_input("Hasta", value=date.today(), key="ncf_hasta")
 
     st.subheader("Por máquina / dimensión")
-    datos_maq = db.informe_ncf_por_maquina(fecha_desde.isoformat(), fecha_hasta.isoformat())
+    datos_maq = db.informe_ncf_por_maquina(
+        fecha_desde.isoformat(), fecha_hasta.isoformat(), solo_activas=solo_activas_stats,
+    )
     if not datos_maq:
         st.info("Sin verificaciones en ese rango de fechas.")
     else:
@@ -130,7 +139,9 @@ with tab_ncf:
 
     st.divider()
     st.subheader("Por operario")
-    datos_op = db.informe_ncf_por_operario(fecha_desde.isoformat(), fecha_hasta.isoformat())
+    datos_op = db.informe_ncf_por_operario(
+        fecha_desde.isoformat(), fecha_hasta.isoformat(), solo_activas=solo_activas_stats,
+    )
     if not datos_op:
         st.info("Sin verificaciones en ese rango de fechas.")
     else:

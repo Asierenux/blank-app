@@ -380,6 +380,19 @@ def page_header(icon_name: str, titulo: str, subtitulo: str = None):
     )
 
 
+def selector_ambito_estadisticas(key: str) -> bool:
+    """Radio para elegir si las estadísticas de la página cuentan sólo los
+    códigos EN MARCHA ahora mismo (por defecto) o todo el histórico
+    (activo o no). Devuelve True si hay que filtrar sólo por los activos."""
+    opcion = st.radio(
+        "Ámbito de las estadísticas",
+        ["Sólo códigos en marcha", "Estadística general (todo el histórico)"],
+        horizontal=True,
+        key=key,
+    )
+    return opcion == "Sólo códigos en marcha"
+
+
 def step_badge(numero: int, texto: str):
     """Cabecera de paso con una insignia numerada cuadrada, estilo asistente
     de formulario ERP."""

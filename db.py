@@ -384,6 +384,7 @@ def init_db(conn):
     _migrar_columna_hora(conn)
     _migrar_solo_carcasas(conn)
     _seed_maquinas_dimensiones_mac(conn)
+    _crear_asignaciones_faltantes(conn)
 
 
 def _migrar_solo_carcasas(conn):
@@ -516,6 +517,7 @@ def add_maquina(codigo, proceso):
         (codigo, proceso, date.today().isoformat()),
     )
     conn.commit()
+    _crear_asignaciones_faltantes(conn)
 
 
 def list_maquinas():
@@ -547,17 +549,25 @@ def update_maquina(maquina_id, codigo, proceso):
     conn.commit()
 
 
-def count_asignaciones_de_maquina(maquina_id) -> int:
+def maquina_eliminable(maquina_id) -> bool:
+    """Se puede eliminar si ninguna de sus combinaciones con una dimensión
+    está en marcha ni tiene verificaciones registradas (si las tiene, hay
+    que sacarla de marcha y conservar el histórico, no borrarla)."""
     conn = get_conn()
-    return conn.execute(
-        "SELECT COUNT(*) AS n FROM asignaciones WHERE maquina_id = ?", (maquina_id,)
-    ).fetchone()["n"]
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM asignaciones a WHERE a.maquina_id = ? AND ("
+        "a.activa = 1 OR EXISTS (SELECT 1 FROM verificaciones v WHERE v.asignacion_id = a.id))",
+        (maquina_id,),
+    ).fetchone()
+    return row["n"] == 0
 
 
 def delete_maquina(maquina_id):
-    """Sólo se puede eliminar si no tiene ninguna asignación (ni activa ni
-    inactiva); si las tiene, hay que eliminarlas/desasignarlas primero."""
+    """Elimina la máquina y las combinaciones máquina+dimensión que la
+    vinculaban (siempre fuera de marcha y sin verificaciones: se comprueba
+    antes con maquina_eliminable)."""
     conn = get_conn()
+    conn.execute("DELETE FROM asignaciones WHERE maquina_id = ?", (maquina_id,))
     conn.execute("DELETE FROM maquinas WHERE id = ?", (maquina_id,))
     conn.commit()
 
@@ -573,6 +583,7 @@ def add_dimension(codigo, tipo, notas=""):
         (codigo, tipo, notas),
     )
     conn.commit()
+    _crear_asignaciones_faltantes(conn)
     return cur.lastrowid
 
 
@@ -595,43 +606,56 @@ def update_dimension(dimension_id, codigo, tipo, notas):
     conn.commit()
 
 
-def count_asignaciones_de_dimension(dimension_id) -> int:
+def dimension_eliminable(dimension_id) -> bool:
+    """Se puede eliminar si ninguna de sus combinaciones con una máquina
+    está en marcha ni tiene verificaciones registradas."""
     conn = get_conn()
-    return conn.execute(
-        "SELECT COUNT(*) AS n FROM asignaciones WHERE dimension_id = ?", (dimension_id,)
-    ).fetchone()["n"]
+    row = conn.execute(
+        "SELECT COUNT(*) AS n FROM asignaciones a WHERE a.dimension_id = ? AND ("
+        "a.activa = 1 OR EXISTS (SELECT 1 FROM verificaciones v WHERE v.asignacion_id = a.id))",
+        (dimension_id,),
+    ).fetchone()
+    return row["n"] == 0
 
 
 def delete_dimension(dimension_id):
+    """Elimina la dimensión y las combinaciones máquina+dimensión que la
+    vinculaban (siempre fuera de marcha y sin verificaciones: se comprueba
+    antes con dimension_eliminable)."""
     conn = get_conn()
+    conn.execute("DELETE FROM asignaciones WHERE dimension_id = ?", (dimension_id,))
     conn.execute("DELETE FROM dimensiones WHERE id = ?", (dimension_id,))
     conn.commit()
 
 
-def delete_asignacion(asignacion_id):
-    """Sólo debería usarse si la asignación no tiene verificaciones
-    históricas; si las tiene, es preferible desactivarla (set_activa_asignacion)."""
-    conn = get_conn()
-    conn.execute("DELETE FROM asignaciones WHERE id = ?", (asignacion_id,))
-    conn.commit()
-
-
-def count_verificaciones_de_asignacion(asignacion_id) -> int:
-    conn = get_conn()
-    return conn.execute(
-        "SELECT COUNT(*) AS n FROM verificaciones WHERE asignacion_id = ?", (asignacion_id,)
-    ).fetchone()["n"]
-
-
-def add_asignacion(maquina_id, dimension_id, estado_dim="D0"):
-    conn = get_conn()
-    cur = conn.execute(
-        "INSERT INTO asignaciones (maquina_id, dimension_id, estado_dim, "
-        "fecha_cambio_estado_dim, fecha_creacion) VALUES (?, ?, ?, ?, ?)",
-        (maquina_id, dimension_id, estado_dim, date.today().isoformat(), date.today().isoformat()),
-    )
-    conn.commit()
-    return cur.lastrowid
+def _crear_asignaciones_faltantes(conn):
+    """La malla máquina x dimensión se mantiene siempre completa: cualquier
+    dimensión puede en principio fabricarse en cualquier máquina, así que no
+    hace falta que un Técnico cree a mano cada combinación. Lo que decide un
+    Técnico es cuándo un código "entra en marcha" (producción) en una
+    máquina concreta, activando esa combinación (ver set_activa_asignacion).
+    Se crean, inactivas y en TRI, sólo las combinaciones que todavía no
+    existan; las que ya había no se tocan."""
+    maquinas_ids = [r["id"] for r in conn.execute("SELECT id FROM maquinas").fetchall()]
+    dimensiones_ids = [r["id"] for r in conn.execute("SELECT id FROM dimensiones").fetchall()]
+    existentes = {
+        (r["maquina_id"], r["dimension_id"])
+        for r in conn.execute("SELECT maquina_id, dimension_id FROM asignaciones").fetchall()
+    }
+    hoy = date.today().isoformat()
+    faltantes = [
+        (maq_id, dim_id, hoy)
+        for maq_id in maquinas_ids
+        for dim_id in dimensiones_ids
+        if (maq_id, dim_id) not in existentes
+    ]
+    if faltantes:
+        conn.executemany(
+            "INSERT INTO asignaciones (maquina_id, dimension_id, estado_dim, activa, fecha_creacion) "
+            "VALUES (?, ?, 'D0', 0, ?)",
+            faltantes,
+        )
+        conn.commit()
 
 
 def list_asignaciones(solo_activas=True):
@@ -941,19 +965,25 @@ def registrar_verificacion(asignacion_id, verificador_id, tipo_verificacion,
 # Consultas / históricos
 # ---------------------------------------------------------------------------
 
-def list_verificaciones(limit=200):
+def list_verificaciones(limit=200, solo_activas=False):
+    """solo_activas=True restringe a verificaciones cuya combinación
+    máquina+dimensión está en marcha AHORA MISMO (para estadísticas que sólo
+    deben contar la producción actual); por defecto se listan todas, activas
+    o no (para el Historial, que es un registro histórico completo)."""
     conn = get_conn()
-    return conn.execute(
+    q = (
         "SELECT v.*, m.codigo AS maquina_codigo, d.codigo AS dimension_codigo, "
         "ve.nombre AS verificador_nombre "
         "FROM verificaciones v "
         "JOIN asignaciones a ON a.id = v.asignacion_id "
         "JOIN maquinas m ON m.id = a.maquina_id "
         "JOIN dimensiones d ON d.id = a.dimension_id "
-        "LEFT JOIN verificadores ve ON ve.id = v.verificador_id "
-        "ORDER BY v.id DESC LIMIT ?",
-        (limit,),
-    ).fetchall()
+        "LEFT JOIN verificadores ve ON ve.id = v.verificador_id"
+    )
+    if solo_activas:
+        q += " WHERE a.activa = 1"
+    q += " ORDER BY v.id DESC LIMIT ?"
+    return conn.execute(q, (limit,)).fetchall()
 
 
 def no_conformidades_por_verificacion(verificacion_ids):
@@ -1025,7 +1055,7 @@ def severidad_por_cqs(cqs: list) -> str:
     return "success"
 
 
-def list_no_conformidades(solo_ncna=False):
+def list_no_conformidades(solo_ncna=False, solo_activas=False):
     conn = get_conn()
     q = (
         "SELECT n.*, v.fecha AS fecha_verificacion, v.tipo_verificacion, "
@@ -1038,8 +1068,13 @@ def list_no_conformidades(solo_ncna=False):
         "JOIN dimensiones d ON d.id = a.dimension_id "
         "LEFT JOIN verificadores ve ON ve.id = v.verificador_id"
     )
+    condiciones = []
     if solo_ncna:
-        q += " WHERE n.familia = 'NCNA'"
+        condiciones.append("n.familia = 'NCNA'")
+    if solo_activas:
+        condiciones.append("a.activa = 1")
+    if condiciones:
+        q += " WHERE " + " AND ".join(condiciones)
     q += " ORDER BY n.id DESC"
     return conn.execute(q).fetchall()
 
@@ -1077,9 +1112,9 @@ def list_cambios_estado(limit=200):
 # de fechas.
 # ---------------------------------------------------------------------------
 
-def informe_ncf_por_maquina(fecha_desde, fecha_hasta):
+def informe_ncf_por_maquina(fecha_desde, fecha_hasta, solo_activas=False):
     conn = get_conn()
-    rows = conn.execute(
+    q = (
         "SELECT m.codigo AS maquina, d.codigo AS dimension, "
         "SUM(v.cantidad) AS verificadas, "
         "SUM(CASE WHEN v.id IS NOT NULL THEN (SELECT COUNT(*) FROM no_conformidades n WHERE n.verificacion_id = v.id) ELSE 0 END) AS no_conformes "
@@ -1087,10 +1122,12 @@ def informe_ncf_por_maquina(fecha_desde, fecha_hasta):
         "JOIN asignaciones a ON a.id = v.asignacion_id "
         "JOIN maquinas m ON m.id = a.maquina_id "
         "JOIN dimensiones d ON d.id = a.dimension_id "
-        "WHERE v.fecha BETWEEN ? AND ? "
-        "GROUP BY m.codigo, d.codigo ORDER BY m.codigo, d.codigo",
-        (fecha_desde, fecha_hasta),
-    ).fetchall()
+        "WHERE v.fecha BETWEEN ? AND ?"
+    )
+    if solo_activas:
+        q += " AND a.activa = 1"
+    q += " GROUP BY m.codigo, d.codigo ORDER BY m.codigo, d.codigo"
+    rows = conn.execute(q, (fecha_desde, fecha_hasta)).fetchall()
     resultado = []
     for r in rows:
         verificadas = r["verificadas"] or 0
@@ -1103,18 +1140,21 @@ def informe_ncf_por_maquina(fecha_desde, fecha_hasta):
     return resultado
 
 
-def informe_ncf_por_operario(fecha_desde, fecha_hasta):
+def informe_ncf_por_operario(fecha_desde, fecha_hasta, solo_activas=False):
     conn = get_conn()
-    rows = conn.execute(
+    q = (
         "SELECT ve.nombre AS operario, "
         "SUM(v.cantidad) AS verificadas, "
         "SUM((SELECT COUNT(*) FROM no_conformidades n WHERE n.verificacion_id = v.id)) AS no_conformes "
         "FROM verificaciones v "
         "JOIN verificadores ve ON ve.id = v.verificador_id "
-        "WHERE v.fecha BETWEEN ? AND ? "
-        "GROUP BY ve.nombre ORDER BY ve.nombre",
-        (fecha_desde, fecha_hasta),
-    ).fetchall()
+        "JOIN asignaciones a ON a.id = v.asignacion_id "
+        "WHERE v.fecha BETWEEN ? AND ?"
+    )
+    if solo_activas:
+        q += " AND a.activa = 1"
+    q += " GROUP BY ve.nombre ORDER BY ve.nombre"
+    rows = conn.execute(q, (fecha_desde, fecha_hasta)).fetchall()
     resultado = []
     for r in rows:
         verificadas = r["verificadas"] or 0
