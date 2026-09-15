@@ -313,6 +313,10 @@ with st.container(border=True):
         if not copia["ok"] and "no hay carpeta de red configurada" not in copia["motivo"]:
             st.toast(f":material/cloud_off: No se pudo copiar a la carpeta de red: {copia['motivo']}", icon="⚠️")
 
+        aplicadas = db.revisar_solicitudes_si_toca()
+        if aplicadas:
+            st.toast(f":material/sync: {aplicadas} cambio(s) recibido(s) desde consulta remota aplicado(s).")
+
         st.session_state.cq_rows = []
         st.session_state.rv_version += 1
         st.session_state.ultima_verificacion_guardada = dim_sel
