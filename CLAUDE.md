@@ -226,9 +226,21 @@ propios ojos, sobre todo para cambios de UI/diseño.
 ## Ramas de git
 
 - `claude/beautiful-noether-kyp4xa` — rama de trabajo, siempre al día.
-- `backup-v1-sin-oracle` — última versión estable antes de la integración
-  con Oracle.
-- `backup-v2-con-oracle` — justo después de esa integración.
+- `backup-v1-sin-oracle` — versión estable sin la integración con Oracle.
+  No lleva los commits posteriores relacionados con Oracle (fugas de
+  fabricación, `oracle_ds.py`, `exportar_oracle_ds.py`) ni con consulta
+  remota, pero SÍ recibe (mediante `cherry-pick` puntual, a petición) los
+  arreglos de bugs y mejoras del autómata de estados que no dependan de
+  esas dos cosas — p.ej. el paso automático TRI → SONDEO por lotes de 125
+  (INS, apdo. 3.1) y su corrección posterior de sincronización
+  cantidad/matrícula final. Esta rama no tiene la carpeta `tests/` ni este
+  mismo `CLAUDE.md`: si se le trae un cambio que toque `views/*.py`,
+  revisa a mano si depende de algo introducido por los commits de Oracle
+  o de consulta remota antes de hacer el cherry-pick.
+- `backup-v2-con-oracle` — justo después de la integración con Oracle. Es
+  un punto de retorno fijo: no se actualiza.
 
-Ninguna de las dos ramas de backup se actualiza: son puntos de retorno
-fijos, no ramas activas.
+Si backup-v1-sin-oracle se sigue usando activamente (no solo como punto
+de retorno), pregunta antes de asumir que un cambio nuevo debe traerse
+también aquí — no todo lo de la rama de trabajo aplica sin más porque a
+veces asume funcionalidad de Oracle/remoto que esta rama no tiene.
