@@ -69,18 +69,35 @@ assert any("8 dígitos" in t for t in error_texts), f"expected 8-digit validatio
 print("Test 3 OK: non-8-digit matrícula is rejected with a clear error")
 
 # --- Test 4: fill a valid 8-digit matrícula, reach summary, save -----------
+# Esta dimensión está recién creada (fase de validación, D0/TRI): la
+# "Cantidad verificada" se sugiere sola con las unidades que faltan para
+# completar el lote (125 en proceso MAC) y la matrícula final se calcula
+# a partir de ella (no se teclea a mano).
 mat_input = next(t for t in at.text_input if t.label and "Matrícula inicial" in t.label)
 mat_input.set_value("04473012").run(timeout=15)
 assert not at.exception, at.exception
 
-mat_final_input = next(t for t in at.text_input if t.label == "Matrícula final")
-mat_final_input.set_value("04473032").run(timeout=15)
-assert not at.exception, at.exception
+mat_final_input = next(t for t in at.text_input if t.label and "Matrícula final" in t.label)
+assert mat_final_input.disabled, "expected matrícula final to be auto-calculated (disabled)"
+assert mat_final_input.value == "04473136", f"expected mat_inicial + 125 - 1, got {mat_final_input.value}"
+
+cantidad_input = next(n for n in at.number_input if n.label == "Cantidad verificada")
+assert cantidad_input.value == 125, f"expected the full 125-unit lot to be suggested, got {cantidad_input.value}"
 
 save_btn = next(b for b in at.button if b.label and "Confirmar y guardar" in b.label)
 save_btn.click().run(timeout=15)
 assert not at.exception, at.exception
 print("Test 4 OK: verificación saved without exception")
+
+# --- Test 4b: a full, defect-free 125-unit lot qualifies the dimension -----
+# Regresión directa del fallo reportado: "verifico el lote de 125 y no se
+# quita el TRI". La dimensión debe pasar de D0 (TRI) a D3 (SONDEO).
+asig_tras_guardar = db.get_asignacion(asig_existente["id"])
+assert asig_tras_guardar["estado_dim"] == "D3", (
+    f"expected dimension to qualify to D3 (SONDEO) after a clean 125-unit lot, "
+    f"got {asig_tras_guardar['estado_dim']}"
+)
+print("Test 4b OK: a clean 125-unit lot clears TRI and qualifies the dimension to SONDEO")
 
 # --- Test 5: after saving, the form is reset (back to a clean screen) ------
 success_texts = [s.value for s in at.success]

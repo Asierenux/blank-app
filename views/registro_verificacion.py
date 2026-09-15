@@ -164,24 +164,36 @@ with st.container(border=True):
         st.caption(f"Cantidad a verificar: **{cantidad_fija} unidades**.")
         cantidad = cantidad_fija
     else:
-        st.caption("Verificación del 100% del lote: indica matrícula inicial y final.")
+        # V1 (TRI): verificación del 100% del lote de validación en curso
+        # (125 ud. en MAC, 80 en BNS.Auto — ver UMBRAL_VALIDACION_UNIDADES).
+        # La matrícula final se calcula SIEMPRE a partir de la cantidad,
+        # nunca al revés: si se dejara editar matrícula final a mano y
+        # cantidad por separado, bastaba con tocar el stepper de cantidad
+        # para que dejaran de coincidir entre sí (el fallo real que había
+        # aquí: la cantidad no "recontaba" la matrícula final).
+        st.caption("Verificación del 100% del lote de validación en curso.")
+        umbral_lote = db.UMBRAL_VALIDACION_UNIDADES.get(
+            asig["maquina_proceso"], db.UMBRAL_VALIDACION_UNIDADES["MAC"]
+        )
+        cantidad_sugerida = max(umbral_lote - (asig["contador_val_unidades"] or 0), 1)
         c1, c2 = st.columns(2)
         mat_inicial = c1.text_input(
             ":material/tag: Matrícula inicial", placeholder="ej. 04473012",
             help=f"Código numérico de {db.MATRICULA_LONGITUD} dígitos.", key=k("rv_mat_inicial"),
         )
-        mat_final = c2.text_input(
-            "Matrícula final", placeholder="ej. 04473032",
-            help=f"Código numérico de {db.MATRICULA_LONGITUD} dígitos.", key=k("rv_mat_final"),
-        )
-        cantidad_calculada = None
-        if db.matricula_valida(mat_inicial) and db.matricula_valida(mat_final):
-            fin, ini = int(mat_final), int(mat_inicial)
-            cantidad_calculada = fin - ini + 1 if fin >= ini else None
+        mat_final_slot = c2.empty()
         cantidad = st.number_input(
-            "Cantidad verificada", min_value=1,
-            value=cantidad_calculada if cantidad_calculada and cantidad_calculada > 0 else 1, step=1,
+            "Cantidad verificada", min_value=1, value=cantidad_sugerida, step=1,
+            help=f"Se sugieren las {cantidad_sugerida} unidades que faltan para completar el lote de {umbral_lote}.",
             key=k("rv_cantidad"),
+        )
+        mat_final = (
+            db.calcular_matricula_final(mat_inicial, int(cantidad))
+            if db.matricula_valida(mat_inicial) else ""
+        )
+        mat_final_slot.text_input(
+            "Matrícula final (calculada sola)", value=mat_final, disabled=True,
+            key=k(f"rv_mat_final_{mat_inicial}_{cantidad}"),
         )
 
 if not mat_inicial:
