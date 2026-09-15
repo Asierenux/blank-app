@@ -225,13 +225,18 @@ with tab_asig:
         opciones_asig_maq = {a["dimension_codigo"]: a["id"] for a in asignaciones_maquina}
         sel_dim_forzar = st.selectbox("Dimensión", list(opciones_asig_maq.keys()), key="sel_forzar_estado")
         asig = db.get_asignacion(opciones_asig_maq[sel_dim_forzar])
+        # Los selectbox de abajo llevan el id de la asignación en su key para
+        # que Streamlit los trate como widgets nuevos (y vuelva a aplicar el
+        # "index" con el estado real) cada vez que cambia la máquina o la
+        # dimensión elegida — si la key fuera fija, Streamlit conservaría el
+        # valor anterior y se podría acabar aplicando el estado equivocado.
         cc1, cc2 = st.columns(2)
         with cc1:
             nuevo_estado_maq = st.selectbox(
                 "Estado de la máquina", list(db.ESTADOS_MAQ.keys()),
                 index=list(db.ESTADOS_MAQ.keys()).index(asig["estado_maq"]),
                 format_func=lambda k: db.ESTADOS_MAQ[k],
-                key="force_estado_maq",
+                key=f"force_estado_maq_{asig['id']}",
             )
             texto_btn_maq = "Enviar estado de máquina" if db.MODO_SOLO_LECTURA else "Aplicar estado de máquina"
             if st.button(texto_btn_maq):
@@ -254,7 +259,7 @@ with tab_asig:
                 "Estado de la dimensión", list(db.ESTADOS_DIM.keys()),
                 index=list(db.ESTADOS_DIM.keys()).index(asig["estado_dim"]),
                 format_func=lambda k: db.ESTADOS_DIM[k],
-                key="force_estado_dim",
+                key=f"force_estado_dim_{asig['id']}",
             )
             texto_btn_dim = "Enviar estado de dimensión" if db.MODO_SOLO_LECTURA else "Aplicar estado de dimensión"
             if st.button(texto_btn_dim):
