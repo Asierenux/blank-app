@@ -1611,3 +1611,207 @@ def copiar_base_datos_a_red():
         return {"ok": True, "destino": str(destino)}
     except Exception as exc:
         return {"ok": False, "motivo": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# Solicitudes de cambio desde el modo consulta remota
+#
+# En modo remoto la copia se abre siempre de solo lectura (MODO_SOLO_LECTURA):
+# nunca se escribe ahí. Un cambio (forzar estado, activar/desactivar) se deja
+# como un fichero de "solicitud" pequeño y estructurado en la carpeta de red,
+# de una whitelist cerrada de acciones seguras. La máquina real (dueña de esa
+# base de datos) revisa esa carpeta en cada rerun de su propia app
+# (revisar_solicitudes_si_toca) y aplica sobre su base VIVA lo que encuentre
+# pendiente para ella, llamando a las mismas funciones de siempre — nunca
+# sustituye ni compara ficheros de base de datos completos.
+# ---------------------------------------------------------------------------
+
+SOLICITUD_ACCIONES = {"forzar_estado_maq", "forzar_estado_dim", "activar_asignacion", "desactivar_asignacion"}
+
+# En modo remoto, streamlit_app.py apunta esto al PC cuya copia se está
+# viendo (para poder dirigir la solicitud a esa máquina).
+PC_OBJETIVO_REMOTO = None
+
+
+def _carpeta_solicitudes():
+    try:
+        carpeta = Path(st.secrets["copia_red"]["carpeta_destino"])
+    except (KeyError, FileNotFoundError):
+        return None
+    return carpeta / "solicitudes"
+
+
+def crear_solicitud_remota(pc_destino, maquina_codigo, dimension_codigo, accion, valor, autor):
+    """Guarda en la carpeta de red una solicitud de cambio para que la
+    máquina `pc_destino` la aplique sola sobre su base de datos viva. Nunca
+    escribe en la copia local (que sigue siendo de solo lectura).
+
+    Devuelve {"ok": True} o {"ok": False, "motivo": texto}."""
+    import json
+    import socket
+    import uuid
+
+    if accion not in SOLICITUD_ACCIONES:
+        return {"ok": False, "motivo": f"acción no permitida: {accion}"}
+
+    carpeta = _carpeta_solicitudes()
+    if carpeta is None:
+        return {"ok": False, "motivo": "no hay carpeta de red configurada (secrets.toml, sección [copia_red])"}
+
+    try:
+        pendientes = carpeta / "pendientes"
+        pendientes.mkdir(parents=True, exist_ok=True)
+        solicitud = {
+            "id": str(uuid.uuid4()),
+            "pc_destino": pc_destino,
+            "maquina_codigo": maquina_codigo,
+            "dimension_codigo": dimension_codigo,
+            "accion": accion,
+            "valor": valor,
+            "autor": autor,
+            "creada_en": datetime.now().isoformat(timespec="seconds"),
+            "origen_pc": socket.gethostname(),
+        }
+        nombre = solicitud["creada_en"].replace(":", "") + "_" + solicitud["id"] + ".json"
+        (pendientes / nombre).write_text(json.dumps(solicitud, ensure_ascii=False, indent=2), encoding="utf-8")
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "motivo": str(exc)}
+
+
+def listar_solicitudes_pendientes_para(pc_destino):
+    """Solicitudes ya enviadas y todavía sin aplicar, dirigidas a `pc_destino`
+    — para poder mostrarlas en el modo remoto justo después de enviarlas."""
+    import json
+
+    carpeta = _carpeta_solicitudes()
+    if carpeta is None:
+        return []
+    pendientes = carpeta / "pendientes"
+    if not pendientes.exists():
+        return []
+    solicitudes = []
+    for f in sorted(pendientes.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if data.get("pc_destino") == pc_destino:
+            solicitudes.append(data)
+    return solicitudes
+
+
+def _aplicar_una_solicitud(conn, solicitud):
+    """Aplica una solicitud sobre la base de datos VIVA de esta máquina,
+    validando de nuevo la acción y los códigos (nunca se fía a ciegas de lo
+    que hay en el fichero). Devuelve (ok: bool, motivo: str)."""
+    accion = solicitud.get("accion")
+    if accion not in SOLICITUD_ACCIONES:
+        return False, f"acción no permitida: {accion}"
+
+    maquina = conn.execute(
+        "SELECT * FROM maquinas WHERE codigo = ?", (solicitud.get("maquina_codigo"),)
+    ).fetchone()
+    if maquina is None:
+        return False, f"no existe la máquina '{solicitud.get('maquina_codigo')}' en este PC"
+
+    if accion == "forzar_estado_maq":
+        valor = solicitud.get("valor")
+        if valor not in ESTADOS_MAQ:
+            return False, f"estado de máquina no válido: {valor}"
+        set_estado_maquina(maquina["id"], valor)
+        return True, ""
+
+    dimension = conn.execute(
+        "SELECT * FROM dimensiones WHERE codigo = ?", (solicitud.get("dimension_codigo"),)
+    ).fetchone()
+    if dimension is None:
+        return False, f"no existe la dimensión '{solicitud.get('dimension_codigo')}' en este PC"
+    asignacion = conn.execute(
+        "SELECT * FROM asignaciones WHERE maquina_id = ? AND dimension_id = ?",
+        (maquina["id"], dimension["id"]),
+    ).fetchone()
+    if asignacion is None:
+        return False, "no existe esa combinación máquina+dimensión en este PC"
+
+    if accion == "forzar_estado_dim":
+        valor = solicitud.get("valor")
+        if valor not in ESTADOS_DIM:
+            return False, f"estado de dimensión no válido: {valor}"
+        set_estado_dimension(asignacion["id"], valor)
+        return True, ""
+    if accion == "activar_asignacion":
+        set_activa_asignacion(asignacion["id"], True)
+        return True, ""
+    set_activa_asignacion(asignacion["id"], False)  # accion == "desactivar_asignacion"
+    return True, ""
+
+
+def aplicar_solicitudes_pendientes():
+    """Revisa la carpeta de red en busca de solicitudes dirigidas a ESTE PC
+    (por nombre de equipo) y las aplica sobre la base de datos viva, una por
+    una. Mueve cada solicitud a 'aplicadas' o 'rechazadas' según el
+    resultado — nunca dos veces la misma. No lanza excepciones: un fallo
+    aquí no debe impedir usar la app con normalidad. Devuelve el número de
+    solicitudes aplicadas correctamente."""
+    import json
+    import socket
+
+    if MODO_SOLO_LECTURA:
+        return 0
+
+    carpeta = _carpeta_solicitudes()
+    if carpeta is None:
+        return 0
+    pendientes = carpeta / "pendientes"
+    if not pendientes.exists():
+        return 0
+
+    hostname = socket.gethostname()
+    conn = get_conn()
+    aplicadas = 0
+    for f in sorted(pendientes.glob("*.json")):
+        try:
+            data = json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            f.unlink(missing_ok=True)
+            continue
+        if data.get("pc_destino") != hostname:
+            continue
+
+        try:
+            ok, motivo = _aplicar_una_solicitud(conn, data)
+        except Exception as exc:
+            ok, motivo = False, str(exc)
+
+        carpeta_final = carpeta / ("aplicadas" if ok else "rechazadas")
+        carpeta_final.mkdir(parents=True, exist_ok=True)
+        data["aplicada_en" if ok else "rechazada_en"] = datetime.now().isoformat(timespec="seconds")
+        if not ok:
+            data["motivo_rechazo"] = motivo
+        try:
+            (carpeta_final / f.name).write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            f.unlink()
+        except Exception:
+            pass
+        if ok:
+            aplicadas += 1
+    return aplicadas
+
+
+_ultima_revision_solicitudes = 0.0
+
+
+def revisar_solicitudes_si_toca(intervalo_seg=30):
+    """Llama a aplicar_solicitudes_pendientes() como mucho una vez cada
+    `intervalo_seg` segundos. La app se queda abierta todo el día y esto se
+    dispara en cada rerun de Streamlit (cualquier interacción), así que sin
+    este throttle golpearía la carpeta de red en cada clic."""
+    import time
+
+    global _ultima_revision_solicitudes
+    ahora = time.monotonic()
+    if ahora - _ultima_revision_solicitudes < intervalo_seg:
+        return 0
+    _ultima_revision_solicitudes = ahora
+    return aplicar_solicitudes_pendientes()

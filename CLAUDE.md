@@ -176,34 +176,41 @@ eso:
    captura el `sqlite3.OperationalError` en `streamlit_app.py` y se
    muestra un aviso en vez de un traceback.
 
-### Pendiente de construir (decidido pero no implementado)
+### Aplicar cambios desde el modo remoto (implementado)
 
-**Aplicar cambios desde el modo remoto** — el usuario quiere poder, desde
-el modo consulta remota, hacer un cambio (p.ej. forzar una dimensión a
-Sondeo) usando la misma app, y que la máquina real lo recoja sola. Diseño
-acordado (para evitar perder verificaciones nuevas hechas en la máquina
-mientras tanto — **nunca sustituir ni "cambiar de base de datos" entera**,
-eso pierde datos):
+Desde el modo consulta remota se puede forzar un estado (máquina o
+dimensión) o activar/desactivar una combinación en marcha, sin escribir
+nunca directamente en la copia (que sigue abierta con `mode=ro`) y sin
+sustituir ni comparar bases de datos completas:
 
-1. En modo remoto, permitir abrir la copia en escritura sobre un fichero
-   de trabajo aparte (no el `mdv_<pc>.db` "oficial"), donde el usuario
-   hace el cambio con los mismos formularios de siempre.
-2. Al guardar esa copia editada, comparar sus tablas contra la copia
-   original de la que partió (antes de editar) y extraer sólo las
-   diferencias concretas (p.ej. "esta asignación cambió estado_dim de D0
-   a D3") — nunca un diff a nivel de fichero completo.
-3. Guardar esas diferencias como una "solicitud" pequeña y estructurada en
-   la carpeta de red (whitelist de acciones seguras: forzar estado_maq,
-   forzar estado_dim, activar/desactivar asignación — nunca escritura
-   arbitraria).
-4. La máquina real revisa si hay solicitudes pendientes para ella y las
-   aplica sobre su base de datos VIVA (que sigue teniendo todo lo nuevo
-   que se haya verificado mientras tanto) — nunca la sustituye.
-5. Importante: como la app se queda abierta todo el día (no reinicia), la
-   revisión de solicitudes pendientes debe hacerse en cada rerun de
-   Streamlit (se dispara con cualquier interacción), no sólo al arrancar
-   — con un pequeño throttle (p.ej. no comprobar más de una vez cada
-   30-60s) para no golpear la carpeta de red en cada clic.
+1. **Mismos formularios de siempre**: en `views/maquinas_dimensiones.py`
+   → pestaña "En marcha y estado", los botones de "Forzar estado
+   manualmente" y "Guardar cambios de marcha" comprueban
+   `db.MODO_SOLO_LECTURA`. Si es `True`, en vez de escribir llaman a
+   `db.crear_solicitud_remota()`.
+2. **Solicitud pequeña y estructurada**: `crear_solicitud_remota()` valida
+   la acción contra la whitelist `db.SOLICITUD_ACCIONES` (`forzar_estado_maq`,
+   `forzar_estado_dim`, `activar_asignacion`, `desactivar_asignacion`) y
+   escribe un JSON en `<carpeta_destino>/solicitudes/pendientes/` —
+   identifica el objetivo por `maquina_codigo`/`dimension_codigo` (nunca
+   por id numérico, que no es portable entre PCs), más el PC destino
+   (`db.PC_OBJETIVO_REMOTO`, apuntado por `streamlit_app.py` al elegir de
+   qué PC ver la copia), el autor y la fecha.
+3. **La máquina real la aplica sola**: `db.aplicar_solicitudes_pendientes()`
+   filtra por su propio hostname, revalida de nuevo la acción y los
+   códigos contra su base VIVA (nunca se fía a ciegas del fichero), y
+   llama a las mismas funciones de siempre (`set_estado_maquina`,
+   `set_estado_dimension`, `set_activa_asignacion`). Cada solicitud se
+   mueve a `solicitudes/aplicadas/` o `solicitudes/rechazadas/` (con el
+   motivo) para no aplicarse dos veces ni desaparecer en silencio.
+4. **Se revisa en cada rerun, con throttle**: como la app se queda abierta
+   todo el día, `streamlit_app.py` llama a
+   `db.revisar_solicitudes_si_toca()` en cada interacción normal (no sólo
+   al arrancar); esta función no vuelve a mirar la carpeta de red si no
+   han pasado al menos 30s desde la última vez.
+5. El modo remoto muestra, justo debajo del selector de PC, cuántos
+   cambios están todavía pendientes de aplicar en esa máquina
+   (`db.listar_solicitudes_pendientes_para()`).
 
 ## Cómo probar cambios
 

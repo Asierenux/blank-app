@@ -178,25 +178,50 @@ with tab_asig:
                     "En marcha": st.column_config.CheckboxColumn("En marcha"),
                 },
             )
-            if st.button(":material/save: Guardar cambios de marcha", type="primary"):
+            texto_boton_marcha = (
+                ":material/send: Enviar cambios de marcha a la máquina" if db.MODO_SOLO_LECTURA
+                else ":material/save: Guardar cambios de marcha"
+            )
+            if st.button(texto_boton_marcha, type="primary"):
+                id_a_dim_codigo = {a["id"]: a["dimension_codigo"] for a in asignaciones_filtradas}
                 cambios = 0
                 originales = dict(zip(df_marcha["id"], df_marcha["En marcha"]))
                 for _, fila in editado.iterrows():
                     if bool(fila["En marcha"]) != bool(originales[fila["id"]]):
-                        db.set_activa_asignacion(int(fila["id"]), bool(fila["En marcha"]))
+                        if db.MODO_SOLO_LECTURA:
+                            resultado = db.crear_solicitud_remota(
+                                db.PC_OBJETIVO_REMOTO, maquina_marcha["codigo"],
+                                id_a_dim_codigo[int(fila["id"])],
+                                "activar_asignacion" if fila["En marcha"] else "desactivar_asignacion",
+                                None, st.session_state.auth_user["username"],
+                            )
+                            if not resultado["ok"]:
+                                st.error(resultado["motivo"])
+                                break
+                        else:
+                            db.set_activa_asignacion(int(fila["id"]), bool(fila["En marcha"]))
                         cambios += 1
                 if cambios:
-                    st.success(f"{cambios} código(s) actualizado(s).")
+                    if db.MODO_SOLO_LECTURA:
+                        st.success(f"{cambios} cambio(s) enviado(s) a {db.PC_OBJETIVO_REMOTO}: se aplicarán solos en esa máquina.")
+                    else:
+                        st.success(f"{cambios} código(s) actualizado(s).")
                     st.rerun()
                 else:
                     st.info("No hay cambios que guardar.")
 
         st.divider()
         st.subheader("Forzar estado manualmente")
-        st.caption(
-            "Úsalo para calificar manualmente un código (fin de Fase 1 → Sondeo) o para "
-            "corregir su estado, esté o no en marcha."
-        )
+        if db.MODO_SOLO_LECTURA:
+            st.caption(
+                "Estás en consulta remota: esto no escribe aquí, deja el cambio pendiente en la "
+                f"carpeta de red para que **{db.PC_OBJETIVO_REMOTO}** lo aplique solo."
+            )
+        else:
+            st.caption(
+                "Úsalo para calificar manualmente un código (fin de Fase 1 → Sondeo) o para "
+                "corregir su estado, esté o no en marcha."
+            )
         opciones_asig_maq = {a["dimension_codigo"]: a["id"] for a in asignaciones_maquina}
         sel_dim_forzar = st.selectbox("Dimensión", list(opciones_asig_maq.keys()), key="sel_forzar_estado")
         asig = db.get_asignacion(opciones_asig_maq[sel_dim_forzar])
@@ -208,10 +233,22 @@ with tab_asig:
                 format_func=lambda k: db.ESTADOS_MAQ[k],
                 key="force_estado_maq",
             )
-            if st.button("Aplicar estado de máquina"):
-                db.set_estado_maquina(asig["maquina_id"], nuevo_estado_maq)
-                st.success("Estado de máquina actualizado.")
-                st.rerun()
+            texto_btn_maq = "Enviar estado de máquina" if db.MODO_SOLO_LECTURA else "Aplicar estado de máquina"
+            if st.button(texto_btn_maq):
+                if db.MODO_SOLO_LECTURA:
+                    resultado = db.crear_solicitud_remota(
+                        db.PC_OBJETIVO_REMOTO, asig["maquina_codigo"], None,
+                        "forzar_estado_maq", nuevo_estado_maq, st.session_state.auth_user["username"],
+                    )
+                    if resultado["ok"]:
+                        st.success(f"Cambio enviado a {db.PC_OBJETIVO_REMOTO}.")
+                        st.rerun()
+                    else:
+                        st.error(resultado["motivo"])
+                else:
+                    db.set_estado_maquina(asig["maquina_id"], nuevo_estado_maq)
+                    st.success("Estado de máquina actualizado.")
+                    st.rerun()
         with cc2:
             nuevo_estado_dim = st.selectbox(
                 "Estado de la dimensión", list(db.ESTADOS_DIM.keys()),
@@ -219,10 +256,22 @@ with tab_asig:
                 format_func=lambda k: db.ESTADOS_DIM[k],
                 key="force_estado_dim",
             )
-            if st.button("Aplicar estado de dimensión"):
-                db.set_estado_dimension(asig["id"], nuevo_estado_dim)
-                st.success("Estado de dimensión actualizado.")
-                st.rerun()
+            texto_btn_dim = "Enviar estado de dimensión" if db.MODO_SOLO_LECTURA else "Aplicar estado de dimensión"
+            if st.button(texto_btn_dim):
+                if db.MODO_SOLO_LECTURA:
+                    resultado = db.crear_solicitud_remota(
+                        db.PC_OBJETIVO_REMOTO, asig["maquina_codigo"], asig["dimension_codigo"],
+                        "forzar_estado_dim", nuevo_estado_dim, st.session_state.auth_user["username"],
+                    )
+                    if resultado["ok"]:
+                        st.success(f"Cambio enviado a {db.PC_OBJETIVO_REMOTO}.")
+                        st.rerun()
+                    else:
+                        st.error(resultado["motivo"])
+                else:
+                    db.set_estado_dimension(asig["id"], nuevo_estado_dim)
+                    st.success("Estado de dimensión actualizado.")
+                    st.rerun()
 
         st.divider()
         st.subheader("Códigos en marcha ahora mismo (todas las máquinas)")

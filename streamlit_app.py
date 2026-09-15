@@ -11,7 +11,7 @@ import ui
 # Identificador de versión visible en pantalla, para poder comprobar de un
 # vistazo si una instalación está actualizada a la última versión del
 # código (compáralo con el commit más reciente en GitHub).
-VERSION = "v9 · entrada directa como operario (11/09/2026)"
+VERSION = "v10 · forzar estado desde consulta remota (15/09/2026)"
 
 _logo = ui.logo_path()
 st.set_page_config(
@@ -56,12 +56,21 @@ if MODO_REMOTO:
         db.DB_PATH = ruta_elegida
         db.MODO_SOLO_LECTURA = True
         db.get_conn.clear()
+    db.PC_OBJETIVO_REMOTO = pc_elegido
 
     fecha_copia = datetime.fromtimestamp(ruta_elegida.stat().st_mtime).strftime("%d/%m/%Y %H:%M")
     st.info(
         f":material/lock: **Modo consulta remota** — viendo la copia de **{pc_elegido}**, "
-        f"actualizada el {fecha_copia}. Aquí no se pueden guardar cambios."
+        f"actualizada el {fecha_copia}. Aquí no se puede guardar directamente, pero en "
+        "**Máquinas y Dimensiones → En marcha y estado** puedes enviar un cambio de estado: "
+        "se queda pendiente hasta que esa máquina lo recoja sola (máx. ~30s con la app abierta)."
     )
+    solicitudes_pend = db.listar_solicitudes_pendientes_para(pc_elegido)
+    if solicitudes_pend:
+        with st.expander(f":material/pending_actions: {len(solicitudes_pend)} cambio(s) enviados a {pc_elegido} pendientes de aplicar"):
+            for s in solicitudes_pend:
+                objetivo = s["maquina_codigo"] + (f" / {s['dimension_codigo']}" if s.get("dimension_codigo") else "")
+                st.caption(f"{s['creada_en']} · {s['autor']} · {s['accion']} → {objetivo} ({s.get('valor') or '—'})")
     st.divider()
 
 # Sesión anónima de Operario: no hace falta usuario/contraseña para verificar
@@ -109,6 +118,11 @@ if db.count_usuarios() == 0:
 
 if st.session_state.auth_user is None:
     st.session_state.auth_user = OPERARIO_ANONIMO
+
+if not MODO_REMOTO:
+    aplicadas = db.revisar_solicitudes_si_toca()
+    if aplicadas:
+        st.toast(f":material/sync: {aplicadas} cambio(s) recibido(s) desde consulta remota aplicado(s).")
 
 auth_user = st.session_state.auth_user
 es_operario_anonimo = auth_user["id"] is None
