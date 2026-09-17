@@ -42,6 +42,14 @@ def guess_default_index(options: list[str], preferred: list[str]) -> int:
     return 0
 
 
+def guess_optional_index(options: list[str], preferred: list[str]) -> int:
+    """Index into ['(ninguna)', *options]: 0 if nothing matches, else match + 1."""
+    for name in preferred:
+        if name in options:
+            return options.index(name) + 1
+    return 0
+
+
 def scan_images(folder: str, recursive: bool, time_source: str) -> pd.DataFrame:
     root = Path(folder)
     paths = root.rglob("*") if recursive else root.iterdir()
@@ -68,6 +76,8 @@ def match_images_to_excel(
     dedup: bool,
     tolerance_min: int,
     unique_match: bool,
+    url_col: str | None = None,
+    zone_col: str | None = None,
 ) -> pd.DataFrame:
     excel = excel_df.copy()
     excel["_ts_parsed"] = pd.to_datetime(excel[ts_col], errors="coerce")
@@ -135,11 +145,33 @@ def match_images_to_excel(
             base["diferencia_segundos"] = round(diff, 1)
             for c in excel_cols:
                 base[c] = excel_row[c]
+
+            # Collect every remote-image URL that belongs to the matched
+            # product/minute (there is one per camera zone), not just the
+            # single row kept by dedup.
+            urls = []
+            if url_col:
+                if dedup and ref_col:
+                    group_mask = (excel[ref_col] == excel_row[ref_col]) & (excel["_minute"] == excel_row["_minute"])
+                else:
+                    group_mask = excel.index == cand_idx
+                for _, r in excel[group_mask].iterrows():
+                    url_val = r.get(url_col)
+                    if pd.isna(url_val) or not str(url_val).strip():
+                        continue
+                    zona = r.get(zone_col) if zone_col else None
+                    urls.append({"zona": zona, "url": url_val})
+            base["_urls_lista"] = urls
+            base["urls_asociadas"] = "; ".join(
+                f"{u['zona']}: {u['url']}" if u["zona"] else str(u["url"]) for u in urls
+            ) or None
         else:
             base["estado"] = "Sin coincidencia"
             base["diferencia_segundos"] = None
             for c in excel_cols:
                 base[c] = None
+            base["_urls_lista"] = []
+            base["urls_asociadas"] = None
         out_rows.append(base)
 
     return pd.DataFrame(out_rows)
@@ -204,11 +236,10 @@ with col1:
     )
 with col2:
     ref_options = ["(ninguna)"] + all_cols
-    default_ref = guess_default_index(all_cols, ["MATRICULE", "Q_COD"])
     ref_col_choice = st.selectbox(
         "Columna de referencia del producto",
         options=ref_options,
-        index=default_ref + 1,
+        index=guess_optional_index(all_cols, ["MATRICULE", "Q_COD"]),
     )
     ref_col = None if ref_col_choice == "(ninguna)" else ref_col_choice
 with col3:
@@ -217,6 +248,27 @@ with col3:
         value=ref_col is not None,
         disabled=ref_col is None,
     )
+
+url_like_cols = [c for c in all_cols if "url" in c.lower()]
+
+col4, col5 = st.columns(2)
+with col4:
+    url_options = ["(ninguna)"] + all_cols
+    url_col_choice = st.selectbox(
+        "Columna con la URL de la imagen remota",
+        options=url_options,
+        index=guess_optional_index(all_cols, url_like_cols + ["url_path"]),
+        help="Cada fila del Excel puede tener su propia imagen remota (una por zona de cámara). Se mostrará junto a la imagen local emparejada.",
+    )
+    url_col = None if url_col_choice == "(ninguna)" else url_col_choice
+with col5:
+    zone_options = ["(ninguna)"] + all_cols
+    zone_col_choice = st.selectbox(
+        "Columna con la etiqueta de zona (opcional)",
+        options=zone_options,
+        index=guess_optional_index(all_cols, ["camera_zone"]),
+    )
+    zone_col = None if zone_col_choice == "(ninguna)" else zone_col_choice
 
 if not folder_path:
     st.info("Indica la ruta de la carpeta de imágenes en la barra lateral.")
@@ -242,6 +294,8 @@ if st.button("🔗 Emparejar imágenes con el Excel", type="primary"):
         dedup=dedup,
         tolerance_min=int(tolerance_min),
         unique_match=unique_match,
+        url_col=url_col,
+        zone_col=zone_col,
     )
     st.session_state["result"] = result
 
@@ -258,9 +312,10 @@ if "result" in st.session_state:
     m3.metric("Sin coincidencia", n_no)
 
     st.subheader("Resultado del emparejamiento")
-    st.dataframe(result, use_container_width=True)
+    display_df = result.drop(columns=["_urls_lista"])
+    st.dataframe(display_df, use_container_width=True)
 
-    csv_bytes = result.to_csv(index=False).encode("utf-8")
+    csv_bytes = display_df.to_csv(index=False).encode("utf-8")
     st.download_button(
         "⬇️ Descargar resultado (CSV)",
         data=csv_bytes,
@@ -271,10 +326,29 @@ if "result" in st.session_state:
     st.subheader("Vista previa de una imagen")
     chosen = st.selectbox("Elige un archivo", options=result["archivo"].tolist())
     row = result[result["archivo"] == chosen].iloc[0]
-    ruta = row["ruta_local"]
-    try:
-        img = Image.open(ruta)
-        st.image(img, caption=f"{chosen} — {row['estado']}", width=400)
-    except Exception as exc:
-        st.warning(f"No se pudo abrir la imagen para previsualizar ({exc}).")
-    st.json({k: (None if pd.isna(v) else v) for k, v in row.items()})
+    urls = row["_urls_lista"] or []
+
+    preview_col, remote_col = st.columns(2)
+    with preview_col:
+        st.markdown(f"**Imagen local** — {row['estado']}")
+        try:
+            img = Image.open(row["ruta_local"])
+            st.image(img, caption=chosen, width=400)
+        except Exception as exc:
+            st.warning(f"No se pudo abrir la imagen local para previsualizar ({exc}).")
+    with remote_col:
+        st.markdown("**Imagen(es) asociada(s) del Excel**")
+        if not urls:
+            st.caption("Sin coincidencia o sin columna de URL configurada.")
+        for u in urls:
+            caption = str(u["zona"]) if u["zona"] else "imagen asociada"
+            st.image(str(u["url"]), caption=caption, width=400)
+            st.markdown(f"[Abrir en el navegador]({u['url']})")
+
+    st.json(
+        {
+            k: (None if pd.isna(v) else v)
+            for k, v in row.items()
+            if k != "_urls_lista"
+        }
+    )
