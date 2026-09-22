@@ -18,6 +18,12 @@ PyInstaller.__main__.run(
         "--collect-all=streamlit",
         "--collect-all=pandas",
         "--collect-all=PIL",
+        # streamlit_app.py is shipped as plain data (run by Streamlit's
+        # CLI, never `import`ed by launcher.py), so PyInstaller's static
+        # analysis never sees its `import tkinter`. Force it in
+        # explicitly so the folder-picker button actually works in the
+        # frozen build, not just when running from source.
+        "--collect-all=tkinter",
         f"--add-data=streamlit_app.py{DATA_SEP}.",
         # Not used by this app; pulling it in can crash PyInstaller's
         # static analysis on some environments where a system-level

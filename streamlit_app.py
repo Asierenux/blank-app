@@ -1,9 +1,15 @@
 import os
+import warnings
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
 from PIL import Image
+
+# Harmless noise: date columns don't share one format, and the source
+# workbooks have no default cell style. Neither affects the results.
+warnings.filterwarnings("ignore", message="Could not infer format")
+warnings.filterwarnings("ignore", message="Workbook contains no default style")
 
 try:
     import tkinter as tk
@@ -254,7 +260,7 @@ else:
     excel_df = pd.read_excel(excel_file)
 
 st.subheader("Vista previa del Excel")
-st.dataframe(excel_df.head(20), use_container_width=True)
+st.dataframe(excel_df.head(20), width="stretch")
 
 ordered_cols = guess_datetime_columns(excel_df)
 all_cols = list(excel_df.columns)
@@ -354,7 +360,7 @@ if "result" in st.session_state:
     st.caption("Haz clic en una fila para ver su imagen abajo.")
     table_event = st.dataframe(
         display_df,
-        use_container_width=True,
+        width="stretch",
         on_select="rerun",
         selection_mode="single-row",
         key="results_table",
@@ -388,7 +394,7 @@ if "result" in st.session_state:
         st.markdown(f"**Imagen local** — {row['estado']}")
         try:
             img = Image.open(row["ruta_local"])
-            st.image(img, caption=f"{chosen}  ({img.width}×{img.height}px)", use_container_width=True)
+            st.image(img, caption=f"{chosen}  ({img.width}×{img.height}px)", width="stretch")
         except Exception as exc:
             st.warning(f"No se pudo abrir la imagen local para previsualizar ({exc}).")
     with remote_col:
@@ -397,12 +403,12 @@ if "result" in st.session_state:
             st.caption("Sin coincidencia o sin columna de URL configurada.")
         for u in urls:
             caption = str(u["zona"]) if u["zona"] else "imagen asociada"
-            st.image(str(u["url"]), caption=caption, use_container_width=True)
+            st.image(str(u["url"]), caption=caption, width="stretch")
             st.markdown(f"[Abrir en el navegador]({u['url']})")
 
     with st.expander("🔍 Ver imagen local a tamaño completo"):
         try:
-            st.image(row["ruta_local"], use_container_width=False)
+            st.image(row["ruta_local"], width="content")
         except Exception as exc:
             st.warning(f"No se pudo abrir la imagen ({exc}).")
 
