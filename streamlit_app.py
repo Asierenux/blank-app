@@ -344,7 +344,7 @@ if "result" in st.session_state:
         st.markdown(f"**Imagen local** — {row['estado']}")
         try:
             img = Image.open(row["ruta_local"])
-            st.image(img, caption=chosen, width=400)
+            st.image(img, caption=f"{chosen}  ({img.width}×{img.height}px)", use_container_width=True)
         except Exception as exc:
             st.warning(f"No se pudo abrir la imagen local para previsualizar ({exc}).")
     with remote_col:
@@ -353,8 +353,14 @@ if "result" in st.session_state:
             st.caption("Sin coincidencia o sin columna de URL configurada.")
         for u in urls:
             caption = str(u["zona"]) if u["zona"] else "imagen asociada"
-            st.image(str(u["url"]), caption=caption, width=400)
+            st.image(str(u["url"]), caption=caption, use_container_width=True)
             st.markdown(f"[Abrir en el navegador]({u['url']})")
+
+    with st.expander("🔍 Ver imagen local a tamaño completo"):
+        try:
+            st.image(row["ruta_local"], use_container_width=False)
+        except Exception as exc:
+            st.warning(f"No se pudo abrir la imagen ({exc}).")
 
     st.json(
         {
