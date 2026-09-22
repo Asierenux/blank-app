@@ -12,7 +12,7 @@ st.title("🖼️ Emparejar imágenes de cámara con filas de Excel")
 st.write(
     "Sube tu Excel y apunta a la carpeta local donde tienes las imágenes. "
     "La app empareja cada imagen con la fila del Excel cuya fecha/hora "
-    "(redondeada al minuto) esté más cerca."
+    "esté más cerca, dentro del margen de segundos que indiques."
 )
 
 
@@ -74,13 +74,15 @@ def match_images_to_excel(
     ts_col: str,
     ref_col: str | None,
     dedup: bool,
-    tolerance_min: int,
+    tolerance_seconds: int,
     unique_match: bool,
     url_col: str | None = None,
     zone_col: str | None = None,
 ) -> pd.DataFrame:
     excel = excel_df.copy()
     excel["_ts_parsed"] = pd.to_datetime(excel[ts_col], errors="coerce")
+    # Only used to group the duplicate camera-zone rows of the same
+    # product together; the matching tolerance itself works in seconds.
     excel["_minute"] = excel["_ts_parsed"].dt.floor("min")
     excel["_row_id"] = excel.index
 
@@ -95,13 +97,12 @@ def match_images_to_excel(
         candidates = excel.dropna(subset=["_ts_parsed"])
 
     images = images_df.copy()
-    images["_minute"] = images["timestamp_archivo"].dt.floor("min")
 
     # Build all image-candidate pairs within the tolerance window.
     pairs = []
     for img_idx, img_row in images.iterrows():
-        window = [img_row["_minute"] + pd.Timedelta(minutes=d) for d in range(-tolerance_min, tolerance_min + 1)]
-        window_matches = candidates[candidates["_minute"].isin(window)]
+        diffs = (candidates["_ts_parsed"] - img_row["timestamp_archivo"]).abs().dt.total_seconds()
+        window_matches = candidates[diffs <= tolerance_seconds]
         for cand_idx, cand_row in window_matches.iterrows():
             diff = abs((cand_row["_ts_parsed"] - img_row["timestamp_archivo"]).total_seconds())
             pairs.append((diff, img_idx, cand_idx))
@@ -201,8 +202,8 @@ with st.sidebar:
     )
 
     st.header("3. Opciones de emparejamiento")
-    tolerance_min = st.number_input(
-        "Tolerancia (± minutos)", min_value=0, max_value=10, value=0, step=1
+    tolerance_seconds = st.number_input(
+        "Tolerancia (± segundos)", min_value=0, max_value=3600, value=60, step=5
     )
     unique_match = st.checkbox(
         "Cada imagen debe emparejar con una fila distinta (evita duplicados)",
@@ -292,7 +293,7 @@ if st.button("🔗 Emparejar imágenes con el Excel", type="primary"):
         ts_col=ts_col,
         ref_col=ref_col,
         dedup=dedup,
-        tolerance_min=int(tolerance_min),
+        tolerance_seconds=int(tolerance_seconds),
         unique_match=unique_match,
         url_col=url_col,
         zone_col=zone_col,
@@ -311,8 +312,14 @@ if "result" in st.session_state:
     m2.metric("Ambiguas", n_amb)
     m3.metric("Sin coincidencia", n_no)
 
+    solo_emparejadas = st.checkbox(
+        "Mostrar solo las imágenes emparejadas (ocultar 'Sin coincidencia')",
+        value=True,
+    )
+    filtered = result[result["estado"] != "Sin coincidencia"] if solo_emparejadas else result
+
     st.subheader("Resultado del emparejamiento")
-    display_df = result.drop(columns=["_urls_lista"])
+    display_df = filtered.drop(columns=["_urls_lista"])
     st.dataframe(display_df, use_container_width=True)
 
     csv_bytes = display_df.to_csv(index=False).encode("utf-8")
@@ -323,9 +330,13 @@ if "result" in st.session_state:
         mime="text/csv",
     )
 
+    if filtered.empty:
+        st.info("No hay imágenes que mostrar con el filtro actual.")
+        st.stop()
+
     st.subheader("Vista previa de una imagen")
-    chosen = st.selectbox("Elige un archivo", options=result["archivo"].tolist())
-    row = result[result["archivo"] == chosen].iloc[0]
+    chosen = st.selectbox("Elige un archivo", options=filtered["archivo"].tolist())
+    row = filtered[filtered["archivo"] == chosen].iloc[0]
     urls = row["_urls_lista"] or []
 
     preview_col, remote_col = st.columns(2)
