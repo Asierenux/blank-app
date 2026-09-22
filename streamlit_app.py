@@ -1,9 +1,12 @@
+import base64
 import os
 import warnings
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 
 # Harmless noise: date columns don't share one format, and the source
@@ -161,6 +164,92 @@ def pick_folder_dialog(start_dir: str = "") -> str | None:
     selected = filedialog.askdirectory(master=root, initialdir=start_dir or None)
     root.destroy()
     return selected or None
+
+
+def render_zoomable_image(path: str, height: int = 650) -> None:
+    """Show an image in a pannable/zoomable viewer (wheel to zoom, drag to
+    pan, double-click to reset). st.image has no zoom, so this embeds a
+    small self-contained HTML/JS viewer instead."""
+    with Image.open(path) as img:
+        img = img.convert("RGB")
+        # Cap the embedded payload; CSS scaling in the viewer still lets
+        # you zoom in well past this without needing more source pixels.
+        img.thumbnail((2400, 2400))
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+
+    html = f"""
+    <div id="zoom-wrap" style="width:100%;height:{height}px;overflow:hidden;
+         border:1px solid #E3E8EF;border-radius:10px;position:relative;
+         background:#F1F4F8;cursor:grab;touch-action:none;">
+      <img id="zoom-img" src="data:image/png;base64,{b64}" draggable="false"
+           style="transform-origin:0 0;position:absolute;top:0;left:0;
+                  user-select:none;pointer-events:none;"/>
+    </div>
+    <div style="margin-top:6px;font-size:0.8rem;color:#5B6B82;">
+      🖱️ Rueda del ratón para hacer zoom · arrastra para mover · doble clic para restablecer
+    </div>
+    <script>
+    (function() {{
+        const wrap = document.getElementById('zoom-wrap');
+        const img = document.getElementById('zoom-img');
+        let scale = 1, panX = 0, panY = 0, isDown = false, startX = 0, startY = 0;
+
+        function apply() {{
+            img.style.transform = `translate(${{panX}}px, ${{panY}}px) scale(${{scale}})`;
+        }}
+        function fit() {{
+            const r = wrap.getBoundingClientRect();
+            scale = Math.min(r.width / img.naturalWidth, r.height / img.naturalHeight);
+            panX = (r.width - img.naturalWidth * scale) / 2;
+            panY = (r.height - img.naturalHeight * scale) / 2;
+            apply();
+        }}
+
+        // The container can still report a zero-size rect at the moment
+        // the image finishes decoding (e.g. while a parent expander is
+        // still settling), which would make fit() divide into a scale of
+        // 0. Keep retrying via ResizeObserver/rAF until it has real size.
+        let didInitialFit = false;
+        function tryInitialFit() {{
+            if (didInitialFit) return;
+            const r = wrap.getBoundingClientRect();
+            if (!r.width || !r.height || !img.naturalWidth || !img.naturalHeight) return;
+            fit();
+            didInitialFit = true;
+        }}
+        img.onload = tryInitialFit;
+        new ResizeObserver(tryInitialFit).observe(wrap);
+        requestAnimationFrame(tryInitialFit);
+
+        wrap.addEventListener('wheel', function(e) {{
+            e.preventDefault();
+            const r = wrap.getBoundingClientRect();
+            const mx = e.clientX - r.left, my = e.clientY - r.top;
+            const delta = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+            const newScale = Math.min(Math.max(scale * delta, 0.2), 20);
+            panX = mx - (mx - panX) * (newScale / scale);
+            panY = my - (my - panY) * (newScale / scale);
+            scale = newScale;
+            apply();
+        }}, {{passive: false}});
+
+        wrap.addEventListener('mousedown', function(e) {{
+            isDown = true; startX = e.clientX - panX; startY = e.clientY - panY;
+            wrap.style.cursor = 'grabbing';
+        }});
+        window.addEventListener('mouseup', function() {{ isDown = false; wrap.style.cursor = 'grab'; }});
+        window.addEventListener('mousemove', function(e) {{
+            if (!isDown) return;
+            panX = e.clientX - startX; panY = e.clientY - startY;
+            apply();
+        }});
+        wrap.addEventListener('dblclick', fit);
+    }})();
+    </script>
+    """
+    components.html(html, height=height + 40, scrolling=False)
 
 
 def scan_images(folder: str, recursive: bool, time_source: str) -> pd.DataFrame:
@@ -495,9 +584,9 @@ if "result" in st.session_state:
             st.image(str(u["url"]), caption=caption, width="stretch")
             st.markdown(f"[Abrir en el navegador]({u['url']})")
 
-    with st.expander("🔍 Ver imagen local a tamaño completo"):
+    with st.expander("🔍 Zoom / inspección detallada", expanded=False):
         try:
-            st.image(row["ruta_local"], width="content")
+            render_zoomable_image(row["ruta_local"])
         except Exception as exc:
             st.warning(f"No se pudo abrir la imagen ({exc}).")
 
