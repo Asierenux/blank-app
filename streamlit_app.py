@@ -21,13 +21,101 @@ except Exception:
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif"}
 
-st.set_page_config(page_title="Emparejar imágenes con Excel", layout="wide")
-st.title("🖼️ Emparejar imágenes de cámara con filas de Excel")
-st.write(
-    "Sube tu Excel y apunta a la carpeta local donde tienes las imágenes. "
-    "La app empareja cada imagen con la fila del Excel cuya fecha/hora "
-    "esté más cerca, dentro del margen de segundos que indiques."
+NAVY = "#0F2A4A"
+BLUE = "#0055A4"
+GREEN = "#1E8E5A"
+AMBER = "#B7791F"
+RED = "#B3261E"
+MUTED = "#5B6B82"
+
+st.set_page_config(page_title="Emparejar imágenes con Excel", page_icon="🛞", layout="wide")
+
+st.markdown(
+    f"""
+    <style>
+    section[data-testid="stSidebar"] h2 {{
+        border-left: 4px solid {BLUE};
+        padding-left: 0.6rem;
+        color: {NAVY};
+        font-size: 1.05rem;
+    }}
+    [data-testid="stDataFrame"], [data-testid="stImage"] img {{
+        border-radius: 10px;
+        overflow: hidden;
+        border: 1px solid #E3E8EF;
+    }}
+    div.stButton > button, div.stDownloadButton > button {{
+        border-radius: 8px;
+        font-weight: 600;
+    }}
+    .app-header {{
+        background: linear-gradient(135deg, {NAVY} 0%, {BLUE} 130%);
+        padding: 1.4rem 1.6rem;
+        border-radius: 12px;
+        margin-bottom: 1.4rem;
+    }}
+    .app-header .brand {{
+        color: #FFFFFF;
+        font-size: 0.72rem;
+        letter-spacing: 0.22em;
+        font-weight: 700;
+        opacity: 0.8;
+        text-transform: uppercase;
+    }}
+    .app-header .title {{
+        color: #FFFFFF;
+        font-size: 1.7rem;
+        font-weight: 700;
+        margin-top: 0.2rem;
+    }}
+    .app-header .subtitle {{
+        color: #D6E2F0;
+        font-size: 0.95rem;
+        margin-top: 0.35rem;
+        max-width: 60rem;
+    }}
+    .stat-card {{
+        border-radius: 10px;
+        padding: 0.85rem 1.1rem;
+        border-left: 5px solid var(--stat-color);
+        background: {MUTED}14;
+        background: color-mix(in srgb, var(--stat-color) 10%, white);
+    }}
+    .stat-card .label {{
+        font-size: 0.78rem;
+        color: {MUTED};
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        font-weight: 600;
+    }}
+    .stat-card .value {{
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--stat-color);
+        line-height: 1.2;
+    }}
+    </style>
+    <div class="app-header">
+        <div class="brand">Michelin</div>
+        <div class="title">🛞 Emparejar imágenes de cámara con filas de Excel</div>
+        <div class="subtitle">
+            Sube tu Excel y apunta a la carpeta local donde tienes las imágenes.
+            La app empareja cada imagen con la fila del Excel cuya fecha/hora esté
+            más cerca, dentro del margen de segundos que indiques.
+        </div>
+    </div>
+    """,
+    unsafe_allow_html=True,
 )
+
+
+def stat_card(label: str, value: int, color: str) -> str:
+    return (
+        f'<div class="stat-card" style="--stat-color:{color}">'
+        f'<div class="label">{label}</div>'
+        f'<div class="value">{value}</div>'
+        f"</div>"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -345,9 +433,10 @@ if "result" in st.session_state:
     n_no = (result["estado"] == "Sin coincidencia").sum()
 
     m1, m2, m3 = st.columns(3)
-    m1.metric("Emparejadas", n_ok)
-    m2.metric("Ambiguas", n_amb)
-    m3.metric("Sin coincidencia", n_no)
+    m1.markdown(stat_card("Emparejadas", n_ok, GREEN), unsafe_allow_html=True)
+    m2.markdown(stat_card("Ambiguas", n_amb, AMBER), unsafe_allow_html=True)
+    m3.markdown(stat_card("Sin coincidencia", n_no, RED), unsafe_allow_html=True)
+    st.write("")
 
     solo_emparejadas = st.checkbox(
         "Mostrar solo las imágenes emparejadas (ocultar 'Sin coincidencia')",
