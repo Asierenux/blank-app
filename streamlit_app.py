@@ -5,6 +5,14 @@ import pandas as pd
 import streamlit as st
 from PIL import Image
 
+try:
+    import tkinter as tk
+    from tkinter import filedialog
+
+    TKINTER_AVAILABLE = True
+except Exception:
+    TKINTER_AVAILABLE = False
+
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".gif"}
 
 st.set_page_config(page_title="Emparejar imágenes con Excel", layout="wide")
@@ -48,6 +56,17 @@ def guess_optional_index(options: list[str], preferred: list[str]) -> int:
         if name in options:
             return options.index(name) + 1
     return 0
+
+
+def pick_folder_dialog(start_dir: str = "") -> str | None:
+    """Open a native OS folder picker. Only works when the app runs on the
+    same machine as the browser (local use, not a hosted deployment)."""
+    root = tk.Tk()
+    root.withdraw()
+    root.wm_attributes("-topmost", 1)
+    selected = filedialog.askdirectory(master=root, initialdir=start_dir or None)
+    root.destroy()
+    return selected or None
 
 
 def scan_images(folder: str, recursive: bool, time_source: str) -> pd.DataFrame:
@@ -186,9 +205,21 @@ with st.sidebar:
     excel_file = st.file_uploader("Archivo Excel", type=["xlsx", "xls", "csv"])
 
     st.header("2. Carpeta de imágenes")
+    if "folder_path" not in st.session_state:
+        st.session_state["folder_path"] = ""
+
+    if TKINTER_AVAILABLE:
+        if st.button("📁 Elegir carpeta..."):
+            picked = pick_folder_dialog(st.session_state["folder_path"])
+            if picked:
+                st.session_state["folder_path"] = picked
+    else:
+        st.caption("Selector de carpeta no disponible en este entorno; escribe la ruta a mano.")
+
     folder_path = st.text_input(
         "Ruta local a la carpeta con las imágenes",
         placeholder="C:\\Users\\...\\Imagenes  o  /home/usuario/imagenes",
+        key="folder_path",
     )
     recursive = st.checkbox("Buscar también en subcarpetas", value=True)
     time_source = st.radio(
@@ -320,7 +351,14 @@ if "result" in st.session_state:
 
     st.subheader("Resultado del emparejamiento")
     display_df = filtered.drop(columns=["_urls_lista"])
-    st.dataframe(display_df, use_container_width=True)
+    st.caption("Haz clic en una fila para ver su imagen abajo.")
+    table_event = st.dataframe(
+        display_df,
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        key="results_table",
+    )
 
     csv_bytes = display_df.to_csv(index=False).encode("utf-8")
     st.download_button(
@@ -334,8 +372,14 @@ if "result" in st.session_state:
         st.info("No hay imágenes que mostrar con el filtro actual.")
         st.stop()
 
+    selected_rows = table_event.selection.rows if table_event and table_event.selection else []
+
     st.subheader("Vista previa de una imagen")
-    chosen = st.selectbox("Elige un archivo", options=filtered["archivo"].tolist())
+    if selected_rows:
+        chosen = display_df.iloc[selected_rows[0]]["archivo"]
+        st.caption(f"Fila seleccionada en la tabla: **{chosen}**")
+    else:
+        chosen = st.selectbox("O elige un archivo de la lista", options=filtered["archivo"].tolist())
     row = filtered[filtered["archivo"] == chosen].iloc[0]
     urls = row["_urls_lista"] or []
 
