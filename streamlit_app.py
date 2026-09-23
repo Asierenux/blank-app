@@ -168,16 +168,17 @@ def pick_folder_dialog(start_dir: str = "") -> str | None:
 
 def render_zoomable_image(path: str, height: int = 650) -> None:
     """Show an image in a pannable/zoomable viewer (wheel to zoom, drag to
-    pan, double-click to reset). st.image has no zoom, so this embeds a
-    small self-contained HTML/JS viewer instead."""
+    pan, double-click to reset), embedded at its true native resolution
+    (no downscaling) so zooming in reveals real detail, not an upscaled
+    blur. st.image has no zoom of its own, so this embeds a small
+    self-contained HTML/JS viewer instead."""
     with Image.open(path) as img:
+        native_w, native_h = img.size
         img = img.convert("RGB")
-        # Cap the embedded payload; CSS scaling in the viewer still lets
-        # you zoom in well past this without needing more source pixels.
-        img.thumbnail((2400, 2400))
         buf = BytesIO()
         img.save(buf, format="PNG")
     b64 = base64.b64encode(buf.getvalue()).decode()
+    st.caption(f"Resolución nativa: {native_w}×{native_h}px — sin reducir.")
 
     html = f"""
     <div id="zoom-wrap" style="width:100%;height:{height}px;overflow:hidden;
