@@ -1,19 +1,38 @@
-# 🎈 Blank app template
+# 🛒 Comparador de precios de supermercados
 
-A simple Streamlit app template for you to modify!
+App en Streamlit que busca tu lista de la compra en las tiendas online de
+**Mercadona, Dia, Consum y Carrefour** y te dice, artículo por artículo, dónde
+es más barato. También calcula cuánto costaría la cesta completa en cada
+supermercado y cuánto si combinas tiendas.
 
-[![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://blank-app-template.streamlit.app/)
+- Compara por **precio por kg / litro / unidad** (más justo cuando los envases
+  son distintos) o por precio del envase.
+- Elige zona para los precios de Mercadona (varían por almacén).
+- Filtra resultados poco relacionados con la búsqueda.
+- **Modo demo** con datos de ejemplo para probar la app sin conexión.
 
-### How to run it on your own machine
+> ⚠️ Las tiendas no ofrecen APIs oficiales: la app usa las mismas APIs que sus
+> webs. Pueden cambiar o bloquear consultas en cualquier momento; si una tienda
+> falla, la app lo indica y sigue con las demás.
 
-1. Install the requirements
+## Cómo ejecutarla
 
-   ```
-   $ pip install -r requirements.txt
-   ```
+```
+pip install -r requirements.txt
+streamlit run streamlit_app.py
+```
 
-2. Run the app
+## Estructura
 
-   ```
-   $ streamlit run streamlit_app.py
-   ```
+- `streamlit_app.py` – interfaz.
+- `supermercados/stores.py` – un conector por supermercado. Para añadir otro,
+  crea una subclase de `Store` con un método `search()` y regístrala en `ALL_STORES`.
+- `supermercados/compare.py` – búsqueda en paralelo, ordenación y resumen de la cesta.
+- `supermercados/demo.py` – datos de ejemplo.
+
+## Tests
+
+```
+pip install pytest
+python -m pytest
+```
