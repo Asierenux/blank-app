@@ -9,7 +9,11 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import urlencode
 
+import json
+import re
+
 from .base import Product, Store, StoreError, normalize_unit, parse_unit_price_text, to_float
+from .extract import products_from_html, products_from_json
 
 
 class Mercadona(Store):
@@ -180,8 +184,73 @@ class Carrefour(Store):
         )
 
 
+class Alcampo(Store):
+    """compraonline.alcampo.es (plataforma de Ocado).
+
+    Se prueban varios endpoints porque la plataforma los versiona; el último
+    recurso es leer el estado inicial que va incrustado en la página HTML.
+    """
+
+    key = "alcampo"
+    name = "Alcampo"
+    BASE = "https://www.compraonline.alcampo.es"
+
+    def search(self, query: str, limit: int = 10, **_: Any) -> list[Product]:
+        errors = []
+        attempts = [
+            lambda: self._get_json(
+                f"{self.BASE}/api/v5/products/search",
+                params={"term": query, "limit": limit, "offset": 0},
+            ),
+            lambda: self._get_json(
+                f"{self.BASE}/api/webproductpagews/v6/product-pages/search",
+                params={"q": query, "maxPageSize": limit},
+            ),
+            lambda: self._initial_state(query),
+        ]
+        for attempt in attempts:
+            try:
+                products = products_from_json(attempt(), self.name, self.BASE)
+            except StoreError as exc:
+                errors.append(str(exc))
+                continue
+            if products:
+                return products[:limit]
+        if errors:
+            raise StoreError(" | ".join(errors))
+        return []
+
+    def _initial_state(self, query: str) -> Any:
+        html = self._get_html(f"{self.BASE}/search", params={"q": query})
+        match = re.search(r"window\.__INITIAL_STATE__\s*=\s*(\{.*?\})\s*;?\s*</script>", html, re.S)
+        if not match:
+            raise StoreError(f"{self.name}: no se encontraron datos en la página")
+        try:
+            return json.loads(match.group(1))
+        except ValueError as exc:
+            raise StoreError(f"{self.name}: datos de la página no válidos") from exc
+
+
+class Eroski(Store):
+    """supermercado.eroski.es: no tiene API JSON pública, se lee el HTML."""
+
+    key = "eroski"
+    name = "Eroski"
+    BASE = "https://supermercado.eroski.es"
+
+    def search(self, query: str, limit: int = 10, **_: Any) -> list[Product]:
+        html = self._get_html(
+            f"{self.BASE}/es/search/results/",
+            params={"q": query, "suggestionsFilter": "false"},
+        )
+        return self.parse_html(html)[:limit]
+
+    def parse_html(self, html: str) -> list[Product]:
+        return products_from_html(html, self.name, self.BASE)
+
+
 ALL_STORES: dict[str, type[Store]] = {
-    cls.key: cls for cls in (Mercadona, Dia, Consum, Carrefour)
+    cls.key: cls for cls in (Mercadona, Dia, Consum, Carrefour, Alcampo, Eroski)
 }
 
 

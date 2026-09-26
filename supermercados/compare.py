@@ -2,38 +2,48 @@
 
 from __future__ import annotations
 
-import unicodedata
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import pandas as pd
 
+from . import quality
 from .base import Product, StoreError
+from .quality import normalize_text
 
 SearchFn = Callable[[str, str], list[Product]]
 
 
 @dataclass
-class SearchResult:
+class Item:
+    """Un artículo de la lista de la compra."""
+
     query: str
+    quantity: float = 1
+    required: list[str] = field(default_factory=list)  # claves de quality.QUALITIES
+
+
+@dataclass
+class SearchResult:
+    item: Item
     products: list[Product] = field(default_factory=list)
     errors: dict[str, str] = field(default_factory=dict)
+    discarded_quality: int = 0  # encontrados pero sin la calidad pedida
 
-
-def _norm(text: str) -> str:
-    text = unicodedata.normalize("NFKD", text.lower())
-    return "".join(c for c in text if not unicodedata.combining(c))
+    @property
+    def query(self) -> str:
+        return self.item.query
 
 
 def is_relevant(product: Product, query: str) -> bool:
     """Todas las palabras de la búsqueda aparecen en el nombre del producto."""
-    name = _norm(f"{product.name} {product.brand or ''}")
-    return all(word in name for word in _norm(query).split() if len(word) > 2)
+    name = normalize_text(f"{product.name} {product.brand or ''}")
+    return all(word in name for word in normalize_text(query).split() if len(word) > 2)
 
 
 def search_all(
-    queries: list[str],
+    items: list[Item | str],
     store_names: list[str],
     search_fn: SearchFn,
     strict: bool = True,
@@ -42,28 +52,52 @@ def search_all(
     """Busca cada artículo en cada supermercado en paralelo.
 
     ``search_fn(store_name, query)`` devuelve los productos de un supermercado.
+    Si el artículo pide una calidad (eco, campero…) se lanza además una búsqueda
+    con esas palabras y solo se conservan los productos que la cumplen.
     """
-    results = {q: SearchResult(q) for q in queries}
-    tasks = [(q, s) for q in queries for s in store_names]
+    items = [Item(i) if isinstance(i, str) else i for i in items]
+    results = [SearchResult(item) for item in items]
+    tasks = [
+        (idx, store, q)
+        for idx, item in enumerate(items)
+        for store in store_names
+        for q in quality.search_queries(item.query, item.required)
+    ]
 
-    def run(task: tuple[str, str]) -> tuple[str, str, list[Product] | None, str | None]:
-        query, store = task
+    def run(task: tuple[int, str, str]):
+        idx, store, query = task
         try:
-            return query, store, search_fn(store, query), None
+            return idx, store, search_fn(store, query), None
         except StoreError as exc:
-            return query, store, None, str(exc)
+            return idx, store, None, str(exc)
         except Exception as exc:  # noqa: BLE001 - un fallo no debe tumbar la app
-            return query, store, None, f"{store}: error inesperado ({exc})"
+            return idx, store, None, f"{store}: error inesperado ({exc})"
 
+    seen: list[set[tuple[str, str, float]]] = [set() for _ in items]
+    succeeded: list[set[str]] = [set() for _ in items]
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        for query, store, products, error in pool.map(run, tasks):
+        for idx, store, products, error in pool.map(run, tasks):
+            result = results[idx]
             if error:
-                results[query].errors[store] = error
+                result.errors.setdefault(store, error)
                 continue
-            if strict:
-                products = [p for p in products if is_relevant(p, query)]
-            results[query].products.extend(products)
-    return [results[q] for q in queries]
+            succeeded[idx].add(store)
+            for p in products:
+                key = (p.store, p.name, p.price)
+                if key in seen[idx]:
+                    continue
+                seen[idx].add(key)
+                if strict and not is_relevant(p, result.item.query):
+                    continue
+                if not quality.satisfies(p.tags, result.item.required):
+                    result.discarded_quality += 1
+                    continue
+                result.products.append(p)
+    # Si una de las búsquedas de una tienda funcionó, no es un error de la tienda.
+    for result, ok in zip(results, succeeded):
+        for store in ok:
+            result.errors.pop(store, None)
+    return results
 
 
 def to_dataframe(products: list[Product]) -> pd.DataFrame:
@@ -75,12 +109,13 @@ def to_dataframe(products: list[Product]) -> pd.DataFrame:
                 "Precio (€)": p.price,
                 "Precio unidad": p.unit_price,
                 "Unidad": p.unit,
+                "Calidad": [quality.QUALITIES[t].label for t in p.tags],
                 "Enlace": p.url,
                 "Imagen": p.image,
             }
             for p in products
         ],
-        columns=["Supermercado", "Producto", "Precio (€)", "Precio unidad", "Unidad", "Enlace", "Imagen"],
+        columns=["Supermercado", "Producto", "Precio (€)", "Precio unidad", "Unidad", "Calidad", "Enlace", "Imagen"],
     )
 
 
@@ -115,33 +150,42 @@ def cheapest_by_store(products: list[Product], by_unit_price: bool = True) -> di
 
 
 def basket_summary(results: list[SearchResult], by_unit_price: bool = True) -> dict[str, Any]:
-    """Resume la cesta: el artículo más barato de cada búsqueda y el total por tienda."""
+    """Resume la cesta: dónde comprar cada artículo y el total por tienda.
+
+    Los totales multiplican el precio del producto elegido por la cantidad.
+    """
     rows = []
     totals: dict[str, float] = {}
     missing: dict[str, int] = {}
     stores = sorted({p.store for r in results for p in r.products})
+    mixed_total = 0.0
     for r in results:
+        qty = r.item.quantity
         best_per_store = cheapest_by_store(r.products, by_unit_price)
         ordered = sort_products(list(best_per_store.values()), by_unit_price)
         winner = ordered[0] if ordered else None
+        if winner:
+            mixed_total += winner.price * qty
         rows.append(
             {
                 "Artículo": r.query,
+                "Calidad pedida": [quality.QUALITIES[k].label for k in r.item.required],
+                "Cantidad": qty,
                 "Más barato en": winner.store if winner else "—",
                 "Producto": winner.name if winner else "No encontrado",
                 "Precio (€)": winner.price if winner else None,
                 "Precio unidad": winner.unit_price_label if winner else "—",
+                "Subtotal (€)": round(winner.price * qty, 2) if winner else None,
             }
         )
         for store in stores:
             if store in best_per_store:
-                totals[store] = totals.get(store, 0.0) + best_per_store[store].price
+                totals[store] = totals.get(store, 0.0) + best_per_store[store].price * qty
             else:
                 missing[store] = missing.get(store, 0) + 1
-    best_total = sum(row["Precio (€)"] or 0 for row in rows)
     return {
         "rows": pd.DataFrame(rows),
         "totals": {s: round(v, 2) for s, v in totals.items()},
         "missing": missing,
-        "mixed_total": round(best_total, 2),
+        "mixed_total": round(mixed_total, 2),
     }

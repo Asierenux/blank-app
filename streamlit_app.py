@@ -1,23 +1,32 @@
+import pandas as pd
 import streamlit as st
 
 from supermercados import ALL_STORES, get_store
-from supermercados.compare import basket_summary, search_all, sort_products, to_dataframe
+from supermercados.compare import Item, basket_summary, search_all, sort_products, to_dataframe
 from supermercados.demo import demo_search
+from supermercados.quality import LABEL_TO_KEY, QUALITIES
 from supermercados.stores import Mercadona
 
 st.set_page_config(page_title="Comparador de supermercados", page_icon="🛒", layout="wide")
 
 st.title("🛒 Comparador de precios de supermercados")
 st.write(
-    "Escribe tu lista de la compra y la app busca cada artículo en las tiendas online "
-    "de los supermercados y te dice dónde es más barato."
+    "Escribe tu lista de la compra, elige la calidad que quieres para cada artículo "
+    "(eco/bio, camperos, integral…) y la app busca en las tiendas online dónde es más barato."
 )
+
+ECO = QUALITIES["eco"].label
+QUALITY_LABELS = [q.label for q in QUALITIES.values()]
 
 # --- Opciones ---------------------------------------------------------------
 with st.sidebar:
     st.header("Opciones")
     store_names = {cls.name: key for key, cls in ALL_STORES.items()}
     selected = st.multiselect("Supermercados", list(store_names), default=list(store_names))
+    eco_basket = st.toggle(
+        "🌱 Cesta eco / bio",
+        help="Exige producto ecológico en todos los artículos de la lista.",
+    )
     warehouse = st.selectbox(
         "Zona (precios de Mercadona)",
         list(Mercadona.WAREHOUSES),
@@ -35,14 +44,54 @@ with st.sidebar:
         help="Filtra resultados poco relacionados con la búsqueda.",
     )
     demo = st.toggle(
-        "Modo demo (datos de ejemplo)",
+        "Modo demo (precios inventados)",
         value=False,
-        help="Útil para probar la app sin conexión o si las tiendas bloquean las consultas.",
+        help="Para probar la app sin conexión. Desactívalo para ver precios reales.",
     )
     st.caption(
-        "Los precios se obtienen de las webs públicas de cada tienda. Pueden variar "
-        "según tu código postal y no incluyen gastos de envío."
+        "Los precios reales se obtienen en el momento de las webs de cada tienda. "
+        "Pueden variar según tu código postal y no incluyen gastos de envío."
     )
+
+# --- Lista de la compra -----------------------------------------------------
+st.subheader("📝 Lista de la compra")
+st.caption(
+    "Añade filas con ➕. En **Calidad** puedes elegir una o varias (p. ej. arroz 🌱 Eco + 🌾 Integral). "
+    "Los huevos ecológicos cuentan también como camperos."
+)
+if "lista" not in st.session_state:
+    st.session_state.lista = pd.DataFrame(
+        [
+            {"Artículo": "leche entera", "Cantidad": 2, "Calidad": []},
+            {"Artículo": "huevos", "Cantidad": 1, "Calidad": [QUALITIES["campero"].label]},
+            {"Artículo": "aceite de oliva", "Cantidad": 1, "Calidad": [QUALITIES["virgen_extra"].label]},
+            {"Artículo": "arroz", "Cantidad": 1, "Calidad": [ECO]},
+        ]
+    )
+lista = st.data_editor(
+    st.session_state.lista,
+    num_rows="dynamic",
+    hide_index=True,
+    use_container_width=True,
+    key="lista_editor",
+    column_config={
+        "Artículo": st.column_config.TextColumn(required=True, width="medium"),
+        "Cantidad": st.column_config.NumberColumn(min_value=1, step=1, default=1, width="small"),
+        "Calidad": st.column_config.MultiselectColumn(options=QUALITY_LABELS, width="large"),
+    },
+)
+
+items = []
+for row in lista.to_dict("records"):
+    name = str(row.get("Artículo") or "").strip()
+    if not name:
+        continue
+    labels = list(row.get("Calidad") or [])
+    required = [LABEL_TO_KEY[label] for label in labels if label in LABEL_TO_KEY]
+    if eco_basket and "eco" not in required:
+        required.append("eco")
+    qty = row.get("Cantidad")
+    items.append(Item(name, float(qty) if pd.notna(qty) and qty else 1, required))
 
 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -56,26 +105,20 @@ def search_fn(store_name: str, query: str):
     return cached_search(store_names[store_name], query, limit, warehouse)
 
 
-# --- Lista de la compra -----------------------------------------------------
-lista = st.text_area(
-    "Lista de la compra (un artículo por línea)",
-    value="leche entera\nhuevos\naceite de oliva virgen extra\narroz",
-    height=140,
-)
-queries = [line.strip() for line in lista.splitlines() if line.strip()]
-
-if not st.button("Comparar precios", type="primary", disabled=not (queries and selected)):
+if not st.button("Comparar precios", type="primary", disabled=not (items and selected)):
     st.stop()
 
-with st.spinner(f"Buscando {len(queries)} artículo(s) en {len(selected)} supermercado(s)…"):
-    results = search_all(queries, selected, search_fn, strict=strict)
+with st.spinner(f"Buscando {len(items)} artículo(s) en {len(selected)} supermercado(s)…"):
+    results = search_all(items, selected, search_fn, strict=strict)
+
+if demo:
+    st.info("Modo demo: los precios son inventados. Desactívalo en la barra lateral para ver precios reales.")
 
 errors = {store: msg for r in results for store, msg in r.errors.items()}
 if errors:
     st.warning(
         "No se pudo consultar: " + ", ".join(sorted(errors))
-        + ". Puede que la tienda haya cambiado su web o esté bloqueando las consultas. "
-        "Prueba el modo demo para ver cómo funciona la app."
+        + ". Puede que la tienda haya cambiado su web o esté bloqueando las consultas."
     )
     with st.expander("Detalles de los errores"):
         for msg in errors.values():
@@ -92,29 +135,40 @@ st.dataframe(
     summary["rows"],
     hide_index=True,
     use_container_width=True,
-    column_config={"Precio (€)": st.column_config.NumberColumn(format="%.2f €")},
+    column_config={
+        "Precio (€)": st.column_config.NumberColumn(format="%.2f €"),
+        "Subtotal (€)": st.column_config.NumberColumn(format="%.2f €"),
+        "Calidad pedida": st.column_config.MultiselectColumn(),
+    },
 )
 
 if summary["totals"]:
-    cols = st.columns(len(summary["totals"]) + 1)
-    cols[0].metric("Combinando tiendas", f"{summary['mixed_total']:.2f} €")
-    for col, (store, total) in zip(cols[1:], sorted(summary["totals"].items(), key=lambda x: x[1])):
-        missing = summary["missing"].get(store, 0)
-        col.metric(
-            f"Todo en {store}",
+    ranking = sorted(summary["totals"].items(), key=lambda x: (summary["missing"].get(x[0], 0), x[1]))
+    cols = st.columns(min(len(ranking) + 1, 4))
+    cells = [("Combinando tiendas", summary["mixed_total"], 0)] + [
+        (f"Todo en {store}", total, summary["missing"].get(store, 0)) for store, total in ranking
+    ]
+    for i, (label, total, missing) in enumerate(cells):
+        cols[i % len(cols)].metric(
+            label,
             f"{total:.2f} €",
-            delta=f"faltan {missing} artículo(s)" if missing else None,
-            delta_color="off",
+            help=f"Faltan {missing} artículo(s) en esta tienda" if missing else None,
         )
-    st.caption("Los totales suman el producto más barato encontrado de cada artículo (1 unidad).")
+        if missing:
+            cols[i % len(cols)].caption(f"⚠️ faltan {missing} artículo(s)")
+    st.caption("Los totales usan el producto más barato de cada artículo que cumple la calidad pedida, por la cantidad indicada.")
 
 # --- Detalle por artículo ---------------------------------------------------
 st.subheader("🔎 Detalle por artículo")
 for r in results:
     products = sort_products(r.products, by_unit)
-    with st.expander(f"{r.query} — {len(products)} resultado(s)", expanded=len(results) == 1):
+    wanted = " + ".join(QUALITIES[k].label for k in r.item.required)
+    title = f"{r.query}{' · ' + wanted if wanted else ''} — {len(products)} resultado(s)"
+    with st.expander(title, expanded=len(results) == 1):
+        if r.discarded_quality:
+            st.caption(f"Se descartaron {r.discarded_quality} producto(s) que no cumplen la calidad pedida.")
         if not products:
-            st.info("No se encontraron productos. Prueba con otras palabras.")
+            st.info("No se encontraron productos. Prueba con otras palabras o quita algún requisito de calidad.")
             continue
         best = products[0]
         st.success(
@@ -131,10 +185,11 @@ for r in results:
                 "Enlace": st.column_config.LinkColumn(display_text="Ver"),
                 "Precio (€)": st.column_config.NumberColumn(format="%.2f €"),
                 "Precio unidad": st.column_config.NumberColumn(format="%.2f €"),
+                "Calidad": st.column_config.MultiselectColumn(),
             },
             column_order=[
                 c
-                for c in ["Imagen", "Supermercado", "Producto", "Precio (€)", "Precio unidad", "Unidad", "Enlace"]
-                if df[c].notna().any()
+                for c in ["Imagen", "Supermercado", "Producto", "Precio (€)", "Precio unidad", "Unidad", "Calidad", "Enlace"]
+                if df[c].map(lambda v: bool(v) if isinstance(v, list) else pd.notna(v)).any()
             ],
         )

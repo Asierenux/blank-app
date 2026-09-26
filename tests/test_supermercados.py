@@ -110,6 +110,7 @@ def test_search_all_handles_errors_and_filters():
 
 
 def test_basket_summary_with_demo():
+    # search_all acepta también textos sueltos
     queries = ["leche entera", "huevos", "producto inexistente"]
     stores = ["Mercadona", "Dia"]
     results = search_all(queries, stores, lambda s, q: demo_search(s, q))
@@ -120,3 +121,132 @@ def test_basket_summary_with_demo():
     assert set(summary["totals"]) == set(stores)
     assert summary["missing"] == {"Mercadona": 1, "Dia": 1}
     assert summary["mixed_total"] <= min(summary["totals"].values())
+
+
+# --- Calidades ---------------------------------------------------------------
+from supermercados import quality
+from supermercados.compare import Item
+from supermercados.stores import Alcampo, Eroski
+
+
+def test_quality_detection():
+    assert quality.detect("Huevos camperos clase L") == ["campero"]
+    assert quality.detect("Huevos de gallinas criadas en libertad") == ["campero"]
+    assert "eco" in quality.detect("Arroz redondo ecológico")
+    assert "eco" in quality.detect("Leche BIO")
+    assert set(quality.detect("Arroz bomba D.O. Calasparra")) == {"bomba", "do"}
+    assert quality.detect("Aceite de oliva virgen extra") == ["virgen_extra"]
+    assert quality.detect("Doritos") == []
+
+
+def test_eco_eggs_count_as_campero():
+    assert quality.satisfies(["eco"], ["campero"])
+    assert not quality.satisfies(["suelo"], ["campero"])
+    assert not quality.satisfies(["campero"], ["eco"])
+    assert quality.satisfies(["eco", "integral"], ["eco", "integral"])
+
+
+def test_search_queries_adds_quality_terms():
+    assert quality.search_queries("arroz", []) == ["arroz"]
+    assert quality.search_queries("arroz", ["eco"]) == ["arroz", "arroz ecologico"]
+    assert quality.search_queries("arroz ecológico", ["eco"]) == ["arroz ecológico"]
+
+
+def test_search_all_filters_by_quality_and_dedupes():
+    calls = []
+
+    def fake(store, query):
+        calls.append(query)
+        return [
+            _p(store, "Huevos gallinas suelo", 2.0, 0.17, "ud"),
+            _p(store, "Huevos camperos", 2.8, 0.23, "ud"),
+            _p(store, "Huevos ecológicos", 3.9, 0.33, "ud"),
+        ]
+
+    [res] = search_all([Item("huevos", 2, ["campero"])], ["A"], fake)
+    assert sorted(calls) == ["huevos", "huevos campero"]
+    assert [p.name for p in res.products] == ["Huevos camperos", "Huevos ecológicos"]
+    assert res.discarded_quality == 1
+    summary = basket_summary([res])
+    assert summary["totals"] == {"A": 5.6}  # 2 docenas de camperos
+
+
+def test_eco_basket_demo():
+    items = [Item(q, 1, ["eco"]) for q in ("leche entera", "arroz", "huevos")]
+    results = search_all(items, ["Mercadona", "Eroski"], lambda s, q: demo_search(s, q))
+    for r in results:
+        assert r.products and all("eco" in p.tags for p in r.products)
+
+
+# --- Alcampo / Eroski ----------------------------------------------------------
+
+
+def test_alcampo_generic_json():
+    data = {
+        "entities": {
+            "product": {
+                "abc": {
+                    "name": "Leche entera ecológica AUCHAN 1 l",
+                    "brand": "AUCHAN",
+                    "price": {"amount": "1.29", "currency": "EUR"},
+                    "unitPrice": {"price": {"amount": "1.29"}, "unit": "fop.price.per.litre"},
+                    "image": {"src": "https://img/a.jpg"},
+                }
+            }
+        }
+    }
+
+    class FakeAlcampo(Alcampo):
+        def _get_json(self, url, **kwargs):
+            return data
+
+    [p] = FakeAlcampo().search("leche")
+    assert (p.price, p.unit_price, p.unit) == (1.29, 1.29, "l")
+    assert "eco" in p.tags and p.image == "https://img/a.jpg"
+
+
+def test_alcampo_reports_errors_when_all_endpoints_fail():
+    class Broken(Alcampo):
+        def _get_json(self, url, **kwargs):
+            raise StoreError("Alcampo: 403")
+
+        def _get_html(self, url, **kwargs):
+            raise StoreError("Alcampo: 403")
+
+    try:
+        Broken().search("leche")
+    except StoreError as exc:
+        assert "403" in str(exc)
+    else:
+        raise AssertionError("debería fallar")
+
+
+def test_eroski_html_cards():
+    html = """
+    <div class="product-item">
+      <h2 class="product-title"><a href="/es/productdetail/123-huevos">Huevos camperos Eroski, 12 uds</a></h2>
+      <img src="https://img/h.jpg">
+      <span class="price-offer-now">3,15 €</span>
+      <span class="price-product">0,26 €/ud</span>
+    </div>
+    <div class="product-item">
+      <h2 class="product-title"><a href="/es/productdetail/124">Arroz bomba</a></h2>
+      <span class="price-offer-now">2,99 €</span>
+      <span>2,99 €/kg</span>
+    </div>"""
+    products = Eroski().parse_html(html)
+    assert [(p.name, p.price, p.unit_price, p.unit) for p in products] == [
+        ("Huevos camperos Eroski, 12 uds", 3.15, 0.26, "ud"),
+        ("Arroz bomba", 2.99, 2.99, "kg"),
+    ]
+    assert products[0].url == "https://supermercado.eroski.es/es/productdetail/123-huevos"
+    assert products[0].tags == ["campero"]
+
+
+def test_eroski_json_ld():
+    html = """<script type="application/ld+json">
+    {"@type": "ItemList", "itemListElement": [
+      {"@type": "Product", "name": "Leche entera", "offers": {"price": "0.95", "priceCurrency": "EUR"}}
+    ]}</script>"""
+    [p] = Eroski().parse_html(html)
+    assert (p.name, p.price) == ("Leche entera", 0.95)

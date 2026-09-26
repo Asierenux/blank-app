@@ -6,6 +6,8 @@ from typing import Any
 
 import requests
 
+from . import quality
+
 USER_AGENT = (
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -27,7 +29,11 @@ class Product:
     brand: str | None = None
     image: str | None = None
     url: str | None = None
-    extra: dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.tags:
+            self.tags = quality.detect(f"{self.name} {self.brand or ''}")
 
     @property
     def unit_price_label(self) -> str:
@@ -46,6 +52,7 @@ class Store:
         self.session = session or requests.Session()
         self.session.headers.setdefault("User-Agent", USER_AGENT)
         self.session.headers.setdefault("Accept", "application/json")
+        self.session.headers.setdefault("Accept-Language", "es-ES,es;q=0.9")
 
     def search(self, query: str, limit: int = 10, **options: Any) -> list[Product]:
         raise NotImplementedError
@@ -56,16 +63,20 @@ class Store:
     def _post_json(self, url: str, **kwargs: Any) -> Any:
         return self._request("POST", url, **kwargs)
 
-    def _request(self, method: str, url: str, **kwargs: Any) -> Any:
+    def _get_html(self, url: str, **kwargs: Any) -> str:
+        headers = {"Accept": "text/html,application/xhtml+xml", **kwargs.pop("headers", {})}
+        return self._request("GET", url, as_json=False, headers=headers, **kwargs)
+
+    def _request(self, method: str, url: str, as_json: bool = True, **kwargs: Any) -> Any:
         kwargs.setdefault("timeout", TIMEOUT)
         try:
             resp = self.session.request(method, url, **kwargs)
             resp.raise_for_status()
-            return resp.json()
+            return resp.json() if as_json else resp.text
         except requests.RequestException as exc:
             raise StoreError(f"{self.name}: {exc}") from exc
         except ValueError as exc:
-            raise StoreError(f"{self.name}: respuesta no válida") from exc
+            raise StoreError(f"{self.name}: respuesta no válida (¿ha cambiado la web?)") from exc
 
 
 def to_float(value: Any) -> float | None:
@@ -87,7 +98,8 @@ _UNIT_ALIASES = {
     "kg": "kg", "kilo": "kg", "kilos": "kg", "kilogramo": "kg", "kilogramos": "kg",
     "l": "l", "lt": "l", "litro": "l", "litros": "l", "litre": "l", "liter": "l",
     "ud": "ud", "u": "ud", "un": "ud", "unidad": "ud", "unidades": "ud", "unit": "ud",
-    "uds": "ud", "docena": "docena", "dozen": "docena",
+    "uds": "ud", "each": "ud", "docena": "docena", "dozen": "docena",
+    "kilogram": "kg", "kilogramme": "kg", "litros.": "l",
 }
 # Unidades pequeñas -> (unidad base, factor para convertir el precio a la base)
 _SMALL_UNITS = {
