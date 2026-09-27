@@ -1,0 +1,78 @@
+name: App Android (APK)
+
+# Compila la app móvil y publica el APK como una Release de GitHub,
+# lista para descargar e instalar en el móvil. No necesita cuentas de Expo ni Google.
+on:
+  push:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/android-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests y tipos
+        run: |
+          npm test
+          npm run typecheck
+
+      - name: Generar proyecto Android
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Compilar APK
+        working-directory: mobile/android
+        # Solo arm64 (casi todos los móviles actuales) para compilar más rápido.
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a --no-daemon
+
+      - name: Renombrar APK
+        run: cp android/app/build/outputs/apk/release/app-release.apk comparador-super.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: comparador-super-apk
+          path: mobile/comparador-super.apk
+
+      - name: Publicar Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-${{ github.run_number }}
+          name: App Android ${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: mobile/comparador-super.apk
+          body: |
+            Descarga `comparador-super.apk` desde el móvil Android y ábrelo para instalarlo
+            (acepta instalar apps de «orígenes desconocidos» si te lo pide).
+
+            Rama: `${{ github.ref_name }}` · Commit: ${{ github.sha }}

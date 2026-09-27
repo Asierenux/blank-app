@@ -1,5 +1,8 @@
 # 🛒 Comparador de precios de supermercados
 
+> 📱 **App móvil (iPhone y Android):** está en [`mobile/`](mobile/README.md).
+> Ahí se explica cómo instalarla. Lo que sigue es la versión web en Streamlit.
+
 App en Streamlit que busca tu lista de la compra en las tiendas online de
 **Mercadona, Dia, Consum, Carrefour, Alcampo y Eroski** con precios reales y
 te dice, artículo por artículo, dónde es más barato. También calcula cuánto
