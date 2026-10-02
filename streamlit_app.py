@@ -572,8 +572,7 @@ if "result" in st.session_state:
     with preview_col:
         st.markdown(f"**Imagen local** — {row['estado']}")
         try:
-            img = Image.open(row["ruta_local"])
-            st.image(img, caption=f"{chosen}  ({img.width}×{img.height}px)", width="stretch")
+            render_zoomable_image(row["ruta_local"], height=500)
         except Exception as exc:
             st.warning(f"No se pudo abrir la imagen local para previsualizar ({exc}).")
     with remote_col:
@@ -584,12 +583,6 @@ if "result" in st.session_state:
             caption = str(u["zona"]) if u["zona"] else "imagen asociada"
             st.image(str(u["url"]), caption=caption, width="stretch")
             st.markdown(f"[Abrir en el navegador]({u['url']})")
-
-    with st.expander("🔍 Zoom / inspección detallada", expanded=False):
-        try:
-            render_zoomable_image(row["ruta_local"])
-        except Exception as exc:
-            st.warning(f"No se pudo abrir la imagen ({exc}).")
 
     st.json(
         {
