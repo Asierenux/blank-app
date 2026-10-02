@@ -1,6 +1,10 @@
-import base64
+import hashlib
+import http.server
 import os
+import socketserver
+import threading
 import warnings
+from collections import OrderedDict
 from io import BytesIO
 from pathlib import Path
 
@@ -166,6 +170,55 @@ def pick_folder_dialog(start_dir: str = "") -> str | None:
     return selected or None
 
 
+@st.cache_resource
+def _get_local_image_server() -> tuple[int, "OrderedDict[str, bytes]"]:
+    """A tiny localhost-only HTTP server that serves image bytes by token.
+
+    The zoom viewer used to embed images as base64 data URIs straight in
+    the HTML passed to components.html(). That HTML travels to the
+    browser inside a Streamlit websocket message, which Tornado caps at
+    10MB by default - fine for small test images, but a real multi-MB
+    camera photo silently never arrived (blank viewer, no error). Serving
+    the bytes over a plain HTTP GET instead means only a short URL goes
+    through that channel; the browser fetches the actual image itself.
+    """
+    served: "OrderedDict[str, bytes]" = OrderedDict()
+    max_cached_images = 8
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):  # noqa: N802
+            data = served.get(self.path.lstrip("/"))
+            if data is None:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *args):  # noqa: N802
+            pass
+
+    httpd = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=httpd.serve_forever, daemon=True).start()
+    served.max_cached_images = max_cached_images  # type: ignore[attr-defined]
+    return httpd.server_address[1], served
+
+
+def _serve_image_bytes(data: bytes) -> str:
+    port, served = _get_local_image_server()
+    token = hashlib.sha1(data).hexdigest()
+    if token not in served:
+        served[token] = data
+        max_cached = getattr(served, "max_cached_images", 8)
+        while len(served) > max_cached:
+            served.popitem(last=False)
+    return f"http://127.0.0.1:{port}/{token}"
+
+
 def render_zoomable_image(path: str, height: int = 650) -> None:
     """Show an image in a pannable/zoomable viewer (wheel to zoom, drag to
     pan, double-click to reset), embedded at its true native resolution
@@ -177,14 +230,14 @@ def render_zoomable_image(path: str, height: int = 650) -> None:
         img = img.convert("RGB")
         buf = BytesIO()
         img.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode()
+    img_url = _serve_image_bytes(buf.getvalue())
     st.caption(f"Resolución nativa: {native_w}×{native_h}px — sin reducir.")
 
     html = f"""
     <div id="zoom-wrap" style="width:100%;height:{height}px;overflow:hidden;
          border:1px solid #E3E8EF;border-radius:10px;position:relative;
          background:#F1F4F8;cursor:grab;touch-action:none;">
-      <img id="zoom-img" src="data:image/png;base64,{b64}" draggable="false"
+      <img id="zoom-img" src="{img_url}" draggable="false"
            style="transform-origin:0 0;position:absolute;top:0;left:0;
                   user-select:none;pointer-events:none;"/>
     </div>
