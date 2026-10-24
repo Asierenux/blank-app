@@ -1,1 +1,5 @@
-streamlit
+streamlit>=1.40
+streamlit-image-coordinates>=0.4.1
+opencv-python-headless
+numpy
+pillow
