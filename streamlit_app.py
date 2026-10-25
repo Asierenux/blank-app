@@ -11,7 +11,9 @@ from streamlit_image_coordinates import streamlit_image_coordinates
 
 import fm_aug as fa
 import fm_core as fc
+import fm_draw as fd
 import fm_export as fe
+from fm_draw import drawer
 
 st.set_page_config(page_title="Editor de materias extrañas", page_icon="🔬", layout="wide")
 
@@ -134,6 +136,29 @@ def thread_defaults(items: list) -> dict:
 # ---------------------------------------------------------- 1. extraer materias
 
 
+def drawn_shapes(key: str) -> list:
+    """Formas dibujadas en un lienzo (las guarda Streamlit en session_state con la clave del componente)."""
+    v = ss.get(key)
+    return v["shapes"] if isinstance(v, dict) and isinstance(v.get("shapes"), list) else []
+
+
+EXTRACT_MODES = {
+    "auto": "Automático dentro de lo marcado",
+    "grabcut": "Ajustar mi trazo a los bordes",
+    "trazo": "Exactamente lo que marco",
+    "puntos": "Puntos / motas",
+}
+EXTRACT_HELP = {
+    "auto": "Rodea la materia (lazo o pincel, sin apurar). Dentro se separa lo que es más claro/oscuro que la goma. "
+            "Para materias con textura (plástico) sube «Unir en una pieza».",
+    "grabcut": "Rodea o pinta la materia aproximadamente; el borde se ajusta solo a la materia. Bueno para piezas grises o "
+               "con poco contraste (plástico).",
+    "trazo": "Pinta o rodea la materia con precisión (usa zoom con la rueda). Se guarda exactamente lo marcado.",
+    "puntos": "Busca motas pequeñas dentro de lo marcado (o en toda la zona). Con la herramienta «Punto» puedes "
+              "elegir cuáles guardar.",
+}
+
+
 def page_extract():
     st.header("1 · Extraer materias de imágenes reales")
     files = st.file_uploader("Imágenes con materia extraña (KO)", type=fc.IMAGE_TYPES, accept_multiple_files=True, key="up_src")
@@ -144,112 +169,168 @@ def page_extract():
     name = st.selectbox("Imagen", list(imgs), key="src_sel")
     img = imgs[name]
     H, W = img.shape[:2]
-    zk, rk = f"zone::{name}", f"roi::{name}"
 
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown("**① Vista general** — arrastra un rectángulo alrededor de la zona de la materia")
-        r = clickable(rect(img, ss.get(zk)) if ss.get(zk) else img, f"ov_{name}", drag=True)
-        if r:
-            x, y, w, h = r
-            m = 48  # zona mínima con algo de margen
-            if w < m or h < m:
-                x, y = max(0, x + w // 2 - m), max(0, y + h // 2 - m)
-                w, h = min(2 * m, W - x), min(2 * m, H - y)
-            ss[zk] = (x, y, w, h)
-            ss.pop(rk, None)
-            st.rerun()
+    st.markdown("**① Vista general** — marca dónde está la materia (rectángulo, lazo o un punto) para ampliar esa zona. "
+                "Rueda del ratón: zoom · espacio o botón derecho: mover.")
+    ov_key = f"ov::{name}"
+    ov_shapes = drawer(img, ov_key, tools=("rect", "lazo", "punto"), default_tool="rect", shapes=drawn_shapes(ov_key),
+                       max_display=1600, max_height=620, allow_subtract=False)
+    if not ov_shapes:
         st.caption(f"{W}×{H} px · {'gris' if img.ndim == 2 else 'color'}")
-    zone = ss.get(zk)
-    if not zone:
+        spot_finder(name, img, None)
         return
-    zx, zy, zw, zh = zone
+    last = ov_shapes[-1]
+    bb = fd.shapes_bbox([last])
+    x, y, w, h = bb
+    side = max(160.0, 1.4 * max(w, h))  # zona cuadrada con margen alrededor de lo marcado
+    cx, cy = x + w / 2, y + h / 2
+    zx, zy = int(max(0, min(W - side, cx - side / 2))), int(max(0, min(H - side, cy - side / 2)))
+    zw, zh = int(min(side, W)), int(min(side, H))
+    zone = (zx, zy, zw, zh)
     zimg = img[zy:zy + zh, zx:zx + zw]
-    with c2:
-        st.markdown("**② Zoom** — ajusta el rectángulo justo alrededor de la materia (opcional)")
-        roi_local = ss.get(rk)
-        r = clickable(rect(zimg, roi_local, (0, 255, 0)) if roi_local else zimg, f"zm_{name}_{zone}", drag=True)
-        if r:
-            ss[rk] = r
-            st.rerun()
-        if roi_local and st.button("Usar toda la zona"):
-            ss.pop(rk, None)
-            st.rerun()
-    rx, ry, rw, rh = ss.get(rk) or (0, 0, zw, zh)
-    roi = zimg[ry:ry + rh, rx:rx + rw]
 
-    st.markdown("**③ Segmentación de la materia**")
-    s1, s2, s3 = st.columns(3)
-    with s1:
-        method = st.selectbox(
-            "Método", ["fondo_local", "borde", "grabcut", "rectangulo"],
-            format_func={"fondo_local": "Diferencia con fondo local (recomendado)", "borde": "Diferencia con el borde del recorte",
-                         "grabcut": "GrabCut", "rectangulo": "Todo el rectángulo"}.get, key="seg_m")
-        polarity = st.radio("La materia es…", ["claro", "oscuro", "ambos"], horizontal=True, key="seg_p",
+    st.markdown("**② Zona ampliada** — marca la materia. Lo que dibujas se ve en rojo; el resultado, en verde.")
+    m1, m2 = st.columns([3, 2])
+    mode = m1.radio("Cómo recortar", list(EXTRACT_MODES), format_func=EXTRACT_MODES.get, horizontal=True, key="ext_mode")
+    m2.caption(EXTRACT_HELP[mode])
+    with st.expander("Ajustes de detección", expanded=mode in ("auto", "puntos")):
+        s1, s2, s3 = st.columns(3)
+        polarity = s1.radio("La materia es…", ["claro", "oscuro", "ambos"], horizontal=True, key="seg_p",
                             format_func={"claro": "más clara", "oscuro": "más oscura", "ambos": "ambas"}.get)
-        threshold = st.slider("Umbral", 1, 120, 20, key="seg_t")
-    with s2:
-        bg_k = st.slider("Tamaño filtro de fondo (px)", 9, 301, 41, 2, key="seg_k",
-                         help="Mayor que el grosor de la materia. Súbelo si la materia es grande y sale hueca.")
-        smooth = st.slider("Suavizado", 0.0, 4.0, 1.0, 0.25, key="seg_s")
-        min_area = st.slider("Área mínima (px)", 1, 2000, 15, key="seg_a")
-    with s3:
-        close = st.slider("Cerrar huecos", 0, 10, 2, key="seg_c")
-        open_ = st.slider("Quitar puntitos", 0, 5, 0, key="seg_o")
-        fill = st.checkbox("Rellenar agujeros", False, key="seg_f")
-        largest = st.checkbox("Solo el objeto mayor", False, key="seg_l")
-        feather = st.slider("Suavizar borde (px)", 0.0, 4.0, 1.0, 0.25, key="seg_fe")
+        threshold = s1.slider("Umbral (sensibilidad)", 1, 120, 20, key="seg_t", help="Más bajo = detecta más.")
+        if mode == "puntos":
+            spot_size = s2.slider("Tamaño máximo del punto (px)", 2, 40, 8, key="seg_spot")
+            grow = s2.slider("Incluir halo (px)", 0, 4, 1, key="seg_grow")
+        else:
+            bg_k = s2.slider("Tamaño filtro de fondo (px)", 9, 301, 41, 2, key="seg_k",
+                             help="Mayor que el grosor de la materia. Súbelo si la materia es grande y sale hueca.")
+            smooth = s2.slider("Suavizado", 0.0, 4.0, 1.0, 0.25, key="seg_s")
+        min_area = s3.slider("Área mínima (px)", 1, 2000, 4 if mode == "puntos" else 15, key=f"seg_a_{mode}")
+        close = s3.slider("Unir en una pieza (cerrar huecos)", 0, 40, 2, key="seg_c",
+                          help="Une trozos cercanos de la misma materia (útil en plásticos con textura).")
+        fill = s3.checkbox("Rellenar agujeros", mode == "grabcut", key=f"seg_f_{mode}")
+        largest = s3.checkbox("Solo el objeto mayor", False, key="seg_l")
+    feather = st.slider("Suavizar borde al guardar (px)", 0.0, 4.0, 1.0, 0.25, key="seg_fe")
 
-    mask = fc.segment(roi, method, polarity, threshold, bg_k, smooth, close, open_, min_area, fill, largest)
-    p1, p2 = st.columns(2)
+    dt_key = f"dt::{name}::{zone}"
+    shapes = drawn_shapes(dt_key)
+    drawn = fd.shapes_to_mask(shapes, zh, zw)
+    pts = fd.shape_points(shapes)
+    region = drawn if drawn.any() else None
+    if mode == "trazo":
+        mask = drawn
+    elif mode == "grabcut":
+        mask = fc.grabcut_from_mask(zimg, drawn) if drawn.any() else drawn
+    elif mode == "puntos":
+        mask = fc.detect_spots(zimg, polarity, spot_size, threshold, region, grow)
+    else:
+        mask = fc.segment(zimg, "fondo_local", polarity, threshold, bg_k, smooth, 0, 0, 1)
+        if region is not None:
+            mask &= region
+    mask = fc.clean_mask(mask, close=close if mode != "trazo" else 0, fill_holes=fill, min_area=min_area,
+                         keep_largest=largest, keep_points=pts if mode in ("auto", "puntos") else None)
+
+    drawer(zimg, dt_key, tools=("lazo", "poligono", "pincel", "borrador", "rect", "punto"), default_tool="lazo",
+           shapes=shapes, overlay=fd.overlay_from_mask(mask), max_display=1600, max_height=720, brush=6)
+    if mode in ("trazo", "grabcut") and not drawn.any():
+        st.info("Marca la materia en la zona ampliada.")
+        return
+
+    comps = fc.split_components(mask, 1)
+    res = fc.make_patch(zimg, mask, feather=feather, bg_ksize=41 if mode == "puntos" else bg_k)
+    p1, p2 = st.columns([1, 2])
     with p1:
-        vis = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR) if roi.ndim == 2 else roi.copy()
-        cnts, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        f = max(1, 500 // max(roi.shape[:2]))
-        big = cv2.resize(vis, None, fx=f, fy=f, interpolation=cv2.INTER_NEAREST)
-        cv2.drawContours(big, [(c * f).astype(np.int32) for c in cnts], -1, (0, 0, 255), 1)
-        st.image(fc.to_rgb(big), caption=f"Recorte {rw}×{rh} px · contorno detectado", width="stretch")
-    res = fc.make_patch(roi, mask, feather=feather, bg_ksize=bg_k)
-    with p2:
         if res is None:
-            st.warning("No se detecta nada: baja el umbral o cambia la polaridad.")
+            st.warning("No se detecta nada: marca la materia, baja el umbral o cambia «La materia es…».")
             return
-        st.image(fc.patch_preview(res[0], 400), caption=f"Materia extraída {res[2][2]}×{res[2][3]} px")
+        st.image(fc.patch_preview(res[0], 360), caption=f"Materia extraída {res[2][2]}×{res[2][3]} px · {len(comps)} trozo(s)")
         mm = fa.measure_patch(res[0], res[1])
         if mm:
             st.caption(f"Área {mm['area']} px · grosor ≈ {mm['grosor']} px · contraste {mm['contraste']} (máx {mm['contraste_max']})")
 
-    st.markdown("**④ Guardar en la biblioteca**")
-    g1, g2, g3 = st.columns([2, 2, 1])
-    cats = LIB.categories()
-    guess = next((c for c in ["TIZA", "PELUSA", "HILO", "PELO", "PLASTICO", "METAL"] if c in name.upper()), "")
-    with g1:
+    with p2:
+        st.markdown("**③ Guardar en la biblioteca**")
+        cats = LIB.categories()
+        guess = next((c for c in ["TIZA", "PELUSA", "HILO", "PLASTICO", "PUNTO", "PELO", "METAL"] if c in name.upper()), "")
+        if mode == "puntos" and not guess:
+            guess = "PUNTO"
         kind = st.radio("Tipo", [TIPO_DEFECTO, TIPO_NEGATIVO], horizontal=True, key="ext_tipo",
                         format_func={TIPO_DEFECTO: "Materia extraña (defecto)",
                                      TIPO_NEGATIVO: "Falso defecto (marca, brillo, rebaba… se debe aceptar)"}.get)
-        cat_sel = st.selectbox("Categoría", cats + ["➕ nueva…"], index=cats.index(guess) if guess in cats else len(cats), key="cat_sel")
-        cat = st.text_input("Nueva categoría", guess if kind == TIPO_DEFECTO else "MARCA",
-                            key="cat_new").strip().upper() if cat_sel == "➕ nueva…" else cat_sel
-    with g2:
-        nombre = st.text_input("Nombre / descripción", Path(name).stem, key="pname")
-        split = st.checkbox("Guardar cada trozo por separado", False, key="split")
-    with g3:
-        st.write("")
-        st.write("")
+        g1, g2 = st.columns(2)
+        cat_sel = g1.selectbox("Categoría", cats + ["➕ nueva…"], index=cats.index(guess) if guess in cats else len(cats), key="cat_sel")
+        cat = (g1.text_input("Nueva categoría", guess if kind == TIPO_DEFECTO else "MARCA", key="cat_new").strip().upper()
+               if cat_sel == "➕ nueva…" else cat_sel)
+        nombre = g2.text_input("Nombre / descripción", Path(name).stem, key="pname")
+        split = g2.checkbox("Guardar cada trozo por separado", mode == "puntos", key=f"split_{mode}",
+                            help="Cada punto o trozo se guarda como una materia distinta.")
+        if not cat:
+            st.caption("✍️ Escribe una categoría (p. ej. PLASTICO, PUNTO) para poder guardar.")
         if st.button("💾 Guardar", type="primary", disabled=not cat):
-            parts = fc.split_components(mask, min_area) if split else [mask]
+            parts = comps if split else [mask]
             n = 0
             for i, pm in enumerate(parts):
-                r_ = fc.make_patch(roi, pm, feather=feather, bg_ksize=bg_k)
+                r_ = fc.make_patch(zimg, pm, feather=feather, bg_ksize=41 if mode == "puntos" else bg_k)
                 if r_ is None:
                     continue
-                patch, bg, (bx, by, bw, bh) = r_
+                patch, bg, (bx, by, _, _) = r_
                 LIB.save(patch, bg, {
                     "nombre": nombre + (f" #{i + 1}" if len(parts) > 1 else ""), "categoria": cat, "tipo": kind,
-                    "origen": name, "pos_origen": [zx + rx + bx, zy + ry + by], "gris": img.ndim == 2,
+                    "origen": name, "pos_origen": [zx + bx, zy + by], "gris": img.ndim == 2, "modo_extraccion": mode,
                 })
                 n += 1
             st.success(f"{n} materia(s) guardada(s) en «{cat}».")
+
+    spot_finder(name, img, fd.shapes_to_mask([s for s in ov_shapes if s.get("t") != "point"], H, W))
+
+
+def spot_finder(name: str, img: np.ndarray, region: np.ndarray | None):
+    """Busca motas en toda la imagen y deja guardar las elegidas de una vez."""
+    with st.expander("🔎 Buscar puntos / motas en toda la imagen"):
+        f1, f2, f3, f4 = st.columns(4)
+        pol = f1.radio("Puntos…", ["claro", "oscuro"], format_func={"claro": "claros", "oscuro": "oscuros"}.get, key="sf_pol")
+        size = f2.slider("Tamaño máximo (px)", 2, 30, 6, key="sf_size")
+        thr = f3.slider("Contraste mínimo", 5, 150, 40, key="sf_thr")
+        only = f4.checkbox("Solo dentro de lo marcado en la vista general", region is not None and region.any(), key="sf_only",
+                           disabled=region is None or not region.any())
+        if st.button("Buscar", key="sf_go"):
+            ss[f"sf::{name}"] = fc.find_spot_candidates(img, pol, size, thr, region if only else None, 48)
+        cands = ss.get(f"sf::{name}")
+        if cands is None:
+            return
+        if not cands:
+            st.info("No se encontró ningún punto con esos ajustes.")
+            return
+        st.caption(f"{len(cands)} candidatos, de más a menos contraste. Marca los que son materia y guárdalos.")
+        cols = st.columns(8)
+        chosen = []
+        for i, (cx, cy, area, con) in enumerate(cands):
+            crop = fa.crop_around(img, cx, cy, 48)
+            vis = cv2.resize(cv2.cvtColor(crop, cv2.COLOR_GRAY2BGR) if crop.ndim == 2 else crop, (120, 120), interpolation=cv2.INTER_NEAREST)
+            cv2.circle(vis, (60, 60), 14, (0, 0, 255), 1)
+            with cols[i % 8]:
+                st.image(vis[..., ::-1], caption=f"({cx:.0f},{cy:.0f}) c{con}")
+                if st.checkbox("materia", False, key=f"sf_{name}_{i}"):
+                    chosen.append((cx, cy))
+        c1, c2 = st.columns(2)
+        cat = c1.text_input("Categoría", "PUNTO", key="sf_cat").strip().upper()
+        kind = c2.radio("Tipo", [TIPO_DEFECTO, TIPO_NEGATIVO], horizontal=True, key="sf_tipo",
+                        format_func={TIPO_DEFECTO: "Defecto", TIPO_NEGATIVO: "Falso defecto"}.get)
+        if st.button(f"💾 Guardar {len(chosen)} punto(s)", disabled=not chosen or not cat, key="sf_save"):
+            n = 0
+            for cx, cy in chosen:
+                x0, y0 = int(max(0, cx - 40)), int(max(0, cy - 40))
+                roi = img[y0:y0 + 80, x0:x0 + 80]
+                m = fc.detect_spots(roi, pol, size, thr * 0.6, None, 1)
+                m = fc.clean_mask(m, keep_points=[(cx - x0, cy - y0)])
+                r_ = fc.make_patch(roi, m, feather=0.75, bg_ksize=21)
+                if r_ is None:
+                    continue
+                patch, bg, (bx, by, _, _) = r_
+                LIB.save(patch, bg, {"nombre": f"punto ({cx:.0f},{cy:.0f})", "categoria": cat, "tipo": kind, "origen": name,
+                                     "pos_origen": [x0 + bx, y0 + by], "gris": img.ndim == 2, "modo_extraccion": "puntos"})
+                n += 1
+            st.success(f"{n} punto(s) guardado(s) en «{cat}».")
 
 
 # --------------------------------------------------------------- 2. biblioteca
@@ -560,6 +641,22 @@ def page_editor():
 # ------------------------------------------------------------- 4. generación por lotes
 
 
+def batch_zone(H: int, W: int, mode: str, hole: float, ref_w: int):
+    """Máscara de zona permitida para una imagen de H×W, a partir de lo dibujado en la primera imagen (ancho ref_w)."""
+    shapes = drawn_shapes(f"b_zone_draw::{mode}")
+    k = W / ref_w
+    if mode == "dibujada":
+        m = fd.shapes_to_mask(shapes, H, W, scale=k)
+        return m if m.any() else None
+    if mode == "anillo":
+        rects = [s for s in shapes if s.get("t") == "rect"]
+        if not rects:
+            return None
+        r = rects[-1]
+        return fc.zone_mask(H, W, "anillo", (r["x"] * k / W, r["y"] * k / H, r["w"] * k / W, r["h"] * k / H), hole)
+    return None
+
+
 def page_batch():
     st.header("4 · Generación automática del conjunto de entrenamiento")
     items = LIB.list()
@@ -631,28 +728,31 @@ def page_batch():
             sh_auto = st.checkbox("Dirección de sombra automática", True, key="b_sha")
             sh_ang = None if sh_auto else float(st.slider("Sombra hacia (°)", -180, 180, 45, 5, key="b_shang"))
     with tab_z:
-        zone_mode = st.radio("Zona permitida", ["anillo", "rectangulo", "toda"], key="b_zone", horizontal=True,
-                             format_func={"anillo": "Anillo (elipse con hueco)", "rectangulo": "Rectángulo dibujado",
+        zone_mode = st.radio("Zona permitida", ["dibujada", "anillo", "toda"], key="b_zone", horizontal=True,
+                             format_func={"dibujada": "Dibujada a mano (lazo, polígono, pincel)", "anillo": "Anillo (elipse con hueco)",
                                           "toda": "Toda la imagen"}.get)
         no_overlap = st.checkbox("Evitar solapes", True, key="b_ov")
         first = next(iter(imgs.values()))
         H0, W0 = first.shape[:2]
         hole = 0.0
-        if zone_mode != "toda":
-            if zone_mode == "anillo":
-                hole = st.slider("Tamaño del hueco central (% de la elipse)", 0, 95, 55, key="b_hole") / 100
-            st.markdown("Arrastra un rectángulo sobre la primera imagen que encierre el producto "
-                        "(se aplica en proporción a todas). Zona permitida en verde.")
-            zm = fc.zone_mask(H0, W0, zone_mode, ss.get("b_rect"), hole)
-            vis = cv2.cvtColor(first, cv2.COLOR_GRAY2BGR) if first.ndim == 2 else first.copy()
-            if zm is not None:
-                vis[zm] = (vis[zm] * 0.6 + np.array([0, 90, 0])).astype(np.uint8)
-            r = clickable(vis, "b_rect_v", drag=True)
-            if r:
-                ss.b_rect = (r[0] / W0, r[1] / H0, r[2] / W0, r[3] / H0)
-                st.rerun()
-            if not ss.get("b_rect"):
-                st.warning("Dibuja el rectángulo; si no, las materias se colocarán en toda la imagen.")
+        zkey = f"b_zone_draw::{zone_mode}"
+        if zone_mode == "dibujada":
+            st.markdown("Dibuja sobre la primera imagen dónde pueden caer materias (se aplica en proporción a todas). "
+                        "Con **➖ Restar** o el **borrador** quitas zonas (p. ej. el hueco central o el fondo). "
+                        "La zona permitida se ve en verde.")
+            zm = fd.shapes_to_mask(drawn_shapes(zkey), H0, W0)
+            drawer(first, zkey, tools=("lazo", "poligono", "pincel", "borrador", "rect"), default_tool="poligono",
+                   shapes=drawn_shapes(zkey), overlay=fd.overlay_from_mask(zm, fill_alpha=60) if zm.any() else None,
+                   max_display=1600, max_height=650, brush=60, fill_shapes=False)
+            if not zm.any():
+                st.warning("Dibuja la zona; si no, las materias se colocarán en toda la imagen.")
+        elif zone_mode == "anillo":
+            hole = st.slider("Tamaño del hueco central (% de la elipse)", 0, 95, 55, key="b_hole") / 100
+            st.markdown("Dibuja un rectángulo que encierre el anillo. Zona permitida en verde.")
+            zm = batch_zone(H0, W0, "anillo", hole, W0)
+            drawer(first, zkey, tools=("rect",), default_tool="rect", shapes=drawn_shapes(zkey), allow_subtract=False,
+                   overlay=fd.overlay_from_mask(zm, fill_alpha=60) if zm is not None else None, max_display=1600, max_height=650,
+                   fill_shapes=False)
     with tab_d:
         e1, e2, e3 = st.columns(3)
         with e1:
@@ -794,7 +894,7 @@ def page_batch():
                 ds.add(out_path("validacion", "OK", stem, "", e_), img, e_, [], "validacion", n)
                 done += 1
                 continue
-            allowed = fc.zone_mask(H, W, zone_mode, ss.get("b_rect"), hole)
+            allowed = batch_zone(H, W, zone_mode, hole, W0)
             allowed = None if allowed is None else np.flatnonzero(allowed)
             if include_ok:
                 ds.add(out_path("entrenamiento", "OK", stem, "", e_), img, e_, [], "entrenamiento", n)

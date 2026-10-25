@@ -12,8 +12,22 @@ y **pegarlas en imágenes nuevas** (con otra luz, otro enfoque…), sin tener qu
    contraste medidos de tus hilos reales. Avisa si una categoría tiene pocas materias reales.
 3. **Editor manual**: clic para añadir; selecciona y clic para **mover**; aplica ajustes a la seleccionada.
    Guarda y carga la **sesión** en JSON.
-4. **Generación por lotes**: crea el conjunto completo (entrenamiento + validación) con variaciones aleatorias.
+4. **Generación por lotes**: crea el conjunto completo (entrenamiento + validación) con variaciones aleatorias,
+   dentro de la zona que dibujes a mano (lazo/polígono/pincel, restando el hueco o el fondo).
 5. **Validación**: compara estadísticas reales vs. generadas y hace una **prueba a ciegas**.
+
+## Cómo recortar cada tipo de materia (página 1)
+
+En la **vista general** marca la zona (rectángulo, lazo o un punto) y en la **zona ampliada** dibuja sobre la materia:
+rueda = zoom, espacio o botón derecho = mover, *Deshacer*, *Restar* y *Borrador* para corregir. Lo dibujado se ve en
+rojo y el resultado en verde.
+
+| Materia | Modo recomendado |
+|---|---|
+| Hilo, pelusa, tiza (claras sobre goma) | **Automático dentro de lo marcado**: rodéala sin apurar con el lazo |
+| Plástico gris / piezas con textura o poco contraste | **Ajustar mi trazo a los bordes** (GrabCut): rodéala aproximadamente |
+| Cualquier cosa difícil | **Exactamente lo que marco**: pinta con el pincel con zoom |
+| Puntos / motas blancas | **Puntos / motas**, o *Buscar puntos en toda la imagen* y marcar los buenos |
 
 ## Realismo
 

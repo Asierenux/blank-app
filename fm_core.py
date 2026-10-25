@@ -157,6 +157,94 @@ def segment(
     return np.isin(lab, keep)
 
 
+def grabcut_from_mask(img: np.ndarray, drawn: np.ndarray, iters: int = 5, band: int = 0) -> np.ndarray:
+    """Ajusta un trazo aproximado a los bordes reales (GrabCut). Fuera del trazo ensanchado = fondo seguro."""
+    if not drawn.any():
+        return drawn
+    src = img if img.ndim == 3 else cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    band = band or max(5, int(0.15 * np.sqrt(drawn.sum())))
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * band + 1,) * 2)
+    d8 = drawn.astype(np.uint8)
+    gc = np.full(drawn.shape, cv2.GC_BGD, np.uint8)
+    gc[cv2.dilate(d8, k) > 0] = cv2.GC_PR_BGD
+    gc[drawn] = cv2.GC_PR_FGD
+    core = cv2.erode(d8, k) > 0
+    gc[core] = cv2.GC_FGD
+    try:
+        cv2.grabCut(src, gc, None, np.zeros((1, 65), np.float64), np.zeros((1, 65), np.float64), iters, cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return drawn
+    return (gc == cv2.GC_FGD) | (gc == cv2.GC_PR_FGD)
+
+
+def detect_spots(img: np.ndarray, polarity: str = "claro", max_size: int = 9, threshold: float = 25,
+                 region: np.ndarray | None = None, grow: int = 1) -> np.ndarray:
+    """Puntos/motas pequeñas: más claros (u oscuros) que su entorno inmediato y de tamaño <= max_size px."""
+    g = to_gray(img)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * max_size + 1,) * 2)
+    if polarity == "oscuro":
+        th = cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, k)
+    elif polarity == "claro":
+        th = cv2.morphologyEx(g, cv2.MORPH_TOPHAT, k)
+    else:
+        th = np.maximum(cv2.morphologyEx(g, cv2.MORPH_TOPHAT, k), cv2.morphologyEx(g, cv2.MORPH_BLACKHAT, k))
+    m = (th > threshold).astype(np.uint8)
+    if region is not None:
+        m &= region.astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m, connectivity=8)
+    keep = [i for i in range(1, n) if st[i, cv2.CC_STAT_WIDTH] <= 2 * max_size and st[i, cv2.CC_STAT_HEIGHT] <= 2 * max_size]
+    out = np.isin(lab, keep).astype(np.uint8)
+    if grow > 0:  # incluye el halo del punto
+        soft = (th > threshold * 0.5).astype(np.uint8)
+        out = cv2.dilate(out, np.ones((3, 3), np.uint8), iterations=grow) & np.maximum(soft, out)
+    return out.astype(bool)
+
+
+def find_spot_candidates(img: np.ndarray, polarity: str = "claro", max_size: int = 6, threshold: float = 40,
+                         region: np.ndarray | None = None, limit: int = 60):
+    """Candidatos a punto en toda la imagen, ordenados por contraste: lista de (cx, cy, área, contraste)."""
+    g = to_gray(img)
+    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * max_size + 1,) * 2)
+    th = cv2.morphologyEx(g, cv2.MORPH_BLACKHAT if polarity == "oscuro" else cv2.MORPH_TOPHAT, k)
+    m = (th > threshold).astype(np.uint8)
+    if region is not None:
+        m &= region.astype(np.uint8)
+    n, lab, st, cen = cv2.connectedComponentsWithStats(m, connectivity=8)
+    out = []
+    for i in range(1, n):
+        if st[i, cv2.CC_STAT_WIDTH] <= 2 * max_size and st[i, cv2.CC_STAT_HEIGHT] <= 2 * max_size:
+            x, y, w, h = st[i, :4]
+            out.append((float(cen[i][0]), float(cen[i][1]), int(st[i, cv2.CC_STAT_AREA]), int(th[y:y + h, x:x + w].max())))
+    out.sort(key=lambda t: -t[3])
+    return out[:limit]
+
+
+def clean_mask(mask: np.ndarray, close: int = 0, fill_holes: bool = False, min_area: int = 1, keep_largest: bool = False,
+               keep_points=None, point_radius: float = 6.0) -> np.ndarray:
+    """Limpieza común: unir trozos, rellenar agujeros, quitar lo pequeño y, si se dan puntos, quedarse con lo que tocan."""
+    m8 = mask.astype(np.uint8)
+    if close > 0:
+        m8 = cv2.morphologyEx(m8, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * close + 1,) * 2))
+    if fill_holes and m8.any():
+        pad = np.pad(m8, 1)
+        ff = pad.copy()
+        cv2.floodFill(ff, None, (0, 0), 1)
+        m8 = (pad | (1 - ff))[1:-1, 1:-1]
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m8, connectivity=8)
+    keep = [i for i in range(1, n) if st[i, cv2.CC_STAT_AREA] >= min_area]
+    if keep_points:
+        near = set()
+        r = int(np.ceil(point_radius))
+        for px, py in keep_points:
+            x, y = int(round(px)), int(round(py))
+            win = lab[max(0, y - r):y + r + 1, max(0, x - r):x + r + 1]
+            near |= set(np.unique(win[win > 0]).tolist())
+        keep = [i for i in keep if i in near]
+    if keep_largest and keep:
+        keep = [max(keep, key=lambda i: st[i, cv2.CC_STAT_AREA])]
+    return np.isin(lab, keep)
+
+
 def split_components(mask: np.ndarray, min_area: int = 1) -> list[np.ndarray]:
     n, lab, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
     return [lab == i for i in range(1, n) if stats[i, cv2.CC_STAT_AREA] >= min_area]
