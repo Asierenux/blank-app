@@ -30,20 +30,21 @@ y **pegarlas en imágenes nuevas** (con otra luz, otro enfoque…), sin tener qu
 En el modo **diferencia** (por defecto) se suma a la imagen nueva solo el contraste `materia − fondo`, así la materia
 hereda la textura de la goma nueva.
 
-## Conjunto exportado
+## Conjunto exportado (formato OneVision, por defecto)
 
 ```
-entrenamiento/OK/        originales + variantes de luz/enfoque (+ falsos defectos sin etiquetar)
-entrenamiento/KO/        (o una carpeta por clase: TIZA/, HILO/…)
-validacion/OK/           imágenes base reservadas (no se usan para generar)
-validacion/KO/           KO reales subidas para validar
-mascaras/, mascaras_clase/
-anotaciones_coco.json    recuadros + polígonos (COCO)
-anotaciones.csv, anotaciones_detalle.json, clases.json, resumen.json
+entrenamiento/OK/OK_<imagen>.bmp          originales + variantes de luz/enfoque (+ falsos defectos sin etiquetar)
+entrenamiento/NG/NG_<imagen>_FM001.bmp    con materia (o NG_TIZA/, NG_HILO/… si eliges NG por tipo)
+validacion/OK/, validacion/NG/            imágenes base reservadas y KO reales (nunca sintéticas)
+guia/…/*.jpg                              copias con la materia rodeada en rojo, para etiquetar a mano
+mascaras/, mascaras_clase/                máscaras de cada imagen NG
+anotaciones_coco.json, anotaciones.csv, anotaciones_detalle.json, clases.json, resumen.json
 ```
 
+OK y NG son las clases por defecto de la herramienta Classify de Cognex. Las imágenes salen en el mismo formato y
+resolución que las de la cámara (BMP gris 8 bits). Si usas **Segment**, las carpetas `guia/` muestran dónde está cada
+materia para pintar la región; las máscaras y el COCO sirven si tu versión o tu integrador permiten importar etiquetas.
 Entrena con `entrenamiento/` y mide con `validacion/` (KO reales): es lo que demuestra si los datos sintéticos ayudan.
-Comprueba qué formato de anotación importa tu versión de OneVision.
 
 ## Ejecutar
 

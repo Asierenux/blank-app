@@ -60,6 +60,20 @@ def mask_polygons(mask: np.ndarray, tol: float = 1.0) -> list[list[float]]:
     return polys
 
 
+def guide_image(img: np.ndarray, instances: list[dict]) -> bytes:
+    """Copia JPG con cada materia rodeada en rojo y su clase escrita, para etiquetar a mano."""
+    vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) if img.ndim == 2 else img.copy()
+    t = max(2, max(img.shape[:2]) // 1000)
+    for inst in instances:
+        m = inst["mask"].astype(np.uint8)
+        cnts, _ = cv2.findContours(cv2.dilate(m, np.ones((5, 5), np.uint8), iterations=2), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        cv2.drawContours(vis, cnts, -1, (0, 0, 255), t)
+        x, y, w, h = inst["bbox_xywh"]
+        cv2.putText(vis, inst["categoria"], (x, max(20, y - 4 * t)), cv2.FONT_HERSHEY_SIMPLEX, 0.6 * t, (0, 0, 255), t)
+    ok, buf = cv2.imencode(".jpg", vis, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    return buf.tobytes()
+
+
 class Dataset:
     """Acumula imágenes y anotaciones y genera COCO, CSV, máscaras y resumen."""
 

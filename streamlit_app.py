@@ -547,7 +547,7 @@ def page_editor():
             e_ = Path(n).suffix.lstrip(".").lower() or "png"
             inst = [{"categoria": e["categoria"], "nombre": e["nombre"], "materia_id": e["pid"], "mask": m, "bbox_xywh": b,
                      "parametros": e["params"]} for e, m, b in zip(ss.edits[n], msks, bxs) if b]
-            ds.add(f"KO/{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
+            ds.add(f"NG/NG_{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
         ss.editor_zip = ds.finish()
     if ss.get("editor_zip"):
         d4.download_button("⬇️ Descargar ZIP", ss.editor_zip, "imagenes_editadas.zip")
@@ -676,16 +676,25 @@ def page_batch():
             neg_in_ko = st.checkbox("Poner también falsos defectos en las KO", False, key="b_negko", disabled=not negatives)
         with e3:
             st.markdown("**Formato**")
-            layout = st.radio("Carpetas", ["resultado", "clase"], key="b_lay",
-                              format_func={"resultado": "Por resultado (OK / KO)", "clase": "Por clase (OK / TIZA / HILO…)"}.get)
+            layout = st.radio("Carpetas", ["onevision", "resultado", "clase"], key="b_lay",
+                              format_func={"onevision": "OneVision (OK / NG)", "resultado": "Por resultado (OK / KO)",
+                                           "clase": "Por clase (OK / TIZA / HILO…)"}.get,
+                              help="OneVision: carpetas OK y NG (las clases por defecto de Classify) y la clase al principio "
+                                   "del nombre de cada fichero, para localizarlas fácilmente al importar y etiquetar.")
+            ng_by_cat = st.checkbox("NG separado por tipo de materia (NG_TIZA, NG_HILO…)", False, key="b_ngcat",
+                                    disabled=layout != "onevision",
+                                    help="Úsalo si en Classify quieres una clase por tipo de materia en vez de una sola NG.")
+            guides = st.checkbox("Imágenes guía con el contorno de la materia", layout == "onevision", key="b_guide",
+                                 help="Copias en JPG con la materia rodeada en rojo, en la carpeta guia/. Sirven para etiquetar "
+                                      "rápido a mano (p. ej. pintar la región en Segment) sabiendo dónde está cada materia.")
             out_fmt = st.selectbox("Formato de imagen", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
             masks_on = st.checkbox("Máscaras binarias", True, key="b_mk")
             cmasks_on = st.checkbox("Máscaras por clase", True, key="b_cmk")
             dest = st.radio("Destino", ["zip", "carpeta"], key="b_dest",
                             format_func={"zip": "ZIP para descargar", "carpeta": "Carpeta en este equipo/servidor (lotes grandes)"}.get)
             folder = st.text_input("Carpeta de salida", str(APP_DIR / "salida"), key="b_folder", disabled=dest != "carpeta")
-            st.caption("Se generan anotaciones en COCO (recuadros y polígonos), CSV y JSON detallado. "
-                       "Comprueba qué formato importa tu versión de OneVision; las carpetas por clase sirven para clasificación.")
+            st.caption("También se generan anotaciones COCO (recuadros y polígonos), CSV y JSON detallado, por si tu "
+                       "versión de OneVision o tu integrador puede importarlas.")
 
     classes = sorted(set(sel_cats) | ({synth_cat} if synth_on and synth_cat else set()))
     if not classes or not (pool or synth_on):
@@ -743,6 +752,14 @@ def page_batch():
                 recs.append({"materia_id": nm["id"], "categoria": nm["categoria"], "bbox_xywh": bb})
         return out, mask, recs
 
+    def out_path(split, kind, stem, suffix, e_, cat=None):
+        """kind: OK | KO. Ruta del fichero según el formato de carpetas elegido."""
+        if layout == "onevision":
+            folder = "OK" if kind == "OK" else (f"NG_{cat}" if ng_by_cat and cat else "NG")
+            return f"{split}/{folder}/{folder}_{stem}{suffix}.{e_}"
+        folder = "OK" if kind == "OK" else (cat if layout == "clase" and cat else "KO")
+        return f"{split}/{folder}/{stem}{suffix}.{e_}"
+
     if st.button("🚀 Generar", type="primary"):
         rng = np.random.default_rng(int(seed))
         dest_dir = Path(folder) / time.strftime("lote_%Y%m%d_%H%M%S") if dest == "carpeta" else None
@@ -758,19 +775,19 @@ def page_batch():
             e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
             stem = Path(n).stem
             if n in val_names:
-                ds.add(f"validacion/OK/{stem}.{e_}", img, e_, [], "validacion", n)
+                ds.add(out_path("validacion", "OK", stem, "", e_), img, e_, [], "validacion", n)
                 done += 1
                 continue
             allowed = fc.zone_mask(H, W, zone_mode, ss.get("b_rect"), hole)
             allowed = None if allowed is None else np.flatnonzero(allowed)
             if include_ok:
-                ds.add(f"entrenamiento/OK/{stem}.{e_}", img, e_, [], "entrenamiento", n)
+                ds.add(out_path("entrenamiento", "OK", stem, "", e_), img, e_, [], "entrenamiento", n)
                 done += 1
             for v in range(int(ok_variants)):
                 base, ph = fa.photometric(img, rng, pcfg)
                 k = int(rng.integers(neg_n[0], neg_n[1] + 1)) if negatives else 0
                 base, _, negs = add_negatives(rng, base, np.zeros((H, W), bool), allowed, H, W, k)
-                ds.add(f"entrenamiento/OK/{stem}_OK{v + 1:03d}.{e_}", base, e_, [], "entrenamiento", n,
+                ds.add(out_path("entrenamiento", "OK", stem, f"_OK{v + 1:03d}", e_), base, e_, [], "entrenamiento", n,
                        {"variacion_global": ph, "falsos_defectos": negs})
                 done += 1
             for v in range(int(variants)):
@@ -797,18 +814,16 @@ def page_batch():
                 negs = []
                 if neg_in_ko and negatives:
                     out, mask, negs = add_negatives(rng, out, mask, allowed, H, W, int(rng.integers(neg_n[0], neg_n[1] + 1)))
-                if inst:
-                    big = max(inst, key=lambda i: int(i["mask"].sum()))["categoria"]
-                    sub = big if layout == "clase" else "KO"
-                else:
-                    sub = "OK"
-                ds.add(f"entrenamiento/{sub}/{stem}_FM{v + 1:03d}.{e_}", out, e_, inst, "entrenamiento", n,
-                       {"variacion_global": ph, "falsos_defectos": negs})
+                big = max(inst, key=lambda i: int(i["mask"].sum()))["categoria"] if inst else None
+                rel = out_path("entrenamiento", "KO" if inst else "OK", stem, f"_FM{v + 1:03d}", e_, big)
+                ds.add(rel, out, e_, inst, "entrenamiento", n, {"variacion_global": ph, "falsos_defectos": negs})
+                if guides and inst:
+                    ds.w.write(f"guia/{Path(rel).with_suffix('.jpg')}", fe.guide_image(out, inst))
                 done += 1
                 bar.progress(min(1.0, done / max(1, est)), f"Generando… {done}/{est}")
         for n, img in real_ko.items():
             e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
-            ds.add(f"validacion/KO/{Path(n).stem}.{e_}", img, e_, [], "validacion", n, {"ko_real": True}, label="KO_real")
+            ds.add(out_path("validacion", "KO", Path(n).stem, "", e_), img, e_, [], "validacion", n, {"ko_real": True}, label="KO_real")
         data = ds.finish()
         bar.empty()
         ss.batch_zip = data
