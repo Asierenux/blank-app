@@ -30,21 +30,28 @@ y **pegarlas en imágenes nuevas** (con otra luz, otro enfoque…), sin tener qu
 En el modo **diferencia** (por defecto) se suma a la imagen nueva solo el contraste `materia − fondo`, así la materia
 hereda la textura de la goma nueva.
 
-## Conjunto exportado (formato OneVision, por defecto)
+## Conjunto exportado (formato OneVision: segmentador + clasificador, por defecto)
 
 ```
-entrenamiento/OK/OK_<imagen>.bmp          originales + variantes de luz/enfoque (+ falsos defectos sin etiquetar)
-entrenamiento/NG/NG_<imagen>_FM001.bmp    con materia (o NG_TIZA/, NG_HILO/… si eliges NG por tipo)
-validacion/OK/, validacion/NG/            imágenes base reservadas y KO reales (nunca sintéticas)
-guia/…/*.jpg                              copias con la materia rodeada en rojo, para etiquetar a mano
-mascaras/, mascaras_clase/                máscaras de cada imagen NG
+segmentador/entrenamiento/OK/OK_<imagen>.bmp          sin materia (originales + variantes de luz/enfoque + falsos defectos)
+segmentador/entrenamiento/NG/NG_<imagen>_FM001.bmp    con materia
+segmentador/validacion/OK/, NG/                       imágenes base reservadas y KO reales (nunca sintéticas)
+mascaras/segmentador/…                                región de cada materia (lo que hay que pintar en Segment)
+guia/segmentador/…/*.jpg                              copias con la materia rodeada en rojo, para pintar rápido
+
+clasificador/entrenamiento/TIZA/, HILO/, PELUSA/…     un recorte por materia, centrado en ella
+clasificador/entrenamiento/FALSO_DEFECTO/             marcas, brillos, rebabas: lo que el segmentador marcará pero se acepta
+clasificador/entrenamiento/OK/                        trozos de goma limpia (por si el segmentador marca algo por error)
+clasificador/validacion/<CLASE>/                      recortes REALES de las KO reales subidas
+clasificador/etiquetas.csv
+
 anotaciones_coco.json, anotaciones.csv, anotaciones_detalle.json, clases.json, resumen.json
 ```
 
-OK y NG son las clases por defecto de la herramienta Classify de Cognex. Las imágenes salen en el mismo formato y
-resolución que las de la cámara (BMP gris 8 bits). Si usas **Segment**, las carpetas `guia/` muestran dónde está cada
-materia para pintar la región; las máscaras y el COCO sirven si tu versión o tu integrador permiten importar etiquetas.
-Entrena con `entrenamiento/` y mide con `validacion/` (KO reales): es lo que demuestra si los datos sintéticos ayudan.
+Flujo en OneVision: entrena **Segment** con `segmentador/` (pintando la región con ayuda de `guia/`, o importando
+las máscaras si tu versión lo permite) y **Classify** con `clasificador/` (cada carpeta es una clase). El tamaño del
+recorte del clasificador se ajusta en la app para que coincida con la región que pasas del segmentador al clasificador.
+Valida siempre con `validacion/` (material real).
 
 ## Ejecutar
 

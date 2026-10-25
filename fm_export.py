@@ -139,3 +139,38 @@ class Dataset:
                                               ensure_ascii=False, indent=1))
         self.w.write("resumen.json", json.dumps(self.counts, ensure_ascii=False, indent=1))
         return self.w.close()
+
+
+class ClassifierSet:
+    """Recortes por clase para el clasificador que va detrás del segmentador (clasificador/<conjunto>/<CLASE>/)."""
+
+    def __init__(self, writer: Writer, size: int = 256, margin: float = 1.5):
+        self.w, self.size, self.margin = writer, size, margin
+        self.rows = []
+        self.counts: dict[str, dict[str, int]] = {}
+
+    def crop(self, img: np.ndarray, bbox) -> np.ndarray:
+        x, y, w, h = bbox
+        side = max(self.size, int(self.margin * max(w, h)))
+        H, W = img.shape[:2]
+        s = min(side, H, W)
+        x0 = int(np.clip(x + w / 2 - s / 2, 0, W - s))
+        y0 = int(np.clip(y + h / 2 - s / 2, 0, H - s))
+        return img[y0:y0 + s, x0:x0 + s]
+
+    def add(self, split: str, cls: str, img: np.ndarray, bbox, name: str, ext: str):
+        rel = f"clasificador/{split}/{cls}/{cls}_{name}.{ext}"
+        self.w.write(rel, encode_image(self.crop(img, bbox), ext))
+        self.rows.append([rel, split, cls])
+        c = self.counts.setdefault(f"clasificador_{split}", {})
+        c[cls] = c.get(cls, 0) + 1
+
+    def finish(self):
+        if not self.rows:
+            return
+        buf = io.StringIO()
+        cw = csv.writer(buf, delimiter=";")
+        cw.writerow(["imagen", "conjunto", "clase"])
+        cw.writerows(self.rows)
+        self.w.write("clasificador/etiquetas.csv", buf.getvalue())
+

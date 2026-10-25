@@ -542,12 +542,16 @@ def page_editor():
     if edited and d4.button(f"Preparar ZIP ({len(edited)} imágenes)"):
         classes = sorted({e["categoria"] for n in edited for e in ss.edits[n]})
         ds = fe.Dataset(fe.Writer(), classes)
+        cs = fe.ClassifierSet(ds.w)
         for n in edited:
             o, _, bxs, msks, _ = render_edits(imgs[n], ss.edits[n])
             e_ = Path(n).suffix.lstrip(".").lower() or "png"
             inst = [{"categoria": e["categoria"], "nombre": e["nombre"], "materia_id": e["pid"], "mask": m, "bbox_xywh": b,
                      "parametros": e["params"]} for e, m, b in zip(ss.edits[n], msks, bxs) if b]
-            ds.add(f"NG/NG_{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
+            ds.add(f"segmentador/entrenamiento/NG/NG_{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
+            for j, it in enumerate(inst):
+                cs.add("entrenamiento", it["categoria"], o, it["bbox_xywh"], f"{Path(n).stem}_FM_{j + 1}", e_)
+        cs.finish()
         ss.editor_zip = ds.finish()
     if ss.get("editor_zip"):
         d4.download_button("⬇️ Descargar ZIP", ss.editor_zip, "imagenes_editadas.zip")
@@ -677,13 +681,24 @@ def page_batch():
         with e3:
             st.markdown("**Formato**")
             layout = st.radio("Carpetas", ["onevision", "resultado", "clase"], key="b_lay",
-                              format_func={"onevision": "OneVision (OK / NG)", "resultado": "Por resultado (OK / KO)",
+                              format_func={"onevision": "OneVision: segmentador (OK / NG) + clasificador", "resultado": "Por resultado (OK / KO)",
                                            "clase": "Por clase (OK / TIZA / HILO…)"}.get,
                               help="OneVision: carpetas OK y NG (las clases por defecto de Classify) y la clase al principio "
                                    "del nombre de cada fichero, para localizarlas fácilmente al importar y etiquetar.")
             ng_by_cat = st.checkbox("NG separado por tipo de materia (NG_TIZA, NG_HILO…)", False, key="b_ngcat",
                                     disabled=layout != "onevision",
-                                    help="Úsalo si en Classify quieres una clase por tipo de materia en vez de una sola NG.")
+                                    help="Para el segmentador basta con una sola NG; el tipo lo decide el clasificador.")
+            st.markdown("**Clasificador (después del segmentador)**")
+            cls_on = st.checkbox("Generar recortes para el clasificador", True, key="b_cls",
+                                 help="Un recorte por cada materia, en clasificador/<conjunto>/<CLASE>/. Es lo que el clasificador "
+                                      "verá: la zona que el segmentador marque.")
+            cls_size = st.slider("Tamaño mínimo del recorte (px)", 64, 1024, 256, 32, key="b_clsz", disabled=not cls_on,
+                                 help="Lado del recorte cuadrado; si la materia es mayor, se amplía a 1,5× su tamaño. "
+                                      "Ajústalo al tamaño de región que pases del segmentador al clasificador.")
+            neg_cls = st.text_input("Clase para falsos defectos", "FALSO_DEFECTO", key="b_negcls", disabled=not cls_on).strip().upper()
+            ok_crops = st.number_input("Recortes de zona buena por imagen OK (clase OK)", 0, 20, 2, key="b_okcrops", disabled=not cls_on,
+                                       help="Trozos de goma sin materia: enseñan al clasificador a aceptar lo que el segmentador "
+                                            "marque por error.")
             guides = st.checkbox("Imágenes guía con el contorno de la materia", layout == "onevision", key="b_guide",
                                  help="Copias en JPG con la materia rodeada en rojo, en la carpeta guia/. Sirven para etiquetar "
                                       "rápido a mano (p. ej. pintar la región en Segment) sabiendo dónde está cada materia.")
@@ -756,7 +771,7 @@ def page_batch():
         """kind: OK | KO. Ruta del fichero según el formato de carpetas elegido."""
         if layout == "onevision":
             folder = "OK" if kind == "OK" else (f"NG_{cat}" if ng_by_cat and cat else "NG")
-            return f"{split}/{folder}/{folder}_{stem}{suffix}.{e_}"
+            return f"segmentador/{split}/{folder}/{folder}_{stem}{suffix}.{e_}"
         folder = "OK" if kind == "OK" else (cat if layout == "clase" and cat else "KO")
         return f"{split}/{folder}/{stem}{suffix}.{e_}"
 
@@ -764,6 +779,7 @@ def page_batch():
         rng = np.random.default_rng(int(seed))
         dest_dir = Path(folder) / time.strftime("lote_%Y%m%d_%H%M%S") if dest == "carpeta" else None
         ds = fe.Dataset(fe.Writer(dest_dir), classes, masks_on, cmasks_on)
+        cs = fe.ClassifierSet(ds.w, cls_size) if cls_on else None
         order = list(rng.permutation(len(names)))
         val_names = {names[i] for i in order[:n_val]}
         stats, crops = [], []
@@ -786,9 +802,20 @@ def page_batch():
             for v in range(int(ok_variants)):
                 base, ph = fa.photometric(img, rng, pcfg)
                 k = int(rng.integers(neg_n[0], neg_n[1] + 1)) if negatives else 0
-                base, _, negs = add_negatives(rng, base, np.zeros((H, W), bool), allowed, H, W, k)
+                base, used, negs = add_negatives(rng, base, np.zeros((H, W), bool), allowed, H, W, k)
                 ds.add(out_path("entrenamiento", "OK", stem, f"_OK{v + 1:03d}", e_), base, e_, [], "entrenamiento", n,
                        {"variacion_global": ph, "falsos_defectos": negs})
+                if cs:
+                    for j, ng in enumerate(negs):
+                        cs.add("entrenamiento", neg_cls, base, ng["bbox_xywh"], f"{stem}_OK{v + 1:03d}_{j + 1}", e_)
+                    for j in range(int(ok_crops)):
+                        for _try in range(20):
+                            cx, cy = fc.sample_mask_point(rng, allowed, W, H)
+                            bb = [int(cx) - 16, int(cy) - 16, 32, 32]
+                            c = cs.crop(used, bb)
+                            if not c.any():
+                                cs.add("entrenamiento", "OK", base, bb, f"{stem}_OK{v + 1:03d}_{j + 1}", e_)
+                                break
                 done += 1
             for v in range(int(variants)):
                 out, ph = fa.photometric(img, rng, pcfg) if photo_ko else (img, {})
@@ -819,11 +846,25 @@ def page_batch():
                 ds.add(rel, out, e_, inst, "entrenamiento", n, {"variacion_global": ph, "falsos_defectos": negs})
                 if guides and inst:
                     ds.w.write(f"guia/{Path(rel).with_suffix('.jpg')}", fe.guide_image(out, inst))
+                if cs:
+                    for j, it in enumerate(inst):
+                        cs.add("entrenamiento", it["categoria"], out, it["bbox_xywh"], f"{stem}_FM{v + 1:03d}_{j + 1}", e_)
+                    for j, ng in enumerate(negs):
+                        cs.add("entrenamiento", neg_cls, out, ng["bbox_xywh"], f"{stem}_FM{v + 1:03d}_N{j + 1}", e_)
                 done += 1
                 bar.progress(min(1.0, done / max(1, est)), f"Generando… {done}/{est}")
         for n, img in real_ko.items():
             e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
             ds.add(out_path("validacion", "KO", Path(n).stem, "", e_), img, e_, [], "validacion", n, {"ko_real": True}, label="KO_real")
+            if cs:  # recortes reales para validar el clasificador: materias de la biblioteca extraídas de esta imagen
+                for m in items:
+                    if m.get("origen") == n and m.get("pos_origen") and not m.get("sintetico"):
+                        x, y = m["pos_origen"]
+                        cls = m["categoria"] if tipo(m) == TIPO_DEFECTO else neg_cls
+                        cs.add("validacion", cls, img, [x, y, m["ancho"], m["alto"]], f"{Path(n).stem}_{m['id']}", e_)
+        if cs:
+            cs.finish()
+            ds.counts.update(cs.counts)
         data = ds.finish()
         bar.empty()
         ss.batch_zip = data
@@ -842,7 +883,8 @@ def page_batch():
         rows = [{"conjunto": sp, "clase": k.replace("_imagenes_", "imágenes "), "cantidad": v}
                 for sp, d in ss.batch_summary.items() for k, v in sorted(d.items())]
         st.dataframe(pd.DataFrame(rows), hide_index=True)
-        inst_counts = {k: v for k, v in ss.batch_summary.get("entrenamiento", {}).items() if not k.startswith("_")}
+        inst_counts = {k: v for k, v in ss.batch_summary.get("clasificador_entrenamiento", ss.batch_summary.get("entrenamiento", {})).items()
+                       if not k.startswith("_") and k != "OK"}
         if inst_counts and max(inst_counts.values()) > 2 * min(inst_counts.values()):
             st.warning("Las categorías están desequilibradas (una aparece más del doble que otra). "
                        "Activa «Equilibrar categorías» o ajusta la selección.")
