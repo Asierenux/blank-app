@@ -53,12 +53,22 @@ las máscaras si tu versión lo permite) y **Classify** con `clasificador/` (cad
 recorte del clasificador se ajusta en la app para que coincida con la región que pasas del segmentador al clasificador.
 Valida siempre con `validacion/` (material real).
 
-## Ejecutar
+## Ponerla en marcha
+
+**Windows:** instala [Python 3.11 o superior](https://www.python.org/downloads/) marcando *Add python.exe to PATH*
+y haz doble clic en `iniciar.bat`. La primera vez instala lo necesario (requiere internet, unos minutos); después
+arranca en segundos y abre el navegador en http://localhost:8501. Para pararla, cierra la ventana negra.
+
+**macOS / Linux:** `./iniciar.sh`
+
+**A mano:**
 
 ```
+python -m venv .venv
+.venv\Scripts\activate          (macOS/Linux: source .venv/bin/activate)
 pip install -r requirements.txt
 streamlit run streamlit_app.py
 ```
 
-La biblioteca se guarda en `materias_lib/` y los lotes en `salida/` (ambas excluidas de git). En Streamlit Cloud el
-disco no es persistente: exporta la biblioteca a ZIP.
+La biblioteca se guarda en `materias_lib/` y los lotes en `salida/` (ambas excluidas de git). Exporta la biblioteca a
+ZIP para copiarla a otro equipo.
