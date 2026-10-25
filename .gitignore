@@ -164,3 +164,4 @@ cython_debug/
 #.idea/
 # Biblioteca local de materias extraídas
 materias_lib/
+salida/

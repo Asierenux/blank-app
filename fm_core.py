@@ -216,15 +216,27 @@ DEFAULT_PARAMS = dict(
     angle=0.0,
     flip_h=False,
     flip_v=False,
+    # deformación (en el sistema de la materia: eje principal)
+    bend=0.0,  # curvatura: desplazamiento de los extremos en fracción de la semilongitud
+    wave_amp=0.0,  # ondulación (px)
+    wave_len=40.0,  # longitud de onda (px)
+    elastic=0.0,  # deformación elástica aleatoria (px)
+    keep=1.0,  # fracción de la materia que se conserva (recorte parcial)
+    keep_side=0,  # 0: conserva el principio, 1: el final
+    # apariencia
     mode="diferencia",  # diferencia | alfa | poisson
     auto_light=True,
-    light_strength=1.0,
+    light_strength=0.5,
     contrast=1.0,
     brightness=0.0,
     blur=0.0,
+    auto_blur=False,  # iguala la nitidez a la de la zona destino
     noise=0.0,
+    auto_noise=False,  # iguala el ruido al de la zona destino
     opacity=1.0,
     shadow=0.0,
+    shadow_angle=None,  # dirección hacia la que cae la sombra (grados, 0 = derecha, 90 = abajo); None = automática
+    occlusion=0.0,  # oculta la materia en pliegues / zonas muy oscuras
 )
 
 
@@ -258,64 +270,231 @@ def _match_channels(f: np.ndarray, gray_target: bool) -> np.ndarray:
     return f
 
 
+def patch_axis(alpha: np.ndarray):
+    """Centroide, ángulo del eje principal (grados, coords. de imagen) y semilongitud de la materia."""
+    m8 = (alpha > 0.3).astype(np.uint8)
+    m = cv2.moments(m8, True)
+    h, w = alpha.shape
+    if m["m00"] < 1:
+        return w / 2, h / 2, 0.0, max(h, w) / 2
+    cx, cy = m["m10"] / m["m00"], m["m01"] / m["m00"]
+    th = 0.5 * np.degrees(np.arctan2(2 * m["mu11"], m["mu20"] - m["mu02"]))
+    ys, xs = np.nonzero(m8)
+    t = np.radians(th)
+    u = (xs - cx) * np.cos(t) + (ys - cy) * np.sin(t)
+    return cx, cy, float(th), max(1.0, float(np.abs(u).max()))
+
+
+def deform(patch: np.ndarray, bg: np.ndarray, p: dict, rng: np.random.Generator):
+    """Curva, ondula, deforma y/o recorta la materia a lo largo de su eje principal."""
+    bend, amp, el, keep = p["bend"], p["wave_amp"], p["elastic"], p["keep"]
+    if not (abs(bend) > 1e-3 or amp > 1e-3 or el > 1e-3 or keep < 0.999):
+        return patch, bg
+    a0 = patch[..., 3].astype(np.float32) / 255
+    cx, cy, th, L = patch_axis(a0)
+    pad = int(abs(bend) * L + amp + 3 * el + 3)
+    P = cv2.copyMakeBorder(patch[..., :3], pad, pad, pad, pad, cv2.BORDER_REPLICATE)
+    B = cv2.copyMakeBorder(bg, pad, pad, pad, pad, cv2.BORDER_REPLICATE)
+    A = cv2.copyMakeBorder(patch[..., 3], pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=0)
+    cx, cy = cx + pad, cy + pad
+    H, W = A.shape
+    Y, X = np.mgrid[0:H, 0:W].astype(np.float32)
+    t = np.radians(th)
+    ax, ay = np.cos(t), np.sin(t)
+    nx, ny = -ay, ax
+    u = (X - cx) * ax + (Y - cy) * ay
+    d = bend * L * ((u / L) ** 2 - 1 / 3)
+    if amp > 1e-3:
+        d = d + amp * np.sin(2 * np.pi * u / max(4.0, p["wave_len"]) + rng.uniform(0, 2 * np.pi))
+    mx, my = X - d * nx, Y - d * ny
+    if el > 1e-3:
+        s = max(3.0, L / 3)
+        for arr in (mx, my):
+            f = cv2.GaussianBlur(rng.standard_normal((H, W)).astype(np.float32), (0, 0), s)
+            arr -= f * (el / (f.std() + 1e-6))
+    mx, my = mx.astype(np.float32), my.astype(np.float32)
+    P = cv2.remap(P, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    B = cv2.remap(B, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+    A = cv2.remap(A, mx, my, cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0).astype(np.float32)
+    if keep < 0.999:
+        on = A > 76
+        if on.any():
+            umin, umax = float(u[on].min()), float(u[on].max())
+            if p["keep_side"]:
+                fade = np.clip((u - (umax - keep * (umax - umin))) / 3 + 0.5, 0, 1)
+            else:
+                fade = np.clip(((umin + keep * (umax - umin)) - u) / 3 + 0.5, 0, 1)
+            A = A * fade
+    ys, xs = np.nonzero(A > 2)
+    if len(xs) == 0:
+        return patch, bg
+    y0, y1 = max(0, ys.min() - 2), min(H, ys.max() + 3)
+    x0, x1 = max(0, xs.min() - 2), min(W, xs.max() + 3)
+    out = np.dstack([P, np.clip(A, 0, 255).astype(np.uint8)])[y0:y1, x0:x1]
+    return np.ascontiguousarray(out), np.ascontiguousarray(B[y0:y1, x0:x1])
+
+
+def surface_angle(gray: np.ndarray, cx: float, cy: float, r: int):
+    """Dirección dominante de surcos/estrías alrededor de (cx, cy) por tensor de estructura.
+    Devuelve (ángulo en grados en coords. de imagen, coherencia 0-1)."""
+    H, W = gray.shape
+    r = int(max(12, r))
+    x0, y0, x1, y1 = max(0, int(cx) - r), max(0, int(cy) - r), min(W, int(cx) + r), min(H, int(cy) + r)
+    g = gray[y0:y1, x0:x1].astype(np.float32)
+    if g.shape[0] < 5 or g.shape[1] < 5:
+        return 0.0, 0.0
+    g = cv2.GaussianBlur(g, (0, 0), 2)
+    gx = cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3)
+    yy, xx = np.mgrid[y0:y1, x0:x1]
+    wgt = np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * (r / 2) ** 2))
+    jxx, jyy, jxy = (wgt * gx * gx).sum(), (wgt * gy * gy).sum(), (wgt * gx * gy).sum()
+    tg = 0.5 * np.degrees(np.arctan2(2 * jxy, jxx - jyy))  # dirección del gradiente
+    coh = np.sqrt((jxx - jyy) ** 2 + 4 * jxy ** 2) / (jxx + jyy + 1e-6)
+    return float(tg + 90.0), float(coh)
+
+
+def auto_angle(target: np.ndarray, patch: np.ndarray, cx: float, cy: float, scale: float = 1.0,
+               flip_h: bool = False, flip_v: bool = False, jitter: float = 10.0,
+               rng: np.random.Generator | None = None, min_coherence: float = 0.12) -> float:
+    """Ángulo de rotación (convención de _transform) que alinea el eje de la materia con los surcos del destino."""
+    rng = rng or np.random.default_rng()
+    a = patch[..., 3]
+    a = a[:, ::-1] if flip_h else a
+    a = a[::-1] if flip_v else a
+    _, _, thp, L = patch_axis(a.astype(np.float32) / 255)
+    ths, coh = surface_angle(to_gray(target), cx, cy, int(L * scale * 1.5))
+    if coh < min_coherence:
+        return float(rng.uniform(-180, 180))
+    # cv2 rota en sentido antihorario visual: una dirección θ (y hacia abajo) pasa a θ - ángulo
+    ang = thp - ths + rng.normal(0, jitter) + (180.0 if rng.random() < 0.5 else 0.0)
+    return float((ang + 180) % 360 - 180)
+
+
+def noise_sigma(g: np.ndarray) -> float:
+    g8 = np.clip(g, 0, 255).astype(np.uint8)
+    hp = g8.astype(np.float32) - cv2.medianBlur(g8, 3).astype(np.float32)
+    return float(1.4826 * np.median(np.abs(hp - np.median(hp))))
+
+
+def sharpness(g: np.ndarray, mask: np.ndarray | None = None) -> float | None:
+    """Índice de nitidez independiente del contraste: detalle fino / detalle medio."""
+    g = g.astype(np.float32)
+    fine = np.abs(cv2.Laplacian(cv2.GaussianBlur(g, (0, 0), 0.7), cv2.CV_32F))
+    mid = np.abs(g - cv2.GaussianBlur(g, (0, 0), 3))
+    if mask is not None:
+        if mask.sum() < 150:
+            return None
+        fine, mid = fine[mask], mid[mask]
+    return float(fine.mean() / (mid.mean() + 1e-3))
+
+
+def _auto_blur_sigma(src_g: np.ndarray, src_mask: np.ndarray, tgt_g: np.ndarray) -> float:
+    st = sharpness(tgt_g)
+    if st is None or sharpness(src_g, src_mask) is None or src_g[src_mask].std() < 1.0:
+        return 0.0  # fondo de origen plano (p. ej. materia sintética): no hay referencia de nitidez
+    best, best_err = 0.0, None
+    for s in np.arange(0, 4.01, 0.25):
+        b = cv2.GaussianBlur(src_g, (0, 0), s) if s > 0 else src_g
+        ss_ = sharpness(b, src_mask)
+        err = abs(ss_ - st)
+        if best_err is None or err < best_err:
+            best, best_err = float(s), err
+    return best
+
+
 def composite(target: np.ndarray, patch: np.ndarray, bg: np.ndarray | None, cx: float, cy: float,
-              params: dict | None = None, rng: np.random.Generator | None = None):
-    """Inserta la materia centrada en (cx, cy). Devuelve (imagen nueva, máscara bool, bbox[x,y,w,h] o None)."""
+              params: dict | None = None, rng: np.random.Generator | None = None, info: dict | None = None):
+    """Inserta la materia centrada en (cx, cy). Devuelve (imagen nueva, máscara bool, bbox[x,y,w,h] o None).
+    Si se pasa `info`, se rellena con los valores automáticos usados (desenfoque, ganancia de luz…)."""
     p = {**DEFAULT_PARAMS, **(params or {})}
     rng = rng or np.random.default_rng()
+    info = info if info is not None else {}
     H, W = target.shape[:2]
     gray = target.ndim == 2
+    if bg is None:
+        bg = patch[..., :3]
 
+    patch, bg = deform(patch, bg, p, rng)
     tf = lambda a, const: _transform(a, p["scale"], p["angle"], p["flip_h"], p["flip_v"], const)  # noqa: E731
     alpha = tf(patch[..., 3], True).astype(np.float32) / 255
     col = _match_channels(tf(patch[..., :3], False).astype(np.float32), gray)
-    bgp = _match_channels(tf(bg if bg is not None else patch[..., :3], False).astype(np.float32), gray)
+    bgp = _match_channels(tf(bg, False).astype(np.float32), gray)
 
     ph, pw = alpha.shape
     x0, y0 = int(round(cx - pw / 2)), int(round(cy - ph / 2))
-    # recorte contra bordes de la imagen
     sx0, sy0 = max(0, -x0), max(0, -y0)
     sx1, sy1 = min(pw, W - x0), min(ph, H - y0)
     if sx1 <= sx0 or sy1 <= sy0:
         return target.copy(), np.zeros((H, W), bool), None
-    tx0, ty0 = x0 + sx0, y0 + sy0
-    tx1, ty1 = x0 + sx1, y0 + sy1
-
-    alpha = alpha[sy0:sy1, sx0:sx1]
-    col = col[sy0:sy1, sx0:sx1]
-    bgp = bgp[sy0:sy1, sx0:sx1]
+    tx0, ty0, tx1, ty1 = x0 + sx0, y0 + sy0, x0 + sx1, y0 + sy1
+    alpha, col, bgp = alpha[sy0:sy1, sx0:sx1], col[sy0:sy1, sx0:sx1], bgp[sy0:sy1, sx0:sx1]
     out = _f3(target)
     region = out[ty0:ty1, tx0:tx1]
+    m = max(ph, pw)
+    lx0, ly0, lx1, ly1 = max(0, tx0 - m // 2), max(0, ty0 - m // 2), min(W, tx1 + m // 2), min(H, ty1 + m // 2)
+    local = out[ly0:ly1, lx0:lx1]
+    local_g = local.mean(axis=2)
 
-    # nivel de luz local del destino vs. el del origen
     if p["auto_light"]:
-        m = max(ph, pw)
-        lx0, ly0, lx1, ly1 = max(0, tx0 - m // 2), max(0, ty0 - m // 2), min(W, tx1 + m // 2), min(H, ty1 + m // 2)
-        tgt_level = np.median(out[ly0:ly1, lx0:lx1].reshape(-1, out.shape[2]), axis=0)
+        tgt_level = np.median(local.reshape(-1, out.shape[2]), axis=0)
         w_ = alpha > 0.3
         src_level = np.median(bgp[w_] if w_.any() else bgp.reshape(-1, bgp.shape[2]), axis=0)
         gain = np.clip((tgt_level + 1) / (src_level + 1), 0.2, 5.0) ** p["light_strength"]
     else:
         gain = np.ones(out.shape[2], np.float32)
+    info["ganancia_luz"] = [round(float(g), 3) for g in np.atleast_1d(gain)]
 
     resid = (col - bgp) * gain * p["contrast"] + p["brightness"]
-    if p["blur"] > 0:
-        resid = cv2.GaussianBlur(resid, (0, 0), p["blur"]).reshape(resid.shape)
-        alpha = cv2.GaussianBlur(alpha, (0, 0), p["blur"])
-    if p["noise"] > 0:
-        resid = resid + rng.normal(0, p["noise"], resid.shape).astype(np.float32) * (alpha[..., None] > 0.05)
+
+    blur = p["blur"]
+    if p["auto_blur"]:
+        ab = _auto_blur_sigma(col.mean(axis=2), alpha < 0.05, local_g)
+        info["desenfoque_auto"] = ab
+        blur = float(np.hypot(blur, ab))
+    if blur > 0:
+        resid = cv2.GaussianBlur(resid, (0, 0), blur).reshape(resid.shape)
+        alpha = cv2.GaussianBlur(alpha, (0, 0), blur)
+
+    noise = p["noise"]
+    if p["auto_noise"]:
+        if p["mode"] == "alfa":
+            nt, ns = noise_sigma(local_g), noise_sigma(col.mean(axis=2))
+            add = float(np.sqrt(max(0.0, nt ** 2 - ns ** 2)))
+            info["ruido_auto"] = round(add, 2)
+            noise = float(np.hypot(noise, add))
+        else:  # en «diferencia» el ruido del destino ya está debajo: se limpia el ruido propio de la materia
+            resid = cv2.GaussianBlur(resid, (0, 0), 0.8).reshape(resid.shape)
+    if noise > 0:
+        resid = resid + rng.normal(0, noise, resid.shape).astype(np.float32) * (alpha[..., None] > 0.05)
+
+    if p["occlusion"] > 0:
+        # solo zonas mucho más oscuras que la variación normal de la textura (pliegues, rendijas)
+        lvl = float(np.median(local_g))
+        spread = float(1.4826 * np.median(np.abs(local_g - lvl))) + 2.0
+        rg = region.mean(axis=2)
+        occ = np.clip((lvl - rg - 2.5 * spread) / (2 * spread), 0, 1) * p["occlusion"]
+        alpha = alpha * (1 - cv2.GaussianBlur(occ, (0, 0), 1.0))
+
     a = (alpha * p["opacity"])[..., None]
 
     if p["shadow"] > 0:
-        sh = cv2.GaussianBlur(alpha, (0, 0), max(1.0, 0.04 * max(ph, pw)))
-        off = max(1, int(0.03 * max(ph, pw)))
-        sh = np.roll(np.roll(sh, off, 0), off, 1)
-        region *= (1 - p["shadow"] * sh)[..., None]
+        sang = p["shadow_angle"]
+        if sang is None:  # hacia donde la iluminación decae
+            gb = cv2.GaussianBlur(local_g, (0, 0), max(3.0, m / 2))
+            gy_, gx_ = np.gradient(gb)
+            cyl, cxl = (ty0 + ty1) // 2 - ly0, (tx0 + tx1) // 2 - lx0
+            gxv, gyv = -gx_[cyl, cxl], -gy_[cyl, cxl]
+            sang = float(np.degrees(np.arctan2(gyv, gxv))) if np.hypot(gxv, gyv) > 1e-3 else 45.0
+        info["sombra_angulo"] = round(float(sang), 1)
+        off = max(1.0, 0.04 * m)
+        sh = cv2.GaussianBlur(alpha, (0, 0), max(1.0, 0.04 * m))
+        M = np.float32([[1, 0, off * np.cos(np.radians(sang))], [0, 1, off * np.sin(np.radians(sang))]])
+        sh = cv2.warpAffine(sh, M, (sh.shape[1], sh.shape[0]), borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+        region *= (1 - p["shadow"] * np.clip(sh - alpha, 0, 1))[..., None]
 
     if p["mode"] == "alfa":
-        new_px = (col * gain - bgp * gain) * p["contrast"] + bgp * gain + p["brightness"]
-        if p["noise"] > 0:
-            new_px = new_px + (resid - (col - bgp) * gain * p["contrast"] - p["brightness"])
+        new_px = bgp * gain + resid
         region[:] = region * (1 - a) + new_px * a
     elif p["mode"] == "poisson":
         region[:] = _poisson(region, region + resid, alpha * p["opacity"])
@@ -325,9 +504,9 @@ def composite(target: np.ndarray, patch: np.ndarray, bg: np.ndarray | None, cx: 
     out = np.clip(out, 0, 255).round().astype(np.uint8)
     out = out[..., 0] if gray else out
     full = np.zeros((H, W), bool)
-    full[ty0:ty1, tx0:tx1] = alpha > 0.35
-    ys, xs = np.nonzero(full)
-    bbox = None if len(xs) == 0 else [int(xs.min()), int(ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)]
+    full[ty0:ty1, tx0:tx1] = alpha * p["opacity"] > 0.35
+    ys, xs = np.nonzero(full[ty0:ty1, tx0:tx1])
+    bbox = None if len(xs) == 0 else [int(tx0 + xs.min()), int(ty0 + ys.min()), int(xs.max() - xs.min() + 1), int(ys.max() - ys.min() + 1)]
     return out, full, bbox
 
 
@@ -357,22 +536,38 @@ def _poisson(dst: np.ndarray, src: np.ndarray, alpha: np.ndarray) -> np.ndarray:
 
 
 def random_params(rng: np.random.Generator, cfg: dict) -> dict:
-    """cfg: rangos (min, max) para scale, blur, noise, shadow, contrast, brightness; flags rotate/flip."""
-    u = lambda k: float(rng.uniform(*cfg[k])) if cfg[k][1] > cfg[k][0] else float(cfg[k][0])  # noqa: E731
+    """cfg: rangos (min, max) para scale, contrast, brightness, blur, noise, shadow, bend, wave_amp, elastic, occlusion;
+    flags rotate/flip/auto_*; keep_prob y keep (rango) para recortes parciales."""
+    def u(k, default=(0.0, 0.0)):
+        lo, hi = cfg.get(k, default)
+        return float(rng.uniform(lo, hi)) if hi > lo else float(lo)
+
+    bend_max = cfg.get("bend", (0.0, 0.0))[1]
+    partial = rng.random() < cfg.get("keep_prob", 0.0)
     return dict(
-        scale=u("scale"),
-        angle=float(rng.uniform(0, 360)) if cfg.get("rotate") else 0.0,
+        scale=u("scale", (1.0, 1.0)),
+        angle=float(rng.uniform(-180, 180)) if cfg.get("rotate") else 0.0,
         flip_h=bool(cfg.get("flip") and rng.random() < 0.5),
         flip_v=bool(cfg.get("flip") and rng.random() < 0.5),
+        bend=float(rng.uniform(-bend_max, bend_max)),
+        wave_amp=u("wave_amp"),
+        wave_len=float(rng.uniform(20, 90)),
+        elastic=u("elastic"),
+        keep=u("keep", (1.0, 1.0)) if partial else 1.0,
+        keep_side=int(rng.integers(2)),
         mode=cfg.get("mode", "diferencia"),
         auto_light=cfg.get("auto_light", True),
-        light_strength=cfg.get("light_strength", 1.0),
-        contrast=u("contrast"),
+        light_strength=cfg.get("light_strength", 0.5),
+        contrast=u("contrast", (1.0, 1.0)),
         brightness=u("brightness"),
         blur=u("blur"),
+        auto_blur=cfg.get("auto_blur", False),
         noise=u("noise"),
+        auto_noise=cfg.get("auto_noise", False),
         opacity=1.0,
         shadow=u("shadow"),
+        shadow_angle=cfg.get("shadow_angle"),
+        occlusion=u("occlusion"),
     )
 
 

@@ -1,24 +1,29 @@
-import io
 import json
-import zipfile
+import time
 from pathlib import Path
 
 import cv2
 import numpy as np
+import pandas as pd
 import streamlit as st
 from PIL import Image
 from streamlit_image_coordinates import streamlit_image_coordinates
 
+import fm_aug as fa
 import fm_core as fc
+import fm_export as fe
 
 st.set_page_config(page_title="Editor de materias extrañas", page_icon="🔬", layout="wide")
 
-LIB = fc.Library(Path(__file__).parent / "materias_lib")
+APP_DIR = Path(__file__).parent
+LIB = fc.Library(APP_DIR / "materias_lib")
 VIEW_W = 820  # ancho máximo de las vistas clicables
 ss = st.session_state
 ss.setdefault("imgs", {})  # file_id -> imagen decodificada
 ss.setdefault("edits", {})  # nombre imagen destino -> lista de inserciones
 ss.setdefault("last_evt", {})  # clave widget -> unix_time del último clic procesado
+
+TIPO_DEFECTO, TIPO_NEGATIVO = "defecto", "negativo"
 
 
 # ------------------------------------------------------------------ utilidades
@@ -81,28 +86,49 @@ def view_box(img, center, size):
     return x, y, s, s
 
 
+def tipo(m: dict) -> str:
+    return m.get("tipo", TIPO_DEFECTO)
+
+
 def patch_label(m: dict) -> str:
-    return f"{m.get('categoria', '?')} · {m.get('nombre', '')} ({m.get('ancho')}×{m.get('alto')})"
+    marks = ("🚫 " if tipo(m) == TIPO_NEGATIVO else "") + ("🧵 " if m.get("sintetico") else "")
+    return f"{marks}{m.get('categoria', '?')} · {m.get('nombre', '')} ({m.get('ancho')}×{m.get('alto')})"
 
 
-def params_ui(prefix: str, compact: bool = False) -> dict:
-    """Controles de ajuste de la materia al pegarla."""
-    p = {}
-    p["mode"] = st.selectbox(
-        "Modo de fusión", ["diferencia", "alfa", "poisson"], key=prefix + "mode",
-        help="diferencia: suma el contraste de la materia sobre la textura de la imagen nueva (recomendado). "
-        "alfa: pega los píxeles de la materia. poisson: fusión por gradientes (bordes muy suaves).",
-    )
-    p["auto_light"] = st.checkbox("Ajustar a la luz local", True, key=prefix + "al",
-                                  help="Escala la materia según lo claro/oscuro del fondo donde se pega respecto al original.")
-    p["light_strength"] = st.slider("Fuerza del ajuste de luz", 0.0, 1.0, 0.5, 0.05, key=prefix + "ls")
-    p["contrast"] = st.slider("Contraste de la materia", 0.0, 3.0, 1.0, 0.05, key=prefix + "ct")
-    p["brightness"] = st.slider("Brillo", -60.0, 60.0, 0.0, 1.0, key=prefix + "br")
-    p["blur"] = st.slider("Desenfoque (σ px)", 0.0, 8.0, 0.0, 0.1, key=prefix + "bl", help="Para simular otro enfoque.")
-    p["noise"] = st.slider("Ruido (σ)", 0.0, 15.0, 0.0, 0.5, key=prefix + "nz")
-    p["shadow"] = st.slider("Sombra", 0.0, 0.8, 0.0, 0.05, key=prefix + "sh")
-    p["opacity"] = st.slider("Opacidad", 0.1, 1.0, 1.0, 0.05, key=prefix + "op")
-    return p
+@st.cache_data(max_entries=256, show_spinner=False)
+def load_patch(pid: str, _mtime: float):
+    return LIB.load(pid)
+
+
+def get_patch(pid: str):
+    f = LIB.root / f"{pid}.json"
+    return load_patch(pid, f.stat().st_mtime) if f.exists() else None
+
+
+@st.cache_data(max_entries=512, show_spinner=False)
+def patch_measure(pid: str, _mtime: float):
+    got = LIB.load(pid)
+    return fa.measure_patch(got[0], got[1])
+
+
+def measure_of(pid: str):
+    f = LIB.root / f"{pid}.json"
+    return patch_measure(pid, f.stat().st_mtime) if f.exists() else None
+
+
+def thread_defaults(items: list) -> dict:
+    """Rangos para hilos sintéticos a partir de los hilos reales de la biblioteca (si hay)."""
+    real = [measure_of(m["id"]) for m in items
+            if "HILO" in m.get("categoria", "").upper() and not m.get("sintetico") and tipo(m) == TIPO_DEFECTO]
+    real = [r for r in real if r]
+    if not real:
+        return dict(fa.THREAD_DEFAULTS, base=60.0, n=0)
+    g = np.median([r["grosor"] for r in real])
+    c = np.median([r["contraste_max"] for r in real])
+    ln = np.median([r["longitud"] for r in real])
+    return dict(length=(max(30.0, 0.5 * ln), 1.5 * ln), thickness=(max(1.0, 0.6 * g), 1.3 * g),
+                contrast=(0.6 * c, 1.2 * c), curl=fa.THREAD_DEFAULTS["curl"], fuzz=fa.THREAD_DEFAULTS["fuzz"],
+                base=float(np.median([r["nivel_fondo"] for r in real])), n=len(real))
 
 
 # ---------------------------------------------------------- 1. extraer materias
@@ -179,8 +205,8 @@ def page_extract():
     with p1:
         vis = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR) if roi.ndim == 2 else roi.copy()
         cnts, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        big = cv2.resize(vis, None, fx=max(1, 500 // max(roi.shape[:2])), fy=max(1, 500 // max(roi.shape[:2])), interpolation=cv2.INTER_NEAREST)
-        f = big.shape[1] / roi.shape[1]
+        f = max(1, 500 // max(roi.shape[:2]))
+        big = cv2.resize(vis, None, fx=f, fy=f, interpolation=cv2.INTER_NEAREST)
         cv2.drawContours(big, [(c * f).astype(np.int32) for c in cnts], -1, (0, 0, 255), 1)
         st.image(fc.to_rgb(big), caption=f"Recorte {rw}×{rh} px · contorno detectado", width="stretch")
     res = fc.make_patch(roi, mask, feather=feather, bg_ksize=bg_k)
@@ -189,14 +215,21 @@ def page_extract():
             st.warning("No se detecta nada: baja el umbral o cambia la polaridad.")
             return
         st.image(fc.patch_preview(res[0], 400), caption=f"Materia extraída {res[2][2]}×{res[2][3]} px")
+        mm = fa.measure_patch(res[0], res[1])
+        if mm:
+            st.caption(f"Área {mm['area']} px · grosor ≈ {mm['grosor']} px · contraste {mm['contraste']} (máx {mm['contraste_max']})")
 
     st.markdown("**④ Guardar en la biblioteca**")
     g1, g2, g3 = st.columns([2, 2, 1])
     cats = LIB.categories()
     guess = next((c for c in ["TIZA", "PELUSA", "HILO", "PELO", "PLASTICO", "METAL"] if c in name.upper()), "")
     with g1:
+        kind = st.radio("Tipo", [TIPO_DEFECTO, TIPO_NEGATIVO], horizontal=True, key="ext_tipo",
+                        format_func={TIPO_DEFECTO: "Materia extraña (defecto)",
+                                     TIPO_NEGATIVO: "Falso defecto (marca, brillo, rebaba… se debe aceptar)"}.get)
         cat_sel = st.selectbox("Categoría", cats + ["➕ nueva…"], index=cats.index(guess) if guess in cats else len(cats), key="cat_sel")
-        cat = st.text_input("Nueva categoría", guess, key="cat_new").strip().upper() if cat_sel == "➕ nueva…" else cat_sel
+        cat = st.text_input("Nueva categoría", guess if kind == TIPO_DEFECTO else "MARCA",
+                            key="cat_new").strip().upper() if cat_sel == "➕ nueva…" else cat_sel
     with g2:
         nombre = st.text_input("Nombre / descripción", Path(name).stem, key="pname")
         split = st.checkbox("Guardar cada trozo por separado", False, key="split")
@@ -210,10 +243,10 @@ def page_extract():
                 r_ = fc.make_patch(roi, pm, feather=feather, bg_ksize=bg_k)
                 if r_ is None:
                     continue
-                patch, bg, (bx, by, _, _) = r_
+                patch, bg, (bx, by, bw, bh) = r_
                 LIB.save(patch, bg, {
-                    "nombre": nombre + (f" #{i + 1}" if len(parts) > 1 else ""), "categoria": cat, "origen": name,
-                    "pos_origen": [zx + rx + bx, zy + ry + by], "gris": img.ndim == 2,
+                    "nombre": nombre + (f" #{i + 1}" if len(parts) > 1 else ""), "categoria": cat, "tipo": kind,
+                    "origen": name, "pos_origen": [zx + rx + bx, zy + ry + by], "gris": img.ndim == 2,
                 })
                 n += 1
             st.success(f"{n} materia(s) guardada(s) en «{cat}».")
@@ -236,23 +269,67 @@ def page_library():
             st.success(f"{n} materias importadas.")
             st.rerun()
     st.caption("La biblioteca se guarda en la carpeta `materias_lib/` del servidor. Si usas Streamlit Cloud, expórtala a ZIP: "
-               "el disco del servidor se borra al reiniciarse la app.")
+               "el disco del servidor se borra al reiniciarse la app. 🚫 = falso defecto · 🧵 = sintética")
+
+    with st.expander("🧵 Generar hilos sintéticos", expanded=False):
+        d = thread_defaults(items)
+        st.caption(f"Rangos calculados a partir de {d['n']} hilo(s) real(es) de la biblioteca." if d["n"]
+                   else "No hay hilos reales (categoría con «HILO») en la biblioteca: se usan rangos genéricos.")
+        t1, t2, t3 = st.columns(3)
+        ln = t1.slider("Longitud (px)", 20, 800, (int(d["length"][0]), int(d["length"][1])), key="th_len")
+        th = t1.slider("Grosor (px)", 0.5, 12.0, (round(float(d["thickness"][0]), 1), round(float(d["thickness"][1]), 1)), 0.1, key="th_th")
+        ct = t2.slider("Contraste (niveles de gris)", 5, 200, (int(d["contrast"][0]), int(d["contrast"][1])), key="th_ct")
+        cu = t2.slider("Rizado", 0.0, 0.3, (0.02, 0.12), 0.01, key="th_cu")
+        fz = t3.slider("Pelillos sueltos", 0.0, 1.0, (0.0, 0.4), 0.05, key="th_fz")
+        n = t3.number_input("Cuántos", 1, 200, 10, key="th_n")
+        cat = t3.text_input("Categoría", "HILO", key="th_cat").strip().upper()
+        cfg = dict(length=ln, thickness=th, contrast=ct, curl=cu, fuzz=fz)
+        seed = ss.setdefault("th_seed", 0)
+        prev_rng = np.random.default_rng(seed)
+        cols = st.columns(6)
+        for i in range(6):
+            cols[i].image(fc.patch_preview(fa.random_thread(prev_rng, cfg, d["base"])[0], 140))
+        b1, b2 = st.columns(2)
+        if b1.button("🔄 Otra muestra"):
+            ss.th_seed += 1
+            st.rerun()
+        if b2.button(f"💾 Guardar {n} hilos en la biblioteca", type="primary", disabled=not cat):
+            rng = np.random.default_rng()
+            for i in range(int(n)):
+                patch, bg = fa.random_thread(rng, cfg, d["base"])
+                LIB.save(patch, bg, {"nombre": f"hilo sintético {i + 1}", "categoria": cat, "tipo": TIPO_DEFECTO, "sintetico": True})
+            st.success(f"{n} hilos sintéticos guardados en «{cat}».")
+            st.rerun()
+
     if not items:
         st.info("Todavía no hay materias. Extráelas en la página 1.")
         return
+    counts = pd.DataFrame([{"categoria": m.get("categoria", ""), "tipo": tipo(m), "sintetica": bool(m.get("sintetico"))} for m in items])
+    summary = counts.groupby(["tipo", "categoria"]).agg(total=("sintetica", "size"), sinteticas=("sintetica", "sum")).reset_index()
+    summary["reales"] = summary["total"] - summary["sinteticas"]
+    st.dataframe(summary, hide_index=True)
+    few = summary[(summary["tipo"] == TIPO_DEFECTO) & (summary["reales"] < 3)]["categoria"].tolist()
+    if few:
+        st.warning(f"Pocas materias reales de origen en: {', '.join(few)}. El modelo puede aprender esas formas concretas; "
+                   "extrae más ejemplos reales o usa deformación / hilos sintéticos.")
+
     cats = sorted({m.get("categoria", "") for m in items})
     sel = st.multiselect("Filtrar por categoría", cats, default=cats)
     items = [m for m in items if m.get("categoria", "") in sel]
     cols = st.columns(5)
     for i, m in enumerate(items):
         with cols[i % 5]:
-            patch, _, _ = LIB.load(m["id"])
-            st.image(fc.patch_preview(patch, 180), caption=patch_label(m))
+            got = get_patch(m["id"])
+            if got is None:
+                continue
+            st.image(fc.patch_preview(got[0], 180), caption=patch_label(m))
             with st.popover("Editar"):
                 nn = st.text_input("Nombre", m.get("nombre", ""), key="n_" + m["id"])
                 nc = st.text_input("Categoría", m.get("categoria", ""), key="c_" + m["id"]).strip().upper()
+                nt = st.radio("Tipo", [TIPO_DEFECTO, TIPO_NEGATIVO], index=0 if tipo(m) == TIPO_DEFECTO else 1,
+                              key="t_" + m["id"], format_func={TIPO_DEFECTO: "Defecto", TIPO_NEGATIVO: "Falso defecto"}.get)
                 if st.button("Guardar cambios", key="u_" + m["id"]):
-                    LIB.update(m["id"], nombre=nn, categoria=nc)
+                    LIB.update(m["id"], nombre=nn, categoria=nc, tipo=nt)
                     st.rerun()
                 if st.button("🗑️ Eliminar", key="d_" + m["id"]):
                     LIB.delete(m["id"])
@@ -262,35 +339,86 @@ def page_library():
 # --------------------------------------------------------------- 3. editor manual
 
 
-@st.cache_data(max_entries=64, show_spinner=False)
-def load_patch(pid: str, _mtime: float):
-    return LIB.load(pid)
+def editor_controls(by_id: dict):
+    """Controles de la barra lateral del editor. Devuelve (pid, ajustes, ajustes de orientación)."""
+    with st.sidebar:
+        st.subheader("Materia a pegar")
+        pid = st.selectbox("Materia", list(by_id), format_func=lambda i: patch_label(by_id[i]), key="ed_pid")
+        got = get_patch(pid)
+        if got:
+            st.image(fc.patch_preview(got[0], 200))
+        with st.expander("Geometría", expanded=True):
+            p = {"scale": st.slider("Escala", 0.2, 3.0, 1.0, 0.05, key="ed_sc")}
+            orient = st.radio("Ángulo", ["surcos", "aleatorio", "fijo"], key="ed_or",
+                              format_func={"surcos": "Seguir los surcos de la goma", "aleatorio": "Aleatorio", "fijo": "Fijo"}.get)
+            jitter = st.slider("Variación respecto a los surcos (°)", 0, 45, 8, key="ed_jit", disabled=orient != "surcos")
+            angle = st.slider("Ángulo fijo (°)", -180, 180, 0, 5, key="ed_an", disabled=orient != "fijo")
+            p["flip_h"] = st.checkbox("Espejo horizontal", False, key="ed_fh")
+            p["flip_v"] = st.checkbox("Espejo vertical", False, key="ed_fv")
+        with st.expander("Deformación"):
+            p["bend"] = st.slider("Curvatura", -0.6, 0.6, 0.0, 0.05, key="ed_bend")
+            p["wave_amp"] = st.slider("Ondulación (px)", 0.0, 15.0, 0.0, 0.5, key="ed_wa")
+            p["wave_len"] = st.slider("Longitud de onda (px)", 10.0, 150.0, 50.0, 5.0, key="ed_wl")
+            p["elastic"] = st.slider("Deformación elástica (px)", 0.0, 6.0, 0.0, 0.25, key="ed_el")
+            p["keep"] = st.slider("Parte que se conserva (%)", 20, 100, 100, 5, key="ed_keep") / 100
+            p["keep_side"] = 0 if st.radio("Conservar", ["principio", "final"], horizontal=True, key="ed_ks") == "principio" else 1
+        with st.expander("Apariencia", expanded=True):
+            p["mode"] = st.selectbox(
+                "Modo de fusión", ["diferencia", "alfa", "poisson"], key="ed_mode",
+                help="diferencia: suma el contraste de la materia sobre la textura de la imagen nueva (recomendado). "
+                "alfa: pega los píxeles de la materia. poisson: fusión por gradientes.")
+            p["auto_light"] = st.checkbox("Ajustar a la luz local", True, key="ed_al")
+            p["light_strength"] = st.slider("Fuerza del ajuste de luz", 0.0, 1.0, 0.5, 0.05, key="ed_ls")
+            p["contrast"] = st.slider("Contraste de la materia", 0.0, 3.0, 1.0, 0.05, key="ed_ct")
+            p["brightness"] = st.slider("Brillo", -60.0, 60.0, 0.0, 1.0, key="ed_br")
+            p["opacity"] = st.slider("Opacidad", 0.1, 1.0, 1.0, 0.05, key="ed_op")
+        with st.expander("Integración", expanded=True):
+            p["auto_blur"] = st.checkbox("Igualar enfoque a la zona", True, key="ed_ab",
+                                         help="Desenfoca la materia si la zona destino está menos nítida que la original.")
+            p["blur"] = st.slider("Desenfoque extra (σ px)", 0.0, 8.0, 0.0, 0.1, key="ed_bl")
+            p["auto_noise"] = st.checkbox("Igualar ruido a la zona", True, key="ed_an2")
+            p["noise"] = st.slider("Ruido extra (σ)", 0.0, 15.0, 0.0, 0.5, key="ed_nz")
+            p["occlusion"] = st.slider("Ocultar en pliegues / zonas muy oscuras", 0.0, 1.0, 0.0, 0.05, key="ed_occ")
+            p["shadow"] = st.slider("Sombra", 0.0, 0.8, 0.0, 0.05, key="ed_sh")
+            auto_sh = st.checkbox("Dirección de sombra automática", True, key="ed_sha",
+                                  help="Hacia donde decae la iluminación de la zona. Si no, elige el ángulo.")
+            p["shadow_angle"] = None if auto_sh else float(st.slider("Sombra hacia (°, 0 = derecha, 90 = abajo)", -180, 180, 45, 5, key="ed_shang"))
+    return pid, p, dict(mode=orient, jitter=jitter, angle=float(angle))
 
 
-def get_patch(pid: str):
-    f = LIB.root / f"{pid}.json"
-    return load_patch(pid, f.stat().st_mtime) if f.exists() else None
+def resolve_angle(img, pid, cx, cy, p, orient, rng):
+    if orient["mode"] == "surcos":
+        got = get_patch(pid)
+        return fc.auto_angle(img, got[0], cx, cy, p["scale"], p["flip_h"], p["flip_v"], orient["jitter"], rng) if got else 0.0
+    if orient["mode"] == "aleatorio":
+        return float(rng.uniform(-180, 180))
+    return orient["angle"]
 
 
 def render_edits(img: np.ndarray, edits: list):
-    out, full_mask, boxes = img, np.zeros(img.shape[:2], bool), []
+    out, full_mask, boxes, masks, infos = img, np.zeros(img.shape[:2], bool), [], [], []
     for e in edits:
         got = get_patch(e["pid"])
         if got is None:
             boxes.append(None)
+            masks.append(None)
+            infos.append({})
             continue
         patch, bg, _ = got
-        out, m, bb = fc.composite(out, patch, bg, e["cx"], e["cy"], e["params"], np.random.default_rng(e.get("seed", 0)))
+        info = {}
+        out, m, bb = fc.composite(out, patch, bg, e["cx"], e["cy"], e["params"], np.random.default_rng(e.get("seed", 0)), info)
         full_mask |= m
         boxes.append(bb)
-    return out, full_mask, boxes
+        masks.append(m)
+        infos.append(info)
+    return out, full_mask, boxes, masks, infos
 
 
-def annotations(name: str, edits: list, boxes: list) -> dict:
+def annotations(name: str, edits: list, boxes: list, infos: list) -> dict:
     return {"imagen": name, "materias": [
         {"materia_id": e["pid"], "categoria": e["categoria"], "nombre": e["nombre"], "bbox_xywh": b,
-         "centro": [round(e["cx"]), round(e["cy"])], "parametros": e["params"]}
-        for e, b in zip(edits, boxes) if b
+         "centro": [round(e["cx"]), round(e["cy"])], "parametros": e["params"], "automatico": inf}
+        for e, b, inf in zip(edits, boxes, infos) if b
     ]}
 
 
@@ -302,39 +430,58 @@ def page_editor():
         return
     files = st.file_uploader("Imágenes nuevas (sin materia)", type=fc.IMAGE_TYPES, accept_multiple_files=True, key="up_tgt")
     imgs = load_uploads(files)
+    by_id = {m["id"]: m for m in items if tipo(m) == TIPO_DEFECTO}
+    if not by_id:
+        st.warning("No hay materias de tipo defecto en la biblioteca.")
+        return
+    pid, prm_now, orient = editor_controls(by_id)
+
+    with st.expander("💾 Sesión de trabajo (guardar / cargar)"):
+        st.download_button("Descargar sesión (.json)", json.dumps({"version": 1, "ediciones": ss.edits}, ensure_ascii=False),
+                           "sesion_editor.json", disabled=not any(ss.edits.values()))
+        up = st.file_uploader("Cargar sesión", type=["json"], key="sess_up")
+        if up is not None and ss.get("sess_done") != up.file_id:
+            try:
+                data = json.loads(up.getvalue())
+                loaded = data.get("ediciones", {})
+                missing = {e["pid"] for v in loaded.values() for e in v} - {m["id"] for m in items}
+                ss.edits.update(loaded)
+                ss.sess_done = up.file_id
+                st.success(f"Sesión cargada: {sum(len(v) for v in loaded.values())} materias en {len(loaded)} imágenes. "
+                           "Sube las imágenes con el mismo nombre para verlas.")
+                if missing:
+                    st.warning(f"{len(missing)} materias de la sesión no están en la biblioteca (impórtala primero).")
+            except (ValueError, KeyError, TypeError) as e:
+                st.error(f"Fichero de sesión no válido: {e}")
     if not imgs:
         st.info("Sube las imágenes nuevas a las que quieres añadir materias.")
         return
 
-    with st.sidebar:
-        st.subheader("Materia a pegar")
-        by_id = {m["id"]: m for m in items}
-        pid = st.selectbox("Materia", list(by_id), format_func=lambda i: patch_label(by_id[i]), key="ed_pid")
-        st.image(fc.patch_preview(get_patch(pid)[0], 200))
-        st.subheader("Geometría")
-        scale = st.slider("Escala", 0.2, 3.0, 1.0, 0.05, key="ed_sc")
-        rand_angle = st.checkbox("Ángulo aleatorio en cada clic", False, key="ed_ra")
-        angle = st.slider("Ángulo (°)", -180, 180, 0, 5, key="ed_an", disabled=rand_angle)
-        fh = st.checkbox("Espejo horizontal", False, key="ed_fh")
-        fv = st.checkbox("Espejo vertical", False, key="ed_fv")
-        st.subheader("Apariencia")
-        app = params_ui("ed_")
-
     name = st.selectbox("Imagen", list(imgs), key="tgt_sel")
     img = imgs[name]
     edits = ss.edits.setdefault(name, [])
-    out, full_mask, boxes = render_edits(img, edits)
+    out, full_mask, boxes, _, infos = render_edits(img, edits)
     H, W = img.shape[:2]
     ck = f"center::{name}"
     ss.setdefault(ck, (W / 2, H / 2))
 
     t1, t2, t3 = st.columns([2, 2, 1])
+    with t1:
+        click_mode = st.radio("Al hacer clic en el detalle…", ["añadir", "mover"], horizontal=True, key="ed_click",
+                              format_func={"añadir": "➕ añadir materia", "mover": "✋ mover la seleccionada"}.get)
     with t2:
         zoom = st.select_slider("Tamaño de la vista de detalle (px)", [256, 512, 768, 1024, 1536, 2048, 3008], 1024, key="ed_zoom")
     with t3:
         show_boxes = st.checkbox("Ver recuadros", True, key="ed_box")
+    sel = None
+    if edits:
+        sel = st.selectbox("Materia seleccionada", list(range(len(edits))), index=len(edits) - 1, key=f"ed_sel_{name}_{len(edits)}",
+                           format_func=lambda i: f"{i + 1}. {edits[i]['categoria']} · {edits[i]['nombre']}")
     vb = view_box(img, ss[ck], zoom)
-    shown = fc.draw_boxes(out, boxes) if show_boxes else out
+    labels = [f"{i + 1}" for i in range(len(boxes))]
+    shown = fc.draw_boxes(out, boxes, labels) if show_boxes else out
+    if show_boxes and sel is not None and boxes[sel]:
+        shown = fc.draw_boxes(shown, [boxes[sel]], thickness=max(3, W // 600 + 2))
 
     c1, c2 = st.columns([2, 3])
     with c1:
@@ -344,40 +491,44 @@ def page_editor():
             ss[ck] = p
             st.rerun()
     with c2:
-        st.markdown("**Detalle** — clic donde quieras añadir la materia")
+        st.markdown("**Detalle** — clic para " + ("añadir la materia" if click_mode == "añadir" else "mover la materia seleccionada"))
         x, y, s, _ = vb
         p = clickable(shown[y:y + s, x:x + s], f"eddt_{name}_{vb}")
         if p:
+            cx, cy = x + p[0], y + p[1]
             rng = np.random.default_rng()
-            meta = by_id[pid]
-            prm = {**app, "scale": scale, "flip_h": fh, "flip_v": fv,
-                   "angle": float(rng.uniform(-180, 180)) if rand_angle else float(angle)}
-            edits.append({"pid": pid, "nombre": meta.get("nombre", ""), "categoria": meta.get("categoria", ""),
-                          "cx": x + p[0], "cy": y + p[1], "params": prm, "seed": int(rng.integers(1 << 31))})
+            if click_mode == "mover" and sel is not None:
+                e = edits[sel]
+                e["cx"], e["cy"] = cx, cy
+                if orient["mode"] == "surcos":
+                    e["params"]["angle"] = resolve_angle(img, e["pid"], cx, cy, e["params"], orient, rng)
+            elif click_mode == "añadir":
+                prm = {**prm_now, "angle": resolve_angle(out, pid, cx, cy, prm_now, orient, rng)}
+                meta = by_id[pid]
+                edits.append({"pid": pid, "nombre": meta.get("nombre", ""), "categoria": meta.get("categoria", ""),
+                              "cx": cx, "cy": cy, "params": prm, "seed": int(rng.integers(1 << 31))})
             st.rerun()
 
     b1, b2, b3, b4 = st.columns(4)
-    if b1.button("↩️ Deshacer última", disabled=not edits):
+    if b1.button("🎛️ Aplicar ajustes actuales a la seleccionada", disabled=sel is None):
+        e = edits[sel]
+        ang = e["params"]["angle"] if orient["mode"] == "aleatorio" else resolve_angle(img, pid, e["cx"], e["cy"], prm_now, orient, np.random.default_rng())
+        e["params"] = {**prm_now, "angle": ang}
+        e.update(pid=pid, nombre=by_id[pid].get("nombre", ""), categoria=by_id[pid].get("categoria", ""))
+        st.rerun()
+    if b2.button("🗑️ Quitar la seleccionada", disabled=sel is None):
+        edits.pop(sel)
+        st.rerun()
+    if b3.button("↩️ Deshacer última", disabled=not edits):
         edits.pop()
         st.rerun()
-    if b2.button("🎛️ Aplicar ajustes actuales a la última", disabled=not edits):
-        edits[-1]["params"] = {**app, "scale": scale, "flip_h": fh, "flip_v": fv,
-                               "angle": edits[-1]["params"]["angle"] if rand_angle else float(angle)}
-        edits[-1]["pid"] = pid
-        edits[-1].update(nombre=by_id[pid].get("nombre", ""), categoria=by_id[pid].get("categoria", ""))
-        st.rerun()
-    if b3.button("🗑️ Borrar todas", disabled=not edits):
+    if b4.button("🧹 Borrar todas", disabled=not edits):
         edits.clear()
         st.rerun()
-
-    if edits:
-        with st.expander(f"Materias añadidas ({len(edits)})"):
-            for i, (e, b) in enumerate(zip(edits, boxes)):
-                a, bb = st.columns([5, 1])
-                a.write(f"{i + 1}. {e['categoria']} · {e['nombre']} — centro ({e['cx']:.0f}, {e['cy']:.0f}), bbox {b}")
-                if bb.button("Quitar", key=f"rm_{name}_{i}"):
-                    edits.pop(i)
-                    st.rerun()
+    if sel is not None:
+        e = edits[sel]
+        st.caption(f"Seleccionada: centro ({e['cx']:.0f}, {e['cy']:.0f}), ángulo {e['params'].get('angle', 0):.0f}°, escala {e['params'].get('scale', 1):.2f}, "
+                   f"bbox {boxes[sel]} · automático: {infos[sel]}")
 
     st.markdown("**Descargas**")
     ext = Path(name).suffix.lstrip(".").lower() or "png"
@@ -385,21 +536,19 @@ def page_editor():
     d1, d2, d3, d4 = st.columns(4)
     d1.download_button("Imagen editada", fc.encode_image(out, ext), f"{stem}_FM.{ext}", disabled=not edits)
     d2.download_button("Máscara", fc.encode_image(full_mask.astype(np.uint8) * 255, "png"), f"{stem}_FM_mask.png", disabled=not edits)
-    d3.download_button("Anotaciones JSON", json.dumps(annotations(f"{stem}_FM.{ext}", edits, boxes), ensure_ascii=False, indent=1),
+    d3.download_button("Anotaciones JSON", json.dumps(annotations(f"{stem}_FM.{ext}", edits, boxes, infos), ensure_ascii=False, indent=1),
                        f"{stem}_FM.json", disabled=not edits)
     edited = [n for n in imgs if ss.edits.get(n)]
     if edited and d4.button(f"Preparar ZIP ({len(edited)} imágenes)"):
-        buf = io.BytesIO()
-        allann = []
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            for n in edited:
-                o, m, bxs = render_edits(imgs[n], ss.edits[n])
-                e_ = Path(n).suffix.lstrip(".").lower() or "png"
-                z.writestr(f"imagenes/{Path(n).stem}_FM.{e_}", fc.encode_image(o, e_))
-                z.writestr(f"mascaras/{Path(n).stem}_FM_mask.png", fc.encode_image(m.astype(np.uint8) * 255, "png"))
-                allann.append(annotations(f"{Path(n).stem}_FM.{e_}", ss.edits[n], bxs))
-            z.writestr("anotaciones.json", json.dumps(allann, ensure_ascii=False, indent=1))
-        ss.editor_zip = buf.getvalue()
+        classes = sorted({e["categoria"] for n in edited for e in ss.edits[n]})
+        ds = fe.Dataset(fe.Writer(), classes)
+        for n in edited:
+            o, _, bxs, msks, _ = render_edits(imgs[n], ss.edits[n])
+            e_ = Path(n).suffix.lstrip(".").lower() or "png"
+            inst = [{"categoria": e["categoria"], "nombre": e["nombre"], "materia_id": e["pid"], "mask": m, "bbox_xywh": b,
+                     "parametros": e["params"]} for e, m, b in zip(ss.edits[n], msks, bxs) if b]
+            ds.add(f"KO/{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
+        ss.editor_zip = ds.finish()
     if ss.get("editor_zip"):
         d4.download_button("⬇️ Descargar ZIP", ss.editor_zip, "imagenes_editadas.zip")
 
@@ -408,125 +557,401 @@ def page_editor():
 
 
 def page_batch():
-    st.header("4 · Generación automática por lotes")
+    st.header("4 · Generación automática del conjunto de entrenamiento")
     items = LIB.list()
-    if not items:
-        st.warning("La biblioteca está vacía. Extrae materias primero (página 1).")
-        return
-    files = st.file_uploader("Imágenes nuevas (sin materia)", type=fc.IMAGE_TYPES, accept_multiple_files=True, key="up_batch")
+    defects = [m for m in items if tipo(m) == TIPO_DEFECTO]
+    negatives = [m for m in items if tipo(m) == TIPO_NEGATIVO]
+    files = st.file_uploader("Imágenes nuevas sin materia (OK) — base para generar", type=fc.IMAGE_TYPES,
+                             accept_multiple_files=True, key="up_batch")
     imgs = load_uploads(files)
     if not imgs:
         st.info("Sube las imágenes base. Se generarán variantes con materias colocadas al azar.")
         return
+    if not defects:
+        st.warning("No hay materias de tipo defecto en la biblioteca. Extráelas (página 1) o genera hilos sintéticos (página 2).")
 
-    by_id = {m["id"]: m for m in items}
-    cats = sorted({m.get("categoria", "") for m in items})
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.subheader("Qué")
+    tab_q, tab_v, tab_z, tab_d = st.tabs(["① Qué materias", "② Variación", "③ Dónde", "④ Datos y exportación"])
+    with tab_q:
+        cats = sorted({m.get("categoria", "") for m in defects})
         sel_cats = st.multiselect("Categorías", cats, default=cats, key="b_cats")
-        pool = [i for i in by_id if by_id[i].get("categoria", "") in sel_cats]
-        st.caption(f"{len(pool)} materias disponibles")
-        variants = st.number_input("Variantes por imagen", 1, 200, 5, key="b_var")
-        nmin, nmax = st.slider("Materias por imagen", 1, 10, (1, 2), key="b_n")
-        include_ok = st.checkbox("Incluir también las originales sin materia (OK)", True, key="b_ok")
-        seed = st.number_input("Semilla aleatoria", 0, 10**6, 42, key="b_seed")
-    with c2:
-        st.subheader("Variación")
-        sc = st.slider("Escala", 0.2, 3.0, (0.8, 1.2), 0.05, key="b_sc")
-        rot = st.checkbox("Rotación aleatoria", True, key="b_rot")
-        flip = st.checkbox("Espejo aleatorio", True, key="b_flip")
-        ct = st.slider("Contraste", 0.0, 3.0, (0.8, 1.2), 0.05, key="b_ct")
-        br = st.slider("Brillo", -60.0, 60.0, (0.0, 0.0), 1.0, key="b_br")
-        bl = st.slider("Desenfoque σ", 0.0, 8.0, (0.0, 1.0), 0.1, key="b_bl")
-        nz = st.slider("Ruido σ", 0.0, 15.0, (0.0, 0.0), 0.5, key="b_nz")
-        sh = st.slider("Sombra", 0.0, 0.8, (0.0, 0.0), 0.05, key="b_sh")
-    with c3:
-        st.subheader("Dónde")
-        mode = st.selectbox("Modo de fusión", ["diferencia", "alfa", "poisson"], key="b_mode")
-        auto = st.checkbox("Ajustar a la luz local", True, key="b_al")
-        ls = st.slider("Fuerza del ajuste de luz", 0.0, 1.0, 0.5, 0.05, key="b_ls")
-        zone_mode = st.radio("Zona permitida", ["anillo", "rectangulo", "toda"], key="b_zone",
+        pool = [m for m in defects if m.get("categoria", "") in sel_cats]
+        df = pd.DataFrame([{"categoria": m["categoria"], "sintetica": bool(m.get("sintetico"))} for m in pool])
+        if len(df):
+            summ = df.groupby("categoria").agg(materias=("sintetica", "size"), sinteticas=("sintetica", "sum")).reset_index()
+            summ["reales"] = summ["materias"] - summ["sinteticas"]
+            st.dataframe(summ, hide_index=True)
+            few = summ[summ["reales"] < 3]["categoria"].tolist()
+            if few:
+                st.warning(f"Pocas materias reales en {', '.join(few)}: activa deformación y recortes para variar más las formas.")
+        q1, q2 = st.columns(2)
+        balance = q1.checkbox("Equilibrar categorías", True, key="b_bal",
+                              help="Elige primero la categoría al azar y luego una materia de ella, para que todas salgan "
+                                   "con frecuencia parecida aunque tengan distinto número de materias.")
+        nmin, nmax = q1.slider("Materias por imagen", 1, 10, (1, 2), key="b_n")
+        variants = q1.number_input("Imágenes KO por cada imagen base", 1, 500, 5, key="b_var")
+        seed = q1.number_input("Semilla aleatoria", 0, 10**6, 42, key="b_seed")
+        synth_on = q2.checkbox("Añadir hilos sintéticos nuevos en cada imagen", False, key="b_syn")
+        td = thread_defaults(items)
+        synth_p = q2.slider("Probabilidad de que una materia sea un hilo sintético", 0.0, 1.0, 0.3, 0.05, key="b_synp", disabled=not synth_on)
+        synth_cat = q2.text_input("Categoría de los hilos sintéticos", "HILO", key="b_syncat", disabled=not synth_on).strip().upper()
+        q2.caption(f"Medidas de hilo tomadas de {td['n']} hilo(s) real(es)." if td["n"] else "Medidas de hilo genéricas (no hay hilos reales).")
+    with tab_v:
+        v1, v2, v3 = st.columns(3)
+        with v1:
+            st.markdown("**Geometría**")
+            sc = st.slider("Escala", 0.2, 3.0, (0.8, 1.2), 0.05, key="b_sc")
+            orient = st.radio("Ángulo", ["surcos", "aleatorio", "fijo"], key="b_or",
+                              format_func={"surcos": "Seguir los surcos (recomendado)", "aleatorio": "Aleatorio", "fijo": "Sin girar"}.get)
+            jitter = st.slider("Variación respecto a los surcos (°)", 0, 45, 10, key="b_jit")
+            flip = st.checkbox("Espejo aleatorio", True, key="b_flip")
+        with v2:
+            st.markdown("**Deformación**")
+            bend = st.slider("Curvatura máxima", 0.0, 0.6, 0.25, 0.05, key="b_bend")
+            wave = st.slider("Ondulación (px)", 0.0, 15.0, (0.0, 3.0), 0.5, key="b_wave")
+            elastic = st.slider("Deformación elástica (px)", 0.0, 6.0, (0.0, 1.5), 0.25, key="b_el")
+            keep_p = st.slider("Probabilidad de usar solo un trozo", 0.0, 1.0, 0.25, 0.05, key="b_kp")
+            keep = st.slider("Tamaño del trozo (%)", 20, 100, (50, 90), 5, key="b_keep")
+        with v3:
+            st.markdown("**Apariencia e integración**")
+            mode = st.selectbox("Modo de fusión", ["diferencia", "alfa", "poisson"], key="b_mode")
+            auto = st.checkbox("Ajustar a la luz local", True, key="b_al")
+            ls = st.slider("Fuerza del ajuste de luz", 0.0, 1.0, 0.5, 0.05, key="b_ls")
+            ct = st.slider("Contraste", 0.0, 3.0, (0.8, 1.2), 0.05, key="b_ct")
+            br = st.slider("Brillo", -60.0, 60.0, (0.0, 0.0), 1.0, key="b_br")
+            auto_blur = st.checkbox("Igualar enfoque a la zona", True, key="b_ab")
+            bl = st.slider("Desenfoque extra σ", 0.0, 8.0, (0.0, 0.5), 0.1, key="b_bl")
+            auto_noise = st.checkbox("Igualar ruido a la zona", True, key="b_an")
+            nz = st.slider("Ruido extra σ", 0.0, 15.0, (0.0, 0.0), 0.5, key="b_nz")
+            occ = st.slider("Ocultar en pliegues", 0.0, 1.0, (0.0, 0.5), 0.05, key="b_occ")
+            sh = st.slider("Sombra", 0.0, 0.8, (0.0, 0.2), 0.05, key="b_sh")
+            sh_auto = st.checkbox("Dirección de sombra automática", True, key="b_sha")
+            sh_ang = None if sh_auto else float(st.slider("Sombra hacia (°)", -180, 180, 45, 5, key="b_shang"))
+    with tab_z:
+        zone_mode = st.radio("Zona permitida", ["anillo", "rectangulo", "toda"], key="b_zone", horizontal=True,
                              format_func={"anillo": "Anillo (elipse con hueco)", "rectangulo": "Rectángulo dibujado",
                                           "toda": "Toda la imagen"}.get)
         no_overlap = st.checkbox("Evitar solapes", True, key="b_ov")
-        out_fmt = st.selectbox("Formato de salida", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
+        first = next(iter(imgs.values()))
+        H0, W0 = first.shape[:2]
+        hole = 0.0
+        if zone_mode != "toda":
+            if zone_mode == "anillo":
+                hole = st.slider("Tamaño del hueco central (% de la elipse)", 0, 95, 55, key="b_hole") / 100
+            st.markdown("Arrastra un rectángulo sobre la primera imagen que encierre el producto "
+                        "(se aplica en proporción a todas). Zona permitida en verde.")
+            zm = fc.zone_mask(H0, W0, zone_mode, ss.get("b_rect"), hole)
+            vis = cv2.cvtColor(first, cv2.COLOR_GRAY2BGR) if first.ndim == 2 else first.copy()
+            if zm is not None:
+                vis[zm] = (vis[zm] * 0.6 + np.array([0, 90, 0])).astype(np.uint8)
+            r = clickable(vis, "b_rect_v", drag=True)
+            if r:
+                ss.b_rect = (r[0] / W0, r[1] / H0, r[2] / W0, r[3] / H0)
+                st.rerun()
+            if not ss.get("b_rect"):
+                st.warning("Dibuja el rectángulo; si no, las materias se colocarán en toda la imagen.")
+    with tab_d:
+        e1, e2, e3 = st.columns(3)
+        with e1:
+            st.markdown("**Entrenamiento / validación**")
+            val_frac = st.slider("% de imágenes base reservadas para validación (OK)", 0, 50, 20, key="b_valf",
+                                 help="Esas imágenes no se usan para generar KO: van tal cual a validacion/OK.")
+            real_ko_files = st.file_uploader("KO reales para validación (opcional)", type=fc.IMAGE_TYPES,
+                                             accept_multiple_files=True, key="b_realko",
+                                             help="Imágenes con materia real. Se guardan en validacion/KO para medir el modelo "
+                                                  "con casos reales; nunca se mezclan con las sintéticas.")
+            real_ko = load_uploads(real_ko_files)
+        with e2:
+            st.markdown("**Imágenes OK**")
+            include_ok = st.checkbox("Incluir las originales sin materia", True, key="b_ok")
+            ok_variants = st.number_input("Variantes OK por imagen (otra luz / enfoque)", 0, 100, 2, key="b_okv")
+            photo_ko = st.checkbox("Aplicar también variación de luz/enfoque a las KO", True, key="b_phko")
+            gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
+            gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
+            pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
+            pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
+            neg_n = st.slider("Falsos defectos por imagen OK", 0, 5, (0, 1) if negatives else (0, 0), key="b_neg",
+                              disabled=not negatives,
+                              help="Marcas, brillos, rebabas… de la biblioteca (tipo «falso defecto»). Se pegan sin etiquetar, "
+                                   "para que el modelo aprenda a no rechazarlos.")
+            neg_in_ko = st.checkbox("Poner también falsos defectos en las KO", False, key="b_negko", disabled=not negatives)
+        with e3:
+            st.markdown("**Formato**")
+            layout = st.radio("Carpetas", ["resultado", "clase"], key="b_lay",
+                              format_func={"resultado": "Por resultado (OK / KO)", "clase": "Por clase (OK / TIZA / HILO…)"}.get)
+            out_fmt = st.selectbox("Formato de imagen", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
+            masks_on = st.checkbox("Máscaras binarias", True, key="b_mk")
+            cmasks_on = st.checkbox("Máscaras por clase", True, key="b_cmk")
+            dest = st.radio("Destino", ["zip", "carpeta"], key="b_dest",
+                            format_func={"zip": "ZIP para descargar", "carpeta": "Carpeta en este equipo/servidor (lotes grandes)"}.get)
+            folder = st.text_input("Carpeta de salida", str(APP_DIR / "salida"), key="b_folder", disabled=dest != "carpeta")
+            st.caption("Se generan anotaciones en COCO (recuadros y polígonos), CSV y JSON detallado. "
+                       "Comprueba qué formato importa tu versión de OneVision; las carpetas por clase sirven para clasificación.")
 
-    first = next(iter(imgs.values()))
-    H0, W0 = first.shape[:2]
-    hole = 0.0
-    if zone_mode != "toda":
-        if zone_mode == "anillo":
-            hole = st.slider("Tamaño del hueco central (% de la elipse)", 0, 95, 55, key="b_hole") / 100
-        st.markdown("Arrastra un rectángulo sobre la primera imagen que encierre el producto "
-                    "(se aplica en proporción a todas). Zona permitida en verde.")
-        zm = fc.zone_mask(H0, W0, zone_mode, ss.get("b_rect"), hole)
-        vis = cv2.cvtColor(first, cv2.COLOR_GRAY2BGR) if first.ndim == 2 else first.copy()
-        if zm is not None:
-            vis[zm] = (vis[zm] * 0.6 + np.array([0, 90, 0])).astype(np.uint8)
-        r = clickable(vis, "b_rect_v", drag=True)
-        if r:
-            ss.b_rect = (r[0] / W0, r[1] / H0, r[2] / W0, r[3] / H0)
-            st.rerun()
-        if not ss.get("b_rect"):
-            st.warning("Dibuja el rectángulo; si no, las materias se colocarán en toda la imagen.")
-
-    if not pool:
-        st.warning("Selecciona al menos una categoría.")
+    classes = sorted(set(sel_cats) | ({synth_cat} if synth_on and synth_cat else set()))
+    if not classes or not (pool or synth_on):
+        st.warning("Selecciona al menos una categoría o activa los hilos sintéticos.")
         return
-    cfg = dict(scale=sc, rotate=rot, flip=flip, contrast=ct, brightness=br, blur=bl, noise=nz, shadow=sh,
-               mode=mode, auto_light=auto, light_strength=ls)
+    cfg = dict(scale=sc, rotate=orient == "aleatorio", flip=flip, contrast=ct, brightness=br, blur=bl, noise=nz, shadow=sh,
+               shadow_angle=sh_ang, occlusion=occ, bend=(0.0, bend), wave_amp=wave, elastic=elastic,
+               keep_prob=keep_p, keep=(keep[0] / 100, keep[1] / 100), mode=mode, auto_light=auto, light_strength=ls,
+               auto_blur=auto_blur, auto_noise=auto_noise)
+    pcfg = dict(gain=gain, gamma=gamma, blur=pblur, noise=pnoise)
+    by_cat: dict[str, list] = {}
+    for m in pool:
+        by_cat.setdefault(m["categoria"], []).append(m["id"])
+    names = list(imgs)
+    n_val = min(len(names) - 1, int(round(len(names) * val_frac / 100)))
+    est = (len(names) - n_val) * (variants + ok_variants + (1 if include_ok else 0)) + n_val + len(real_ko)
+    st.info(f"Se generarán unas **{est} imágenes**: {len(names) - n_val} base de entrenamiento × "
+            f"({variants} KO + {ok_variants} OK variantes{' + original' if include_ok else ''}), "
+            f"{n_val} OK de validación y {len(real_ko)} KO reales de validación.")
+
+    def pick(rng):
+        """Devuelve (patch, bg, meta) de la materia a pegar."""
+        if synth_on and (not pool or rng.random() < synth_p):
+            patch, bg = fa.random_thread(rng, td, td["base"])
+            return patch, bg, {"id": "sintetico", "categoria": synth_cat, "nombre": "hilo sintético", "sintetico": True}
+        if balance:
+            cat = list(by_cat)[int(rng.integers(len(by_cat)))]
+            pid = by_cat[cat][int(rng.integers(len(by_cat[cat])))]
+        else:
+            pid = pool[int(rng.integers(len(pool)))]["id"]
+        patch, bg, meta = get_patch(pid)
+        return patch, bg, meta
+
+    def place(rng, out, mask, allowed, patch, bg, H, W, tries=25):
+        for _ in range(tries):
+            cx, cy = fc.sample_mask_point(rng, allowed, W, H)
+            prm = fc.random_params(rng, cfg)
+            if orient == "surcos":
+                prm["angle"] = fc.auto_angle(out, patch, cx, cy, prm["scale"], prm["flip_h"], prm["flip_v"], jitter, rng)
+            info = {}
+            new, m, bb = fc.composite(out, patch, bg, cx, cy, prm, rng, info)
+            if bb and not (no_overlap and (m & mask).any()):
+                return new, m, bb, cx, cy, prm, info
+        return None
+
+    def add_negatives(rng, out, mask, allowed, H, W, n):
+        recs = []
+        for _ in range(n):
+            nm = negatives[int(rng.integers(len(negatives)))]
+            patch, bg, _ = get_patch(nm["id"])
+            r = place(rng, out, mask, allowed, patch, bg, H, W)
+            if r:
+                out, m, bb = r[0], r[1], r[2]
+                mask = mask | m
+                recs.append({"materia_id": nm["id"], "categoria": nm["categoria"], "bbox_xywh": bb})
+        return out, mask, recs
 
     if st.button("🚀 Generar", type="primary"):
         rng = np.random.default_rng(int(seed))
-        buf = io.BytesIO()
-        allann, previews = [], []
-        total = len(imgs) * variants
+        dest_dir = Path(folder) / time.strftime("lote_%Y%m%d_%H%M%S") if dest == "carpeta" else None
+        ds = fe.Dataset(fe.Writer(dest_dir), classes, masks_on, cmasks_on)
+        order = list(rng.permutation(len(names)))
+        val_names = {names[i] for i in order[:n_val]}
+        stats, crops = [], []
         bar = st.progress(0.0, "Generando…")
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-            k = 0
-            for n, img in imgs.items():
-                H, W = img.shape[:2]
-                e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
-                stem = Path(n).stem
-                allowed = fc.zone_mask(H, W, zone_mode, ss.get("b_rect"), hole)
-                allowed = None if allowed is None else np.flatnonzero(allowed)
-                if include_ok:
-                    z.writestr(f"OK/{stem}.{e_}", fc.encode_image(img, e_))
-                for v in range(variants):
-                    out, mask, recs = img, np.zeros((H, W), bool), []
-                    for _ in range(int(rng.integers(nmin, nmax + 1))):
-                        pid = pool[int(rng.integers(len(pool)))]
-                        patch, bg, meta = get_patch(pid)
-                        for _try in range(25):
-                            cx, cy = fc.sample_mask_point(rng, allowed, W, H)
-                            prm = fc.random_params(rng, cfg)
-                            new, m, bb = fc.composite(out, patch, bg, cx, cy, prm, rng)
-                            if bb and not (no_overlap and (m & mask).any()):
-                                break
-                        else:
-                            continue
-                        out, mask = new, mask | m
-                        recs.append({"materia_id": pid, "categoria": meta.get("categoria", ""), "nombre": meta.get("nombre", ""),
-                                     "bbox_xywh": bb, "centro": [round(cx), round(cy)], "parametros": prm})
-                    fname = f"{stem}_FM{v + 1:03d}.{e_}"
-                    z.writestr(f"KO/{fname}", fc.encode_image(out, e_))
-                    z.writestr(f"mascaras/{Path(fname).stem}_mask.png", fc.encode_image(mask.astype(np.uint8) * 255, "png"))
-                    allann.append({"imagen": fname, "origen": n, "materias": recs})
-                    if len(previews) < 6:
-                        previews.append((fname, fc.draw_boxes(out, [r["bbox_xywh"] for r in recs], [r["categoria"] for r in recs])))
-                    k += 1
-                    bar.progress(k / total, f"Generando… {k}/{total}")
-            z.writestr("anotaciones.json", json.dumps(allann, ensure_ascii=False, indent=1))
+        done = 0
+        for n in names:
+            img = imgs[n]
+            H, W = img.shape[:2]
+            e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
+            stem = Path(n).stem
+            if n in val_names:
+                ds.add(f"validacion/OK/{stem}.{e_}", img, e_, [], "validacion", n)
+                done += 1
+                continue
+            allowed = fc.zone_mask(H, W, zone_mode, ss.get("b_rect"), hole)
+            allowed = None if allowed is None else np.flatnonzero(allowed)
+            if include_ok:
+                ds.add(f"entrenamiento/OK/{stem}.{e_}", img, e_, [], "entrenamiento", n)
+                done += 1
+            for v in range(int(ok_variants)):
+                base, ph = fa.photometric(img, rng, pcfg)
+                k = int(rng.integers(neg_n[0], neg_n[1] + 1)) if negatives else 0
+                base, _, negs = add_negatives(rng, base, np.zeros((H, W), bool), allowed, H, W, k)
+                ds.add(f"entrenamiento/OK/{stem}_OK{v + 1:03d}.{e_}", base, e_, [], "entrenamiento", n,
+                       {"variacion_global": ph, "falsos_defectos": negs})
+                done += 1
+            for v in range(int(variants)):
+                out, ph = fa.photometric(img, rng, pcfg) if photo_ko else (img, {})
+                mask = np.zeros((H, W), bool)
+                inst = []
+                for _ in range(int(rng.integers(nmin, nmax + 1))):
+                    patch, bg, meta = pick(rng)
+                    r = place(rng, out, mask, allowed, patch, bg, H, W)
+                    if not r:
+                        continue
+                    new, m, bb, cx, cy, prm, info = r
+                    ms = fa.measure_instance(out, new, m)
+                    if ms:
+                        stats.append({"categoria": meta.get("categoria", ""), "sintetica": bool(meta.get("sintetico")), **ms})
+                    if len(crops) < 120:
+                        crops.append({"categoria": meta.get("categoria", ""),
+                                      "crop": fa.crop_around(new, bb[0] + bb[2] / 2, bb[1] + bb[3] / 2, 256)})
+                    out, mask = new, mask | m
+                    inst.append({"categoria": meta.get("categoria", ""), "nombre": meta.get("nombre", ""),
+                                 "materia_id": meta.get("id", ""), "sintetica": bool(meta.get("sintetico")),
+                                 "mask": m, "bbox_xywh": bb, "centro": [round(cx), round(cy)],
+                                 "parametros": prm, "automatico": info})
+                negs = []
+                if neg_in_ko and negatives:
+                    out, mask, negs = add_negatives(rng, out, mask, allowed, H, W, int(rng.integers(neg_n[0], neg_n[1] + 1)))
+                if inst:
+                    big = max(inst, key=lambda i: int(i["mask"].sum()))["categoria"]
+                    sub = big if layout == "clase" else "KO"
+                else:
+                    sub = "OK"
+                ds.add(f"entrenamiento/{sub}/{stem}_FM{v + 1:03d}.{e_}", out, e_, inst, "entrenamiento", n,
+                       {"variacion_global": ph, "falsos_defectos": negs})
+                done += 1
+                bar.progress(min(1.0, done / max(1, est)), f"Generando… {done}/{est}")
+        for n, img in real_ko.items():
+            e_ = (Path(n).suffix.lstrip(".").lower() or "png") if out_fmt.startswith("igual") else out_fmt
+            ds.add(f"validacion/KO/{Path(n).stem}.{e_}", img, e_, [], "validacion", n, {"ko_real": True}, label="KO_real")
+        data = ds.finish()
         bar.empty()
-        ss.batch_zip = buf.getvalue()
-        ss.batch_prev = [(f, cv2.resize(fc.to_rgb(p), (600, round(p.shape[0] * 600 / p.shape[1])), interpolation=cv2.INTER_AREA))
-                         for f, p in previews]
-    if ss.get("batch_zip"):
-        st.download_button(f"⬇️ Descargar lote ({len(ss.batch_zip) / 1e6:.0f} MB)", ss.batch_zip, "lote_materias.zip", type="primary")
-        cols = st.columns(3)
-        for i, (f, p) in enumerate(ss.get("batch_prev", [])):
-            cols[i % 3].image(p, caption=f)
+        ss.batch_zip = data
+        ss.batch_dir = str(dest_dir) if dest_dir else None
+        ss.batch_summary = ds.counts
+        ss.batch_stats = stats
+        ss.synth_crops = crops
+        st.rerun()
+
+    if ss.get("batch_summary"):
+        st.subheader("Resultado")
+        if ss.get("batch_dir"):
+            st.success(f"Conjunto guardado en `{ss.batch_dir}`")
+        elif ss.get("batch_zip"):
+            st.download_button(f"⬇️ Descargar conjunto ({len(ss.batch_zip) / 1e6:.0f} MB)", ss.batch_zip, "conjunto_onevision.zip", type="primary")
+        rows = [{"conjunto": sp, "clase": k.replace("_imagenes_", "imágenes "), "cantidad": v}
+                for sp, d in ss.batch_summary.items() for k, v in sorted(d.items())]
+        st.dataframe(pd.DataFrame(rows), hide_index=True)
+        inst_counts = {k: v for k, v in ss.batch_summary.get("entrenamiento", {}).items() if not k.startswith("_")}
+        if inst_counts and max(inst_counts.values()) > 2 * min(inst_counts.values()):
+            st.warning("Las categorías están desequilibradas (una aparece más del doble que otra). "
+                       "Activa «Equilibrar categorías» o ajusta la selección.")
+        if ss.get("synth_crops"):
+            st.caption("Ejemplos de materias generadas (la página 5 permite compararlas con las reales):")
+            cols = st.columns(6)
+            for i, c in enumerate(ss.synth_crops[:12]):
+                cols[i % 6].image(c["crop"], caption=c["categoria"])
+
+
+# ---------------------------------------------------------------- 5. validación
+
+
+def norm_crop(c: np.ndarray) -> np.ndarray:
+    g = fc.to_gray(c).astype(np.float32)
+    lo, hi = np.percentile(g, (1, 99.5))
+    return np.clip((g - lo) / max(1.0, hi - lo) * 255, 0, 255).astype(np.uint8)
+
+
+def page_validation():
+    st.header("5 · Validar que las imágenes sintéticas se parecen a las reales")
+    st.markdown(
+        "Tres comprobaciones antes de entrenar:\n"
+        "1. **Estadísticas**: tamaño, grosor y contraste de las materias reales frente a las generadas.\n"
+        "2. **Prueba a ciegas**: alguien de calidad intenta distinguir recortes reales de sintéticos. "
+        "Si acierta mucho más del 50 %, el modelo también podrá distinguirlos: hay que ajustar la generación.\n"
+        "3. **Validar solo con KO reales**: en la página 4 sube KO reales en «KO reales para validación». "
+        "Entrena con `entrenamiento/` y mide con `validacion/`: es lo que dice si los datos sintéticos ayudan de verdad.")
+    items = [m for m in LIB.list() if tipo(m) == TIPO_DEFECTO]
+
+    st.subheader("1 · Estadísticas reales vs. generadas")
+    real = []
+    for m in items:
+        if m.get("sintetico"):
+            continue
+        ms = measure_of(m["id"])
+        if ms:
+            real.append({"origen": "real", "categoria": m["categoria"], **ms})
+    gen = [{"origen": "generada", **s} for s in ss.get("batch_stats", [])]
+    if not real or not gen:
+        st.info("Necesitas materias reales en la biblioteca y haber generado un lote (página 4).")
+    else:
+        df = pd.DataFrame(real + gen)
+        cols = ["area", "grosor", "longitud", "contraste", "contraste_max", "nivel_fondo"]
+        st.dataframe(df.groupby(["categoria", "origen"])[cols].median().round(1), width="stretch")
+        st.caption("Medianas. El contraste de las generadas depende de la luz de las imágenes nuevas (ajuste de luz), "
+                   "así que no tiene por qué coincidir exactamente; sí deberían coincidir tamaño y grosor, "
+                   "y el contraste no debería estar muy por encima ni muy por debajo de lo que verías en una KO real con la luz nueva.")
+        var = st.selectbox("Comparar distribución de", cols, index=3, key="val_var")
+        cat = st.selectbox("Categoría", sorted(df["categoria"].unique()), key="val_cat")
+        sub = df[df["categoria"] == cat]
+        lo, hi = float(sub[var].min()), float(sub[var].max())
+        bins = np.linspace(lo, hi if hi > lo else lo + 1, 16)
+        hist = {}
+        for o in ["real", "generada"]:
+            h, _ = np.histogram(sub[sub["origen"] == o][var], bins=bins)
+            hist[o] = h / max(1, h.sum())
+        st.bar_chart(pd.DataFrame(hist, index=[f"{b:.0f}" for b in bins[:-1]]), stack=False)
+        if (sub["origen"] == "real").sum() < 5:
+            st.caption("Hay pocas materias reales en esta categoría: la distribución real es poco representativa.")
+
+    st.subheader("2 · Prueba a ciegas")
+    files = st.file_uploader("Imágenes KO reales originales (las mismas de las que extrajiste las materias)", type=fc.IMAGE_TYPES,
+                             accept_multiple_files=True, key="val_real")
+    real_imgs = load_uploads(files)
+    real_crops = []
+    for m in items:
+        if m.get("sintetico") or not m.get("pos_origen") or m.get("origen") not in real_imgs:
+            continue
+        x, y = m["pos_origen"]
+        real_crops.append({"categoria": m["categoria"],
+                           "crop": fa.crop_around(real_imgs[m["origen"]], x + m["ancho"] / 2, y + m["alto"] / 2, 256)})
+    synth = ss.get("synth_crops", [])
+    st.caption(f"Recortes disponibles: {len(real_crops)} reales · {len(synth)} generados.")
+    normalize = st.checkbox("Normalizar brillo/contraste de cada recorte", True, key="val_norm",
+                            help="Las reales tienen la luz antigua y las generadas la nueva: sin normalizar, se distinguirían por la luz "
+                                 "y no por la materia. Lo ideal es usar KO reales con la luz nueva cuando las tengas.")
+    n_each = st.slider("Recortes de cada tipo", 1, 30, 10, key="val_n")
+    if st.button("▶️ Empezar prueba", disabled=not real_crops or not synth):
+        rng = np.random.default_rng()
+        a = [dict(real_crops[i], real=True) for i in rng.permutation(len(real_crops))[:n_each]]
+        b = [dict(synth[i], real=False) for i in rng.permutation(len(synth))[:n_each]]
+        q = a + b
+        ss.quiz = [q[i] for i in rng.permutation(len(q))]
+        ss.quiz_ans = []
+        st.rerun()
+    quiz = ss.get("quiz")
+    if quiz:
+        i = len(ss.quiz_ans)
+        if i < len(quiz):
+            c = quiz[i]
+            img = norm_crop(c["crop"]) if normalize else fc.to_rgb(c["crop"])
+            st.image(cv2.resize(img, (512, 512), interpolation=cv2.INTER_NEAREST), caption=f"{i + 1} / {len(quiz)}")
+            q1, q2, _ = st.columns([1, 1, 4])
+            if q1.button("Real", key=f"qr{i}"):
+                ss.quiz_ans.append(True)
+                st.rerun()
+            if q2.button("Sintética", key=f"qs{i}"):
+                ss.quiz_ans.append(False)
+                st.rerun()
+        else:
+            truth = np.array([c["real"] for c in quiz])
+            ans = np.array(ss.quiz_ans)
+            rec_real = float((ans & truth).sum() / max(1, truth.sum()))
+            rec_syn = float((~ans & ~truth).sum() / max(1, (~truth).sum()))
+            acc = (rec_real + rec_syn) / 2  # precisión equilibrada: 50 % = no se distinguen
+            st.metric("Precisión equilibrada", f"{acc:.0%}", help="Media de aciertos en reales y en sintéticas. "
+                      "50 % = azar (no se distinguen); 100 % = se distinguen siempre.")
+            st.write(f"Reales identificadas como reales: {int((ans & truth).sum())}/{int(truth.sum())} · "
+                     f"sintéticas identificadas como sintéticas: {int((~ans & ~truth).sum())}/{int((~truth).sum())}")
+            if min(truth.sum(), (~truth).sum()) < 5:
+                st.caption("Con menos de 5 recortes de algún tipo el resultado es poco fiable.")
+            if acc <= 0.65:
+                st.success("Cuesta distinguirlas: buena señal de realismo.")
+            elif acc <= 0.8:
+                st.warning("Se distinguen a menudo: revisa contraste, enfoque y bordes de las materias generadas.")
+            else:
+                st.error("Se distinguen con facilidad: el modelo podría aprender a detectar «lo sintético». Ajusta la generación.")
+            res = pd.DataFrame([{"categoria": c["categoria"], "real": c["real"], "acierto": bool(c["real"] == a)}
+                                for c, a in zip(quiz, ss.quiz_ans)])
+            st.dataframe(res.groupby(["categoria", "real"])["acierto"].mean().round(2).reset_index(), hide_index=True)
+            if st.button("Repetir"):
+                ss.quiz = None
+                st.rerun()
 
 
 # ------------------------------------------------------------------------ main
@@ -536,6 +961,7 @@ PAGES = {
     "2 · Biblioteca": page_library,
     "3 · Editor manual": page_editor,
     "4 · Generación por lotes": page_batch,
+    "5 · Validación": page_validation,
 }
 with st.sidebar:
     st.title("🔬 Materias extrañas")
