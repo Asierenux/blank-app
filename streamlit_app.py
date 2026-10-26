@@ -804,12 +804,14 @@ def page_batch():
             with i2:
                 ok_variants = st.number_input("Además, imágenes sin materia con otra luz/enfoque (por imagen base)", 0, 100, 0,
                                               key="b_okv_s", help="Opcional. 0 = solo se generan imágenes con materia.")
-                photo_ko = st.checkbox("Variar un poco la luz y el enfoque de cada imagen generada", True, key="b_phko")
+                photo_ko = st.checkbox("Variar también la luz y el enfoque de TODA la imagen", False, key="b_phko2",
+                                       help="Desactivado: la imagen queda idéntica a la original salvo donde se pega la materia. "
+                                            "Actívalo solo si quieres simular cambios de iluminación de la cámara.")
                 with st.expander("Cuánto variar la luz / enfoque"):
-                    gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
-                    gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
-                    pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
-                    pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
+                    gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.95, 1.05), 0.01, key="b_pg2")
+                    gamma = st.slider("Gamma", 0.6, 1.5, (0.97, 1.03), 0.01, key="b_pgm2")
+                    pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.5), 0.1, key="b_pbl2")
+                    pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 1.0), 0.5, key="b_pnz2")
             st.caption("Se guardan las imágenes con materia en `con_materia/` (mismo tamaño y formato que las de la cámara)"
                        + (" y las de otra luz en `sin_materia/`." if ok_variants else "."))
             val_frac, real_ko, include_ok = 0, {}, False
@@ -831,11 +833,11 @@ def page_batch():
                 st.markdown("**Imágenes OK**")
                 include_ok = st.checkbox("Incluir las originales sin materia", True, key="b_ok")
                 ok_variants = st.number_input("Variantes OK por imagen (otra luz / enfoque)", 0, 100, 2, key="b_okv")
-                photo_ko = st.checkbox("Aplicar también variación de luz/enfoque a las KO", True, key="b_phko")
-                gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
-                gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
-                pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
-                pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
+                photo_ko = st.checkbox("Aplicar también variación de luz/enfoque a las KO", False, key="b_phko2")
+                gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.95, 1.05), 0.01, key="b_pg2")
+                gamma = st.slider("Gamma", 0.6, 1.5, (0.97, 1.03), 0.01, key="b_pgm2")
+                pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.5), 0.1, key="b_pbl2")
+                pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 1.0), 0.5, key="b_pnz2")
                 neg_n = st.slider("Falsos defectos por imagen OK", 0, 5, (0, 1) if negatives else (0, 0), key="b_neg",
                                   disabled=not negatives,
                                   help="Marcas, brillos, rebabas… de la biblioteca (tipo «falso defecto»). Se pegan sin etiquetar, "
