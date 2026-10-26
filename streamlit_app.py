@@ -38,7 +38,7 @@ def load_uploads(files) -> dict:
             try:
                 ss.imgs[f.file_id] = fc.decode_image(f.getvalue())
             except ValueError as e:
-                st.error(f"{f.name}: {e}")
+                st.error(f"⚠️ {f.name}: {e}. Se ignora este archivo.")
                 continue
         out[f.name] = ss.imgs[f.file_id]
     return out

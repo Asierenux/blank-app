@@ -29,9 +29,14 @@ IMAGE_TYPES = ["bmp", "png", "jpg", "jpeg", "tif", "tiff"]
 
 
 def decode_image(data: bytes) -> np.ndarray:
-    img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_UNCHANGED)
+    if not data:
+        raise ValueError("el archivo está vacío (0 bytes). Vuelve a copiarlo o súbelo desde una carpeta local")
+    try:
+        img = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_UNCHANGED)
+    except cv2.error:
+        img = None
     if img is None:
-        raise ValueError("No se pudo leer la imagen")
+        raise ValueError("no se pudo leer la imagen (archivo dañado o formato no soportado)")
     if img.dtype != np.uint8:
         # Cámaras de 10/12/16 bits: se pasa a 8 bits
         div = 16.0 if img.max() <= 4095 else 256.0
