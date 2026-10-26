@@ -12,8 +12,9 @@ y **pegarlas en imágenes nuevas** (con otra luz, otro enfoque…), sin tener qu
    contraste medidos de tus hilos reales. Avisa si una categoría tiene pocas materias reales.
 3. **Editor manual**: clic para añadir; selecciona y clic para **mover**; aplica ajustes a la seleccionada.
    Guarda y carga la **sesión** en JSON.
-4. **Generación por lotes**: crea el conjunto completo (entrenamiento + validación) con variaciones aleatorias,
-   dentro de la zona que dibujes a mano (lazo/polígono/pincel, restando el hueco o el fondo).
+4. **Generación por lotes**: crea el conjunto completo (entrenamiento + validación) con variaciones aleatorias.
+   Por defecto las materias caen **solo sobre la goma**, que se detecta sola en cada imagen; puedes limitar la zona
+   dibujando. Se comprueba que la materia entera (no solo su centro) quede dentro.
 5. **Validación**: compara estadísticas reales vs. generadas y hace una **prueba a ciegas**.
 
 ## Cómo recortar cada tipo de materia (página 1)

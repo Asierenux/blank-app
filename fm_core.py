@@ -703,6 +703,105 @@ def zone_mask(H: int, W: int, kind: str, rel_rect, hole: float = 0.0) -> np.ndar
     return m.astype(bool)
 
 
+# ------------------------------------------------- zona de la goma (automática)
+
+def _ellipse_r(e, pts):
+    (cx, cy), (a, b), ang = e
+    t = np.radians(ang)
+    dx, dy = pts[:, 0] - cx, pts[:, 1] - cy
+    u = dx * np.cos(t) + dy * np.sin(t)
+    v = -dx * np.sin(t) + dy * np.cos(t)
+    return np.sqrt((u / max(a / 2, 1e-3)) ** 2 + (v / max(b / 2, 1e-3)) ** 2)
+
+
+def _robust_ellipse(pts, trials=300, tol=0.02, seed=0, valid=None):
+    """Elipse por RANSAC: ignora trozos del contorno que no pertenecen al neumático (sombras pegadas)."""
+    pts = pts.astype(np.float32)
+    rng = np.random.default_rng(seed)
+    best, best_n = None, -1
+    k = min(len(pts), 12)
+    for _ in range(trials):
+        sub = pts[rng.choice(len(pts), k, replace=False)]
+        try:
+            e = cv2.fitEllipse(sub)
+        except cv2.error:
+            continue
+        if not np.all(np.isfinite(e[1])) or min(e[1]) < 5 or (valid is not None and not valid(e)):
+            continue
+        n = int((np.abs(_ellipse_r(e, pts) - 1) < tol).sum())
+        if n > best_n:
+            best, best_n = e, n
+    if best is None:
+        return None
+    inl = pts[np.abs(_ellipse_r(best, pts) - 1) < tol]
+    if len(inl) >= 5:
+        e = cv2.fitEllipse(inl)
+        if valid is None or valid(e):
+            return e
+    return best
+
+
+def tire_mask(img: np.ndarray, ratio: float = 0.65, margin: int = 0, pct: float = 85) -> np.ndarray:
+    """Goma del neumático detectada automáticamente.
+
+    La cámara es de línea: la placa de fondo tiene casi el mismo brillo a lo largo de cada columna, así que la goma es lo
+    que queda bastante más oscuro que la placa de su columna (ratio). Se toma la pieza mayor, se ajusta una elipse al
+    contorno exterior por RANSAC (descarta sombras pegadas) y se quita el hueco central. margin: px hacia dentro."""
+    g = to_gray(img)
+    H, W = g.shape[:2]
+    s = 0.125
+    sm = cv2.resize(g, None, fx=s, fy=s, interpolation=cv2.INTER_AREA).astype(np.float32)
+    sm = cv2.GaussianBlur(sm, (0, 0), 1.5)
+    col = np.percentile(sm, pct, axis=0)
+    col = cv2.GaussianBlur(col.reshape(1, -1), (0, 0), 2).ravel()
+    m = (sm / (col[None, :] + 1) < ratio).astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11)))
+    m = cv2.morphologyEx(m, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
+    n, lab, st, _ = cv2.connectedComponentsWithStats(m)
+    if n < 2:
+        return np.zeros((H, W), bool)
+    comp = (lab == 1 + int(np.argmax(st[1:, 4]))).astype(np.uint8)
+    h, w = comp.shape
+    # hueco central: mayor zona sin goma que no toca el borde
+    n2, lab2, st2, _ = cv2.connectedComponentsWithStats(1 - comp)
+    holes = [j for j in range(1, n2) if st2[j, 0] > 0 and st2[j, 1] > 0 and st2[j, 0] + st2[j, 2] < w and st2[j, 1] + st2[j, 3] < h]
+    hole = (lab2 == max(holes, key=lambda j: st2[j, 4])) if holes else np.zeros_like(comp, bool)
+    cnts, _ = cv2.findContours(comp, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    pts = max(cnts, key=len).reshape(-1, 2)
+    # notches rellenados: la goma con reflejos puede quedar mordida en el borde
+    filled = cv2.morphologyEx(comp, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (25, 25)))
+    filled[hole] = 0
+    out = filled
+    if holes and len(pts) >= 20:
+        hx, hy, hw, hh = st2[max(holes, key=lambda j: st2[j, 4]), :4]
+
+        def valid(e):  # centro dentro del hueco y elipse dentro de la imagen (con poco margen)
+            (cx, cy), (a, b), ang = e
+            if not (hx <= cx <= hx + hw and hy <= cy <= hy + hh):
+                return False
+            box = cv2.boxPoints(e)
+            return box[:, 0].min() > -0.05 * w and box[:, 0].max() < 1.05 * w and box[:, 1].min() > -0.05 * h and box[:, 1].max() < 1.05 * h
+
+        e = _robust_ellipse(pts, valid=valid)
+        if e is not None:
+            ell = np.zeros_like(comp)
+            (cx, cy), (a, b), ang = e
+            cv2.ellipse(ell, ((cx, cy), (a * 1.01, b * 1.01), ang), 1, -1)
+            out = filled & ell
+    out = cv2.resize(out, (W, H), interpolation=cv2.INTER_NEAREST)
+    if margin > 0:
+        out = cv2.erode(out, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * margin + 1,) * 2))
+    return out.astype(bool)
+
+
+def inside_fraction(m: np.ndarray, allowed: np.ndarray | None) -> float:
+    """Fracción de la máscara m que cae dentro de la zona permitida."""
+    if allowed is None:
+        return 1.0
+    n = int(m.sum())
+    return 1.0 if n == 0 else float((m & allowed).sum()) / n
+
+
 # ------------------------------------------------------------------ biblioteca
 
 _ID_RE = re.compile(r"^[0-9a-f]{12}$")

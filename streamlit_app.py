@@ -436,6 +436,8 @@ def editor_controls(by_id: dict):
             angle = st.slider("Ángulo fijo (°)", -180, 180, 0, 5, key="ed_an", disabled=orient != "fijo")
             p["flip_h"] = st.checkbox("Espejo horizontal", False, key="ed_fh")
             p["flip_v"] = st.checkbox("Espejo vertical", False, key="ed_fv")
+            only_tire = st.checkbox("Solo sobre la goma", True, key="ed_ontire",
+                                    help="No deja pegar materias fuera del neumático (se detecta la goma automáticamente).")
         with st.expander("Deformación"):
             p["bend"] = st.slider("Curvatura", -0.6, 0.6, 0.0, 0.05, key="ed_bend")
             p["wave_amp"] = st.slider("Ondulación (px)", 0.0, 15.0, 0.0, 0.5, key="ed_wa")
@@ -464,7 +466,7 @@ def editor_controls(by_id: dict):
             auto_sh = st.checkbox("Dirección de sombra automática", True, key="ed_sha",
                                   help="Hacia donde decae la iluminación de la zona. Si no, elige el ángulo.")
             p["shadow_angle"] = None if auto_sh else float(st.slider("Sombra hacia (°, 0 = derecha, 90 = abajo)", -180, 180, 45, 5, key="ed_shang"))
-    return pid, p, dict(mode=orient, jitter=jitter, angle=float(angle))
+    return pid, p, dict(mode=orient, jitter=jitter, angle=float(angle), only_tire=only_tire)
 
 
 def resolve_angle(img, pid, cx, cy, p, orient, rng):
@@ -578,17 +580,35 @@ def page_editor():
         if p:
             cx, cy = x + p[0], y + p[1]
             rng = np.random.default_rng()
+            tire = auto_tire(img, 0.65, 5) if orient["only_tire"] else None
+
+            def fits(e):  # la materia entera cae sobre la goma
+                got = get_patch(e["pid"])
+                if tire is None or got is None:
+                    return True
+                _, m, _ = fc.composite(img, got[0], got[1], e["cx"], e["cy"], e["params"], np.random.default_rng(e["seed"]))
+                return fc.inside_fraction(m, tire) >= 0.99
+
             if click_mode == "mover" and sel is not None:
-                e = edits[sel]
-                e["cx"], e["cy"] = cx, cy
+                e = dict(edits[sel], cx=cx, cy=cy, params=dict(edits[sel]["params"]))
                 if orient["mode"] == "surcos":
                     e["params"]["angle"] = resolve_angle(img, e["pid"], cx, cy, e["params"], orient, rng)
+                if fits(e):
+                    edits[sel] = e
+                else:
+                    ss.ed_msg = "La materia quedaría fuera del neumático: no se ha movido."
             elif click_mode == "añadir":
                 prm = {**prm_now, "angle": resolve_angle(out, pid, cx, cy, prm_now, orient, rng)}
                 meta = by_id[pid]
-                edits.append({"pid": pid, "nombre": meta.get("nombre", ""), "categoria": meta.get("categoria", ""),
-                              "cx": cx, "cy": cy, "params": prm, "seed": int(rng.integers(1 << 31))})
+                e = {"pid": pid, "nombre": meta.get("nombre", ""), "categoria": meta.get("categoria", ""),
+                     "cx": cx, "cy": cy, "params": prm, "seed": int(rng.integers(1 << 31))}
+                if fits(e):
+                    edits.append(e)
+                else:
+                    ss.ed_msg = "La materia quedaría (al menos en parte) fuera del neumático: haz clic más dentro de la goma."
             st.rerun()
+        if ss.get("ed_msg"):
+            st.warning(ss.pop("ed_msg"))
 
     b1, b2, b3, b4 = st.columns(4)
     if b1.button("🎛️ Aplicar ajustes actuales a la seleccionada", disabled=sel is None):
@@ -641,20 +661,43 @@ def page_editor():
 # ------------------------------------------------------------- 4. generación por lotes
 
 
-def batch_zone(H: int, W: int, mode: str, hole: float, ref_w: int):
-    """Máscara de zona permitida para una imagen de H×W, a partir de lo dibujado en la primera imagen (ancho ref_w)."""
+class Zone:
+    """Zona permitida de una imagen: máscara completa (para comprobar que la materia cabe) e índices para sortear posiciones."""
+
+    def __init__(self, full: np.ndarray | None):
+        self.full = full if full is not None and full.any() else None
+        self.flat = None if self.full is None else np.flatnonzero(self.full)
+
+
+@st.cache_data(max_entries=64, show_spinner=False)
+def auto_tire(img: np.ndarray, ratio: float, margin: int) -> np.ndarray:
+    return fc.tire_mask(img, ratio, margin)
+
+
+def batch_zone(img: np.ndarray, mode: str, hole: float, ref_w: int, ratio: float, margin: int, on_tire: bool) -> np.ndarray | None:
+    """Máscara de zona permitida para `img`, con lo dibujado en la primera imagen (ancho ref_w) escalado."""
+    H, W = img.shape[:2]
     shapes = drawn_shapes(f"b_zone_draw::{mode}")
     k = W / ref_w
-    if mode == "dibujada":
-        m = fd.shapes_to_mask(shapes, H, W, scale=k)
-        return m if m.any() else None
+    adds = [s for s in shapes if s.get("op") != "sub"]
+    subs = [dict(s, op="add") for s in shapes if s.get("op") == "sub"]
+    if mode == "toda":
+        return None
     if mode == "anillo":
         rects = [s for s in shapes if s.get("t") == "rect"]
         if not rects:
             return None
         r = rects[-1]
-        return fc.zone_mask(H, W, "anillo", (r["x"] * k / W, r["y"] * k / H, r["w"] * k / W, r["h"] * k / H), hole)
-    return None
+        m = fc.zone_mask(H, W, "anillo", (r["x"] * k / W, r["y"] * k / H, r["w"] * k / W, r["h"] * k / H), hole)
+    else:
+        m = auto_tire(img, ratio, margin) if (mode == "goma" or on_tire) else np.ones((H, W), bool)
+        if adds:
+            m = m & fd.shapes_to_mask(adds, H, W, scale=k)
+        if subs:
+            m = m & ~fd.shapes_to_mask(subs, H, W, scale=k)
+    if mode != "goma" and on_tire and mode == "anillo":
+        m = m & auto_tire(img, ratio, margin)
+    return m if m.any() else None
 
 
 def page_batch():
@@ -728,31 +771,42 @@ def page_batch():
             sh_auto = st.checkbox("Dirección de sombra automática", True, key="b_sha")
             sh_ang = None if sh_auto else float(st.slider("Sombra hacia (°)", -180, 180, 45, 5, key="b_shang"))
     with tab_z:
-        zone_mode = st.radio("Zona permitida", ["dibujada", "anillo", "toda"], key="b_zone", horizontal=True,
-                             format_func={"dibujada": "Dibujada a mano (lazo, polígono, pincel)", "anillo": "Anillo (elipse con hueco)",
-                                          "toda": "Toda la imagen"}.get)
-        no_overlap = st.checkbox("Evitar solapes", True, key="b_ov")
+        zone_mode = st.radio("Zona permitida", ["goma", "dibujada", "anillo", "toda"], key="b_zone", horizontal=True,
+                             format_func={"goma": "Sobre la goma (automático)", "dibujada": "Dibujada a mano",
+                                          "anillo": "Anillo (elipse con hueco)", "toda": "Toda la imagen"}.get)
+        z1, z2, z3, z4 = st.columns(4)
+        no_overlap = z1.checkbox("Evitar solapes", True, key="b_ov")
+        on_tire = z2.checkbox("Siempre sobre la goma", True, key="b_ontire", disabled=zone_mode in ("goma", "toda"),
+                              help="Además de lo dibujado, exige que la materia caiga sobre la goma detectada.")
+        tire_ratio = z3.slider("Sensibilidad de la goma", 0.40, 0.90, 0.65, 0.01, key="b_tratio",
+                               help="Qué tan oscura respecto a la placa tiene que ser una zona para considerarla goma. "
+                                    "Súbelo si falta goma; bájalo si entra fondo.")
+        tire_margin = z4.slider("Margen desde el borde de la goma (px)", 0, 150, 20, 5, key="b_tmargin")
         first = next(iter(imgs.values()))
         H0, W0 = first.shape[:2]
         hole = 0.0
         zkey = f"b_zone_draw::{zone_mode}"
-        if zone_mode == "dibujada":
-            st.markdown("Dibuja sobre la primera imagen dónde pueden caer materias (se aplica en proporción a todas). "
-                        "Con **➖ Restar** o el **borrador** quitas zonas (p. ej. el hueco central o el fondo). "
-                        "La zona permitida se ve en verde.")
-            zm = fd.shapes_to_mask(drawn_shapes(zkey), H0, W0)
-            drawer(first, zkey, tools=("lazo", "poligono", "pincel", "borrador", "rect"), default_tool="poligono",
-                   shapes=drawn_shapes(zkey), overlay=fd.overlay_from_mask(zm, fill_alpha=60) if zm.any() else None,
+        if zone_mode in ("goma", "dibujada"):
+            st.markdown("Zona permitida en **verde** (en la primera imagen; en las demás se detecta en cada una). "
+                        + ("Puedes limitarla dibujando zonas o quitar partes con **➖ Restar** / **borrador**."
+                           if zone_mode == "goma" else
+                           "Dibuja dónde pueden caer materias; con **➖ Restar** o el **borrador** quitas zonas."))
+            zm = batch_zone(first, zone_mode, 0, W0, tire_ratio, tire_margin, on_tire)
+            drawer(first, zkey, tools=("lazo", "poligono", "pincel", "borrador", "rect"),
+                   default_tool="poligono", shapes=drawn_shapes(zkey),
+                   overlay=fd.overlay_from_mask(zm, fill_alpha=60) if zm is not None else None,
                    max_display=1600, max_height=650, brush=60, fill_shapes=False)
-            if not zm.any():
-                st.warning("Dibuja la zona; si no, las materias se colocarán en toda la imagen.")
+            if zm is None:
+                st.warning("No hay zona permitida: revisa la sensibilidad o lo dibujado (se usaría toda la imagen).")
         elif zone_mode == "anillo":
             hole = st.slider("Tamaño del hueco central (% de la elipse)", 0, 95, 55, key="b_hole") / 100
             st.markdown("Dibuja un rectángulo que encierre el anillo. Zona permitida en verde.")
-            zm = batch_zone(H0, W0, "anillo", hole, W0)
+            zm = batch_zone(first, "anillo", hole, W0, tire_ratio, tire_margin, on_tire)
             drawer(first, zkey, tools=("rect",), default_tool="rect", shapes=drawn_shapes(zkey), allow_subtract=False,
                    overlay=fd.overlay_from_mask(zm, fill_alpha=60) if zm is not None else None, max_display=1600, max_height=650,
                    fill_shapes=False)
+        else:
+            st.warning("Con «Toda la imagen» las materias pueden caer fuera del neumático.")
     with tab_d:
         e1, e2, e3 = st.columns(3)
         with e1:
@@ -843,15 +897,16 @@ def page_batch():
         patch, bg, meta = get_patch(pid)
         return patch, bg, meta
 
-    def place(rng, out, mask, allowed, patch, bg, H, W, tries=25):
+    def place(rng, out, mask, zone, patch, bg, H, W, tries=40):
         for _ in range(tries):
-            cx, cy = fc.sample_mask_point(rng, allowed, W, H)
+            cx, cy = fc.sample_mask_point(rng, zone.flat, W, H)
             prm = fc.random_params(rng, cfg)
             if orient == "surcos":
                 prm["angle"] = fc.auto_angle(out, patch, cx, cy, prm["scale"], prm["flip_h"], prm["flip_v"], jitter, rng)
             info = {}
             new, m, bb = fc.composite(out, patch, bg, cx, cy, prm, rng, info)
-            if bb and not (no_overlap and (m & mask).any()):
+            # toda la materia (no solo su centro) tiene que quedar dentro de la zona
+            if bb and fc.inside_fraction(m, zone.full) >= 0.99 and not (no_overlap and (m & mask).any()):
                 return new, m, bb, cx, cy, prm, info
         return None
 
@@ -894,8 +949,7 @@ def page_batch():
                 ds.add(out_path("validacion", "OK", stem, "", e_), img, e_, [], "validacion", n)
                 done += 1
                 continue
-            allowed = batch_zone(H, W, zone_mode, hole, W0)
-            allowed = None if allowed is None else np.flatnonzero(allowed)
+            allowed = Zone(batch_zone(img, zone_mode, hole, W0, tire_ratio, tire_margin, on_tire))
             if include_ok:
                 ds.add(out_path("entrenamiento", "OK", stem, "", e_), img, e_, [], "entrenamiento", n)
                 done += 1
@@ -910,7 +964,7 @@ def page_batch():
                         cs.add("entrenamiento", neg_cls, base, ng["bbox_xywh"], f"{stem}_OK{v + 1:03d}_{j + 1}", e_)
                     for j in range(int(ok_crops)):
                         for _try in range(20):
-                            cx, cy = fc.sample_mask_point(rng, allowed, W, H)
+                            cx, cy = fc.sample_mask_point(rng, allowed.flat, W, H)
                             bb = [int(cx) - 16, int(cy) - 16, 32, 32]
                             c = cs.crop(used, bb)
                             if not c.any():
