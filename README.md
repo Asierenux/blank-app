@@ -11,7 +11,7 @@ y **pegarlas en imágenes nuevas** (con otra luz, otro enfoque…), sin tener qu
 2. **Biblioteca**: revisa, renombra, borra o exporta/importa (ZIP). Genera **hilos sintéticos** con grosor, longitud y
    contraste medidos de tus hilos reales. Avisa si una categoría tiene pocas materias reales.
 3. **Editor manual**: clic para añadir; selecciona y clic para **mover**; aplica ajustes a la seleccionada.
-   Guarda y carga la **sesión** en JSON.
+   Descarga la imagen editada (o un ZIP con todas). Guarda y carga la **sesión** en JSON.
 4. **Generación por lotes**: crea el conjunto completo (entrenamiento + validación) con variaciones aleatorias.
    Por defecto las materias caen **solo sobre la goma**, que se detecta sola en cada imagen; puedes limitar la zona
    dibujando. Se comprueba que la materia entera (no solo su centro) quede dentro.
@@ -45,7 +45,14 @@ rojo y el resultado en verde.
 En el modo **diferencia** (por defecto) se suma a la imagen nueva solo el contraste `materia − fondo`, así la materia
 hereda la textura de la goma nueva.
 
-## Conjunto exportado (formato OneVision: segmentador + clasificador, por defecto)
+## Qué se guarda
+
+Por defecto, **solo las imágenes**: `con_materia/<imagen>_FM001.bmp`… (mismo tamaño y formato que las de la cámara),
+listas para subirlas tal cual a OneVision. Opcionalmente, imágenes sin materia con otra luz en `sin_materia/`.
+
+Si algún día necesitas más, en *④ Guardar → Conjunto completo* se genera esta estructura:
+
+## Conjunto completo (opcional)
 
 ```
 segmentador/entrenamiento/OK/OK_<imagen>.bmp          sin materia (originales + variantes de luz/enfoque + falsos defectos)

@@ -497,14 +497,6 @@ def render_edits(img: np.ndarray, edits: list):
     return out, full_mask, boxes, masks, infos
 
 
-def annotations(name: str, edits: list, boxes: list, infos: list) -> dict:
-    return {"imagen": name, "materias": [
-        {"materia_id": e["pid"], "categoria": e["categoria"], "nombre": e["nombre"], "bbox_xywh": b,
-         "centro": [round(e["cx"]), round(e["cy"])], "parametros": e["params"], "automatico": inf}
-        for e, b, inf in zip(edits, boxes, infos) if b
-    ]}
-
-
 def page_editor():
     st.header("3 · Editor: añadir materias a imágenes nuevas")
     items = LIB.list()
@@ -543,7 +535,7 @@ def page_editor():
     name = st.selectbox("Imagen", list(imgs), key="tgt_sel")
     img = imgs[name]
     edits = ss.edits.setdefault(name, [])
-    out, full_mask, boxes, _, infos = render_edits(img, edits)
+    out, _, boxes, _, infos = render_edits(img, edits)
     H, W = img.shape[:2]
     ck = f"center::{name}"
     ss.setdefault(ck, (W / 2, H / 2))
@@ -634,26 +626,16 @@ def page_editor():
     st.markdown("**Descargas**")
     ext = Path(name).suffix.lstrip(".").lower() or "png"
     stem = Path(name).stem
-    d1, d2, d3, d4 = st.columns(4)
-    d1.download_button("Imagen editada", fc.encode_image(out, ext), f"{stem}_FM.{ext}", disabled=not edits)
-    d2.download_button("Máscara", fc.encode_image(full_mask.astype(np.uint8) * 255, "png"), f"{stem}_FM_mask.png", disabled=not edits)
-    d3.download_button("Anotaciones JSON", json.dumps(annotations(f"{stem}_FM.{ext}", edits, boxes, infos), ensure_ascii=False, indent=1),
-                       f"{stem}_FM.json", disabled=not edits)
+    d1, d4 = st.columns(2)
+    d1.download_button("⬇️ Imagen editada", fc.encode_image(out, ext), f"{stem}_FM.{ext}", disabled=not edits, type="primary")
     edited = [n for n in imgs if ss.edits.get(n)]
     if edited and d4.button(f"Preparar ZIP ({len(edited)} imágenes)"):
-        classes = sorted({e["categoria"] for n in edited for e in ss.edits[n]})
-        ds = fe.Dataset(fe.Writer(), classes)
-        cs = fe.ClassifierSet(ds.w)
+        w = fe.Writer()
         for n in edited:
-            o, _, bxs, msks, _ = render_edits(imgs[n], ss.edits[n])
+            o, _, _, _, _ = render_edits(imgs[n], ss.edits[n])
             e_ = Path(n).suffix.lstrip(".").lower() or "png"
-            inst = [{"categoria": e["categoria"], "nombre": e["nombre"], "materia_id": e["pid"], "mask": m, "bbox_xywh": b,
-                     "parametros": e["params"]} for e, m, b in zip(ss.edits[n], msks, bxs) if b]
-            ds.add(f"segmentador/entrenamiento/NG/NG_{Path(n).stem}_FM.{e_}", o, e_, inst, "entrenamiento", n)
-            for j, it in enumerate(inst):
-                cs.add("entrenamiento", it["categoria"], o, it["bbox_xywh"], f"{Path(n).stem}_FM_{j + 1}", e_)
-        cs.finish()
-        ss.editor_zip = ds.finish()
+            w.write(f"{Path(n).stem}_FM.{e_}", fc.encode_image(o, e_))
+        ss.editor_zip = w.close()
     if ss.get("editor_zip"):
         d4.download_button("⬇️ Descargar ZIP", ss.editor_zip, "imagenes_editadas.zip")
 
@@ -714,7 +696,7 @@ def page_batch():
     if not defects:
         st.warning("No hay materias de tipo defecto en la biblioteca. Extráelas (página 1) o genera hilos sintéticos (página 2).")
 
-    tab_q, tab_v, tab_z, tab_d = st.tabs(["① Qué materias", "② Variación", "③ Dónde", "④ Datos y exportación"])
+    tab_q, tab_v, tab_z, tab_d = st.tabs(["① Qué materias", "② Variación", "③ Dónde", "④ Guardar"])
     with tab_q:
         cats = sorted({m.get("categoria", "") for m in defects})
         sel_cats = st.multiselect("Categorías", cats, default=cats, key="b_cats")
@@ -808,62 +790,89 @@ def page_batch():
         else:
             st.warning("Con «Toda la imagen» las materias pueden caer fuera del neumático.")
     with tab_d:
-        e1, e2, e3 = st.columns(3)
-        with e1:
-            st.markdown("**Entrenamiento / validación**")
-            val_frac = st.slider("% de imágenes base reservadas para validación (OK)", 0, 50, 20, key="b_valf",
-                                 help="Esas imágenes no se usan para generar KO: van tal cual a validacion/OK.")
-            real_ko_files = st.file_uploader("KO reales para validación (opcional)", type=fc.IMAGE_TYPES,
-                                             accept_multiple_files=True, key="b_realko",
-                                             help="Imágenes con materia real. Se guardan en validacion/KO para medir el modelo "
-                                                  "con casos reales; nunca se mezclan con las sintéticas.")
-            real_ko = load_uploads(real_ko_files)
-        with e2:
-            st.markdown("**Imágenes OK**")
-            include_ok = st.checkbox("Incluir las originales sin materia", True, key="b_ok")
-            ok_variants = st.number_input("Variantes OK por imagen (otra luz / enfoque)", 0, 100, 2, key="b_okv")
-            photo_ko = st.checkbox("Aplicar también variación de luz/enfoque a las KO", True, key="b_phko")
-            gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
-            gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
-            pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
-            pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
-            neg_n = st.slider("Falsos defectos por imagen OK", 0, 5, (0, 1) if negatives else (0, 0), key="b_neg",
-                              disabled=not negatives,
-                              help="Marcas, brillos, rebabas… de la biblioteca (tipo «falso defecto»). Se pegan sin etiquetar, "
-                                   "para que el modelo aprenda a no rechazarlos.")
-            neg_in_ko = st.checkbox("Poner también falsos defectos en las KO", False, key="b_negko", disabled=not negatives)
-        with e3:
-            st.markdown("**Formato**")
-            layout = st.radio("Carpetas", ["onevision", "resultado", "clase"], key="b_lay",
-                              format_func={"onevision": "OneVision: segmentador (OK / NG) + clasificador", "resultado": "Por resultado (OK / KO)",
-                                           "clase": "Por clase (OK / TIZA / HILO…)"}.get,
-                              help="OneVision: carpetas OK y NG (las clases por defecto de Classify) y la clase al principio "
-                                   "del nombre de cada fichero, para localizarlas fácilmente al importar y etiquetar.")
-            ng_by_cat = st.checkbox("NG separado por tipo de materia (NG_TIZA, NG_HILO…)", False, key="b_ngcat",
-                                    disabled=layout != "onevision",
-                                    help="Para el segmentador basta con una sola NG; el tipo lo decide el clasificador.")
-            st.markdown("**Clasificador (después del segmentador)**")
-            cls_on = st.checkbox("Generar recortes para el clasificador", True, key="b_cls",
-                                 help="Un recorte por cada materia, en clasificador/<conjunto>/<CLASE>/. Es lo que el clasificador "
-                                      "verá: la zona que el segmentador marque.")
-            cls_size = st.slider("Tamaño mínimo del recorte (px)", 64, 1024, 256, 32, key="b_clsz", disabled=not cls_on,
-                                 help="Lado del recorte cuadrado; si la materia es mayor, se amplía a 1,5× su tamaño. "
-                                      "Ajústalo al tamaño de región que pases del segmentador al clasificador.")
-            neg_cls = st.text_input("Clase para falsos defectos", "FALSO_DEFECTO", key="b_negcls", disabled=not cls_on).strip().upper()
-            ok_crops = st.number_input("Recortes de zona buena por imagen OK (clase OK)", 0, 20, 2, key="b_okcrops", disabled=not cls_on,
-                                       help="Trozos de goma sin materia: enseñan al clasificador a aceptar lo que el segmentador "
-                                            "marque por error.")
-            guides = st.checkbox("Imágenes guía con el contorno de la materia", layout == "onevision", key="b_guide",
-                                 help="Copias en JPG con la materia rodeada en rojo, en la carpeta guia/. Sirven para etiquetar "
-                                      "rápido a mano (p. ej. pintar la región en Segment) sabiendo dónde está cada materia.")
-            out_fmt = st.selectbox("Formato de imagen", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
-            masks_on = st.checkbox("Máscaras binarias", True, key="b_mk")
-            cmasks_on = st.checkbox("Máscaras por clase", True, key="b_cmk")
-            dest = st.radio("Destino", ["zip", "carpeta"], key="b_dest",
-                            format_func={"zip": "ZIP para descargar", "carpeta": "Carpeta en este equipo/servidor (lotes grandes)"}.get)
-            folder = st.text_input("Carpeta de salida", str(APP_DIR / "salida"), key="b_folder", disabled=dest != "carpeta")
-            st.caption("También se generan anotaciones COCO (recuadros y polígonos), CSV y JSON detallado, por si tu "
-                       "versión de OneVision o tu integrador puede importarlas.")
+        what = st.radio("Qué guardar", ["imagenes", "completo"], key="b_what", horizontal=True,
+                        format_func={"imagenes": "Solo las imágenes (para subirlas tal cual a OneVision)",
+                                     "completo": "Conjunto completo (carpetas OK/NG, máscaras, recortes, anotaciones)"}.get)
+        simple = what == "imagenes"
+        if simple:
+            i1, i2 = st.columns(2)
+            with i1:
+                out_fmt = st.selectbox("Formato de imagen", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
+                dest = st.radio("Destino", ["zip", "carpeta"], key="b_dest",
+                                format_func={"zip": "ZIP para descargar", "carpeta": "Carpeta en este equipo (lotes grandes)"}.get)
+                folder = st.text_input("Carpeta de salida", str(APP_DIR / "salida"), key="b_folder", disabled=dest != "carpeta")
+            with i2:
+                ok_variants = st.number_input("Además, imágenes sin materia con otra luz/enfoque (por imagen base)", 0, 100, 0,
+                                              key="b_okv_s", help="Opcional. 0 = solo se generan imágenes con materia.")
+                photo_ko = st.checkbox("Variar un poco la luz y el enfoque de cada imagen generada", True, key="b_phko")
+                with st.expander("Cuánto variar la luz / enfoque"):
+                    gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
+                    gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
+                    pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
+                    pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
+            st.caption("Se guardan las imágenes con materia en `con_materia/` (mismo tamaño y formato que las de la cámara)"
+                       + (" y las de otra luz en `sin_materia/`." if ok_variants else "."))
+            val_frac, real_ko, include_ok = 0, {}, False
+            neg_n, neg_in_ko = (0, 0), False
+            layout, ng_by_cat, cls_on, cls_size, neg_cls, ok_crops, guides = "simple", False, False, 256, "FALSO_DEFECTO", 0, False
+            masks_on = cmasks_on = False
+        else:
+            e1, e2, e3 = st.columns(3)
+            with e1:
+                st.markdown("**Entrenamiento / validación**")
+                val_frac = st.slider("% de imágenes base reservadas para validación (OK)", 0, 50, 20, key="b_valf",
+                                     help="Esas imágenes no se usan para generar KO: van tal cual a validacion/OK.")
+                real_ko_files = st.file_uploader("KO reales para validación (opcional)", type=fc.IMAGE_TYPES,
+                                                 accept_multiple_files=True, key="b_realko",
+                                                 help="Imágenes con materia real. Se guardan en validacion/KO para medir el modelo "
+                                                      "con casos reales; nunca se mezclan con las sintéticas.")
+                real_ko = load_uploads(real_ko_files)
+            with e2:
+                st.markdown("**Imágenes OK**")
+                include_ok = st.checkbox("Incluir las originales sin materia", True, key="b_ok")
+                ok_variants = st.number_input("Variantes OK por imagen (otra luz / enfoque)", 0, 100, 2, key="b_okv")
+                photo_ko = st.checkbox("Aplicar también variación de luz/enfoque a las KO", True, key="b_phko")
+                gain = st.slider("Ganancia de luz", 0.5, 1.5, (0.85, 1.15), 0.01, key="b_pg")
+                gamma = st.slider("Gamma", 0.6, 1.5, (0.9, 1.1), 0.01, key="b_pgm")
+                pblur = st.slider("Desenfoque global σ", 0.0, 3.0, (0.0, 0.8), 0.1, key="b_pbl")
+                pnoise = st.slider("Ruido global σ", 0.0, 8.0, (0.0, 2.0), 0.5, key="b_pnz")
+                neg_n = st.slider("Falsos defectos por imagen OK", 0, 5, (0, 1) if negatives else (0, 0), key="b_neg",
+                                  disabled=not negatives,
+                                  help="Marcas, brillos, rebabas… de la biblioteca (tipo «falso defecto»). Se pegan sin etiquetar, "
+                                       "para que el modelo aprenda a no rechazarlos.")
+                neg_in_ko = st.checkbox("Poner también falsos defectos en las KO", False, key="b_negko", disabled=not negatives)
+            with e3:
+                st.markdown("**Formato**")
+                layout = st.radio("Carpetas", ["onevision", "resultado", "clase"], key="b_lay",
+                                  format_func={"onevision": "OneVision: segmentador (OK / NG) + clasificador", "resultado": "Por resultado (OK / KO)",
+                                               "clase": "Por clase (OK / TIZA / HILO…)"}.get,
+                                  help="OneVision: carpetas OK y NG (las clases por defecto de Classify) y la clase al principio "
+                                       "del nombre de cada fichero, para localizarlas fácilmente al importar y etiquetar.")
+                ng_by_cat = st.checkbox("NG separado por tipo de materia (NG_TIZA, NG_HILO…)", False, key="b_ngcat",
+                                        disabled=layout != "onevision",
+                                        help="Para el segmentador basta con una sola NG; el tipo lo decide el clasificador.")
+                st.markdown("**Clasificador (después del segmentador)**")
+                cls_on = st.checkbox("Generar recortes para el clasificador", True, key="b_cls",
+                                     help="Un recorte por cada materia, en clasificador/<conjunto>/<CLASE>/. Es lo que el clasificador "
+                                          "verá: la zona que el segmentador marque.")
+                cls_size = st.slider("Tamaño mínimo del recorte (px)", 64, 1024, 256, 32, key="b_clsz", disabled=not cls_on,
+                                     help="Lado del recorte cuadrado; si la materia es mayor, se amplía a 1,5× su tamaño. "
+                                          "Ajústalo al tamaño de región que pases del segmentador al clasificador.")
+                neg_cls = st.text_input("Clase para falsos defectos", "FALSO_DEFECTO", key="b_negcls", disabled=not cls_on).strip().upper()
+                ok_crops = st.number_input("Recortes de zona buena por imagen OK (clase OK)", 0, 20, 2, key="b_okcrops", disabled=not cls_on,
+                                           help="Trozos de goma sin materia: enseñan al clasificador a aceptar lo que el segmentador "
+                                                "marque por error.")
+                guides = st.checkbox("Imágenes guía con el contorno de la materia", layout == "onevision", key="b_guide",
+                                     help="Copias en JPG con la materia rodeada en rojo, en la carpeta guia/. Sirven para etiquetar "
+                                          "rápido a mano (p. ej. pintar la región en Segment) sabiendo dónde está cada materia.")
+                out_fmt = st.selectbox("Formato de imagen", ["igual que la original", "bmp", "png", "jpg"], key="b_fmt")
+                masks_on = st.checkbox("Máscaras binarias", True, key="b_mk")
+                cmasks_on = st.checkbox("Máscaras por clase", True, key="b_cmk")
+                dest = st.radio("Destino", ["zip", "carpeta"], key="b_dest",
+                                format_func={"zip": "ZIP para descargar", "carpeta": "Carpeta en este equipo/servidor (lotes grandes)"}.get)
+                folder = st.text_input("Carpeta de salida", str(APP_DIR / "salida"), key="b_folder", disabled=dest != "carpeta")
+                st.caption("También se generan anotaciones COCO (recuadros y polígonos), CSV y JSON detallado, por si tu "
+                           "versión de OneVision o tu integrador puede importarlas.")
 
     classes = sorted(set(sel_cats) | ({synth_cat} if synth_on and synth_cat else set()))
     if not classes or not (pool or synth_on):
@@ -880,9 +889,13 @@ def page_batch():
     names = list(imgs)
     n_val = min(len(names) - 1, int(round(len(names) * val_frac / 100)))
     est = (len(names) - n_val) * (variants + ok_variants + (1 if include_ok else 0)) + n_val + len(real_ko)
-    st.info(f"Se generarán unas **{est} imágenes**: {len(names) - n_val} base de entrenamiento × "
-            f"({variants} KO + {ok_variants} OK variantes{' + original' if include_ok else ''}), "
-            f"{n_val} OK de validación y {len(real_ko)} KO reales de validación.")
+    if simple:
+        st.info(f"Se generarán **{len(names) * variants} imágenes con materia** ({variants} por cada imagen base)"
+                + (f" y {len(names) * ok_variants} sin materia con otra luz." if ok_variants else "."))
+    else:
+        st.info(f"Se generarán unas **{est} imágenes**: {len(names) - n_val} base de entrenamiento × "
+                f"({variants} KO + {ok_variants} OK variantes{' + original' if include_ok else ''}), "
+                f"{n_val} OK de validación y {len(real_ko)} KO reales de validación.")
 
     def pick(rng):
         """Devuelve (patch, bg, meta) de la materia a pegar."""
@@ -924,6 +937,8 @@ def page_batch():
 
     def out_path(split, kind, stem, suffix, e_, cat=None):
         """kind: OK | KO. Ruta del fichero según el formato de carpetas elegido."""
+        if layout == "simple":
+            return f"{'con_materia' if kind == 'KO' else 'sin_materia'}/{stem}{suffix}.{e_}"
         if layout == "onevision":
             folder = "OK" if kind == "OK" else (f"NG_{cat}" if ng_by_cat and cat else "NG")
             return f"segmentador/{split}/{folder}/{folder}_{stem}{suffix}.{e_}"
@@ -933,7 +948,7 @@ def page_batch():
     if st.button("🚀 Generar", type="primary"):
         rng = np.random.default_rng(int(seed))
         dest_dir = Path(folder) / time.strftime("lote_%Y%m%d_%H%M%S") if dest == "carpeta" else None
-        ds = fe.Dataset(fe.Writer(dest_dir), classes, masks_on, cmasks_on)
+        ds = fe.Dataset(fe.Writer(dest_dir), classes, masks_on, cmasks_on, metadata=not simple)
         cs = fe.ClassifierSet(ds.w, cls_size) if cls_on else None
         order = list(rng.permutation(len(names)))
         val_names = {names[i] for i in order[:n_val]}
@@ -1033,7 +1048,7 @@ def page_batch():
         if ss.get("batch_dir"):
             st.success(f"Conjunto guardado en `{ss.batch_dir}`")
         elif ss.get("batch_zip"):
-            st.download_button(f"⬇️ Descargar conjunto ({len(ss.batch_zip) / 1e6:.0f} MB)", ss.batch_zip, "conjunto_onevision.zip", type="primary")
+            st.download_button(f"⬇️ Descargar imágenes ({len(ss.batch_zip) / 1e6:.0f} MB)", ss.batch_zip, "imagenes_generadas.zip", type="primary")
         rows = [{"conjunto": sp, "clase": k.replace("_imagenes_", "imágenes "), "cantidad": v}
                 for sp, d in ss.batch_summary.items() for k, v in sorted(d.items())]
         st.dataframe(pd.DataFrame(rows), hide_index=True)

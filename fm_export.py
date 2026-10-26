@@ -77,7 +77,9 @@ def guide_image(img: np.ndarray, instances: list[dict]) -> bytes:
 class Dataset:
     """Acumula imágenes y anotaciones y genera COCO, CSV, máscaras y resumen."""
 
-    def __init__(self, writer: Writer, classes: list[str], save_masks: bool = True, save_class_masks: bool = True):
+    def __init__(self, writer: Writer, classes: list[str], save_masks: bool = True, save_class_masks: bool = True,
+                 metadata: bool = True):
+        self.metadata = metadata
         self.w = writer
         self.classes = list(classes)
         self.cat_id = {c: i + 1 for i, c in enumerate(self.classes)}
@@ -128,6 +130,8 @@ class Dataset:
         self.detail.append({"imagen": rel_path, "split": split, "origen": origen, "materias": det, **(extra or {})})
 
     def finish(self):
+        if not self.metadata:  # solo imágenes
+            return self.w.close()
         self.w.write("anotaciones_coco.json", json.dumps(self.coco, ensure_ascii=False))
         buf = io.StringIO()
         cw = csv.writer(buf, delimiter=";")
