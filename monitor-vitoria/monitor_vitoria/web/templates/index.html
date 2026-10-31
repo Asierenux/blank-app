@@ -27,8 +27,37 @@
     <button role="tab" id="tab-energia" data-vista="energia" class="n-ok"><span class="marca-nivel"></span>Energía</button>
     <button role="tab" id="tab-aire" data-vista="aire" class="n-ok"><span class="marca-nivel"></span>Aire</button>
     <button role="tab" id="tab-meteo" data-vista="meteo" class="n-ok"><span class="marca-nivel"></span>Meteo</button>
+    <button role="tab" id="tab-explorar" data-vista="explorar" class="n-ok"><span class="marca-nivel"></span>Explorar</button>
     <button role="tab" id="tab-sistema" data-vista="sistema" class="n-ok"><span class="marca-nivel"></span>Sistema</button>
   </nav>
+
+  <!-- Barra de periodo: se usa en Agua, Aire, Meteo y Explorar -->
+  <div class="filtros" id="filtros" hidden>
+    <span class="filtros-t">Periodo</span>
+    <div class="selector" id="presets" role="group" aria-label="Periodo">
+      <button class="boton" data-horas="6">6 h</button>
+      <button class="boton" data-horas="24">24 h</button>
+      <button class="boton" data-horas="48">48 h</button>
+      <button class="boton" data-horas="168">7 días</button>
+      <button class="boton" data-horas="720">30 días</button>
+      <button class="boton" data-horas="2160">90 días</button>
+      <button class="boton" data-horas="personalizado">Fechas…</button>
+    </div>
+    <form class="rango" id="rango" hidden>
+      <label>Desde <input type="datetime-local" id="desde" required></label>
+      <label>Hasta <input type="datetime-local" id="hasta"></label>
+      <button class="boton primario" type="submit">Aplicar</button>
+    </form>
+    <label class="campo-sel">Resolución
+      <select id="agrupar">
+        <option value="auto">Automática</option>
+        <option value="ninguno">Cada dato</option>
+        <option value="hora">Por horas</option>
+        <option value="dia">Por días</option>
+      </select>
+    </label>
+    <span class="filtros-info" id="periodo-info"></span>
+  </div>
 </header>
 
 <main>
@@ -64,24 +93,19 @@
     <div class="embalses" id="agua-embalses"></div>
     <div class="embalses" id="agua-rios"></div>
     <article class="tarjeta">
-      <h2><span>Lluvia y respuesta de embalses y ríos</span>
-        <span class="selector" id="agua-rango">
-          <button class="boton" data-dias="2">48 h</button>
-          <button class="boton" data-dias="7" aria-pressed="true">7 días</button>
-          <button class="boton" data-dias="30">30 días</button>
-        </span></h2>
+      <h2><span>Lluvia y respuesta de embalses y ríos</span><span class="gris" id="agua-resolucion"></span></h2>
       <div class="fila mitades">
         <div>
-          <div class="leyenda" style="margin-bottom:6px"><span><i style="background:var(--lluvia)"></i>Lluvia (mm)</span><span id="leyenda-embalses"></span></div>
+          <div class="leyenda-int" id="ley-agua-embalses"></div>
           <div class="lienzo alto"><canvas id="g-agua-embalses"></canvas></div>
         </div>
         <div>
-          <div class="leyenda" style="margin-bottom:6px"><span><i style="background:var(--lluvia)"></i>Lluvia (mm)</span><span id="leyenda-rios"></span></div>
+          <div class="leyenda-int" id="ley-agua-rios"></div>
           <div class="lienzo alto"><canvas id="g-agua-rios"></canvas></div>
         </div>
       </div>
-      <p class="nota">Las barras de lluvia cuelgan desde arriba (como en los hidrogramas) para que se vea el
-        <b>retraso</b> entre el aguacero y la subida del río o del embalse.</p>
+      <p class="nota">Pulsa en la leyenda para ocultar o mostrar cada serie. Las barras de lluvia cuelgan desde arriba
+        (como en los hidrogramas) para que se vea el <b>retraso</b> entre el aguacero y la subida del río o del embalse.</p>
       <p class="nota"><b>Sobre las compuertas:</b> su posición no es un dato público. El panel lo estima comparando
         el <b>caudal de entrada</b> con el de <b>salida</b>: si sale bastante más de lo que entra, la presa está
         desembalsando (compuertas abiertas o turbinando); si el embalse está al máximo, puede estar vertiendo.</p>
@@ -97,10 +121,9 @@
       <div class="vacio" id="energia-luz-nota"></div>
     </article>
     <article class="tarjeta">
-      <h2><span>Generación hidráulica · últimos 30 días</span>
-        <span class="leyenda"><span><i style="background:var(--agua)"></i>País Vasco (MWh/día)</span>
-          <span><i class="linea" style="background:var(--agua-2)"></i>% hidráulica en la península</span></span></h2>
+      <h2><span>Generación hidráulica · últimos 30 días</span></h2>
       <div class="datos d4" id="energia-hidro-datos"></div>
+      <div class="leyenda-int" id="ley-energia-hidro"></div>
       <div class="lienzo"><canvas id="g-energia-hidro"></canvas></div>
       <p class="nota">Red Eléctrica no publica la producción de cada presa concreta. Esto es el total de energía
         hidráulica del País Vasco y de la península, por días.</p>
@@ -111,8 +134,10 @@
   <section class="vista" id="vista-aire" role="tabpanel" aria-labelledby="tab-aire" hidden>
     <div class="fichas f3" id="aire-fichas"></div>
     <article class="tarjeta">
-      <h2><span>Contaminantes · últimas 72 h (índice AQI)</span><span class="leyenda" id="leyenda-aire"></span></h2>
+      <h2><span>Contaminantes (índice AQI)</span><span class="gris" id="aire-resolucion"></span></h2>
+      <div class="leyenda-int" id="ley-aire"></div>
       <div class="lienzo alto"><canvas id="g-aire"></canvas></div>
+      <div class="desplazable"><table class="resumen-tabla" id="aire-tabla"></table></div>
       <p class="nota">Escala AQI (EE. UU.): <b style="color:var(--ok)">0–50 bueno</b> · <b style="color:var(--aviso)">51–100 moderado</b> ·
         <b style="color:var(--critico)">101–150 malo para grupos sensibles</b> · &gt;150 malo para todos. Los valores son índices, no µg/m³.</p>
     </article>
@@ -123,22 +148,66 @@
     <div class="fichas" id="meteo-fichas"></div>
     <div class="fila mitades">
       <article class="tarjeta">
-        <h2><span>Temperatura y viento · 48 h</span>
-          <span class="leyenda"><span><i style="background:var(--info)"></i>Temperatura (°C)</span>
-            <span><i class="linea" style="background:var(--aviso)"></i>Racha (m/s)</span></span></h2>
+        <h2><span>Temperatura y viento</span><span class="gris" id="meteo-resolucion"></span></h2>
+        <div class="leyenda-int" id="ley-meteo-temp"></div>
         <div class="lienzo"><canvas id="g-meteo-temp"></canvas></div>
       </article>
       <article class="tarjeta">
-        <h2><span>Lluvia y humedad · 48 h</span>
-          <span class="leyenda"><span><i style="background:var(--lluvia)"></i>Lluvia (mm/h)</span>
-            <span><i class="linea" style="background:var(--agua-2)"></i>Humedad (%)</span></span></h2>
+        <h2><span>Lluvia y humedad</span></h2>
+        <div class="leyenda-int" id="ley-meteo-lluvia"></div>
         <div class="lienzo"><canvas id="g-meteo-lluvia"></canvas></div>
       </article>
+    </div>
+    <article class="tarjeta">
+      <h2><span>Resumen del periodo</span></h2>
+      <div class="desplazable"><table class="resumen-tabla" id="meteo-tabla"></table></div>
+    </article>
+  </section>
+
+  <!-- ============================ EXPLORAR ============================ -->
+  <section class="vista" id="vista-explorar" role="tabpanel" aria-labelledby="tab-explorar" hidden>
+    <div class="explorar">
+      <article class="tarjeta selector-series">
+        <h2><span>Datos a comparar</span><button class="boton" id="exp-limpiar" type="button">Quitar todos</button></h2>
+        <input class="buscador" id="exp-buscar" type="search" placeholder="Buscar (temperatura, Urrunaga, caudal…)" aria-label="Buscar series">
+        <label class="campo-sel">Cálculo por intervalo
+          <select id="exp-funcion">
+            <option value="auto">Automático</option>
+            <option value="media">Media</option>
+            <option value="max">Máximo</option>
+            <option value="min">Mínimo</option>
+            <option value="suma">Suma (acumulado)</option>
+            <option value="ultimo">Último valor</option>
+          </select>
+        </label>
+        <div class="lista-series" id="exp-lista"></div>
+        <p class="nota">Hasta 12 series. Las grises aún no tienen datos.</p>
+      </article>
+      <div class="explorar-der">
+        <article class="tarjeta">
+          <h2><span id="exp-titulo">Comparar series</span>
+            <span class="selector"><button class="boton" id="exp-tipo" type="button" aria-pressed="false">▮ Barras</button>
+              <a class="boton" id="exp-csv" href="#" download>⬇ Descargar CSV</a></span></h2>
+          <div class="leyenda-int" id="ley-explorar"></div>
+          <div class="lienzo muy-alto"><canvas id="g-explorar"></canvas></div>
+          <div class="vacio" id="exp-vacio"></div>
+        </article>
+        <article class="tarjeta">
+          <h2><span>Resumen del periodo</span></h2>
+          <div class="desplazable"><table class="resumen-tabla" id="exp-tabla"></table></div>
+        </article>
+      </div>
     </div>
   </section>
 
   <!-- ============================= SISTEMA ============================ -->
   <section class="vista" id="vista-sistema" role="tabpanel" aria-labelledby="tab-sistema" hidden>
+    <article class="tarjeta" id="configuracion">
+      <h2><span>Configuración · claves y códigos</span><span class="gris" id="config-nota"></span></h2>
+      <p class="nota" style="margin-top:0">Pega cada clave y pulsa <b>Guardar y probar</b>: se guarda en el archivo
+        <code>.env</code> y se hace una recogida al momento para comprobar que funciona.</p>
+      <div class="config" id="config-campos"></div>
+    </article>
     <div class="fila">
       <article class="tarjeta">
         <h2><span>Estado de las fuentes</span></h2>
@@ -150,6 +219,13 @@
       </article>
       <article class="tarjeta">
         <h2><span>Historial de alertas</span><span id="sistema-alertas-num"></span></h2>
+        <div class="filtros-alertas">
+          <select id="alertas-cat" aria-label="Tipo de alerta">
+            <option value="">Todas</option><option value="agua">🌊 Agua</option><option value="meteo">🌦 Meteo</option>
+            <option value="aire">😷 Aire</option><option value="luz">💡 Luz</option>
+          </select>
+          <input class="buscador" id="alertas-buscar" type="search" placeholder="Buscar…" aria-label="Buscar alertas">
+        </div>
         <ul class="lista larga" id="sistema-alertas"></ul>
       </article>
     </div>

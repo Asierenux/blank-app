@@ -308,13 +308,17 @@ def construir_alertas(conn, c: Config) -> list[dict]:
             reglas[f"crecida_{e.id}"] = Regla(f"crecida_{e.id}", "saih", f"{e.id}.caudal",
                                               max, 0, f"🌊 Crecida en {e.nombre}")
     salida = []
-    for fila in db.alertas_recientes(conn, 30):
+    for fila in db.alertas_recientes(conn, 200):
         regla = reglas.get(fila["regla"])
         valor = db.valor_en(conn, regla.fuente, regla.metrica, fila["momento"]) if regla else None
         nivel = "ok" if fila["regla"] == "pvpc_barato" else "critico"
         unidad = RECOLECTORES[regla.fuente].metricas[regla.metrica][1] if regla else ""
+        rid = fila["regla"]
+        categoria = ("luz" if rid.startswith("pvpc") else "aire" if rid.startswith("aqi")
+                     else "agua" if rid.startswith(("embalse", "crecida", "caudal")) else "meteo")
         salida.append({
             "regla": fila["regla"],
+            "categoria": categoria,
             "titulo": regla.titulo if regla else fila["regla"],
             "momento": fila["momento"],
             "enviado_en": fila["enviado_en"],
@@ -530,47 +534,28 @@ def construir_agua(conn, c: Config, ahora: datetime) -> dict:
     }
 
 
-def historico_agua(conn, c: Config, dias: int, ahora: datetime | None = None) -> dict:
+def historico_agua(conn, c: Config, inicio: datetime, fin: datetime,
+                   agrupar: str = "auto") -> dict:
     """Lluvia + embalses + ríos alineados en el tiempo, para ver cómo responden
-    los niveles a la lluvia. Hasta 3 días: por horas. Más: por días."""
+    los niveles a la lluvia. Usa la consulta genérica de `consultas.py`."""
+    from .consultas import consultar
     from .recolectores.saih import catalogo_con_codigos
-    ahora = ahora or datetime.now(timezone.utc)
-    desde = ahora - timedelta(days=dias)
-    por_horas = dias <= 3
-
-    def cubo(momento_txt: str) -> str:
-        t = _dt(momento_txt)
-        if por_horas:
-            return a_utc_iso(t.replace(minute=0, second=0))
-        return t.astimezone(MADRID).date().isoformat()
-
-    # Rejilla de cubos (para que salgan también las horas/días sin datos)
-    cubos: list[str] = []
-    t = desde
-    while t <= ahora:
-        k = cubo(a_utc_iso(t))
-        if not cubos or cubos[-1] != k:
-            cubos.append(k)
-        t += timedelta(hours=1)
-
-    def agrupar(fuente, metrica, modo):
-        grupos: dict[str, list[float]] = {}
-        for r in db.serie_rango(conn, fuente, metrica, desde, ahora):
-            grupos.setdefault(cubo(r["momento"]), []).append(r["valor"])
-        f = {"suma": lambda v: round(sum(v), 1), "max": max, "ultimo": lambda v: v[-1]}[modo]
-        return [f(grupos[k]) if k in grupos else None for k in cubos]
-
     estaciones = catalogo_con_codigos(c.saih_codigos)
+    embalses = [e for e in estaciones if e.tipo == "embalse"]
+    rios = [e for e in estaciones if e.tipo == "rio"]
+    ids = (["aemet:precipitacion"] + [f"saih:{e.id}.porcentaje" for e in embalses]
+           + [f"saih:{e.id}.caudal" for e in rios])
+    r = consultar(conn, ids, inicio, fin, agrupar)
+    valores = {s["id"]: s["valores"] for s in r["series"]}
     return {
-        "resolucion": "hora" if por_horas else "dia",
-        "cubos": cubos,
-        "lluvia": agrupar("aemet", "precipitacion", "suma"),
+        "resolucion": r["agrupar"],
+        "desde": r["desde"], "hasta": r["hasta"],
+        "cubos": r["cubos"],
+        "lluvia": valores["aemet:precipitacion"],
         "embalses": [{"id": e.id, "nombre": e.nombre,
-                      "porcentaje": agrupar("saih", f"{e.id}.porcentaje", "ultimo")}
-                     for e in estaciones if e.tipo == "embalse"],
+                      "porcentaje": valores[f"saih:{e.id}.porcentaje"]} for e in embalses],
         "rios": [{"id": e.id, "nombre": e.nombre,
-                  "caudal": agrupar("saih", f"{e.id}.caudal", "max")}
-                 for e in estaciones if e.tipo == "rio"],
+                  "caudal": valores[f"saih:{e.id}.caudal"]} for e in rios],
     }
 
 

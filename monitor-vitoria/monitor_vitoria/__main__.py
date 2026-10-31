@@ -1,6 +1,7 @@
 """Línea de comandos: `python -m monitor_vitoria <orden>`.
 
 Órdenes:
+    iniciar [--demo]        ⭐ TODO EN UNO: recogida + panel + abre el navegador
     init-db                 crea la base de datos vacía
     recoger [fuente|todas]  ejecuta un recolector una vez (para probar)
     planificador            arranca la recogida periódica (se queda corriendo)
@@ -26,6 +27,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="monitor_vitoria", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="orden", required=True)
+    p_ini = sub.add_parser("iniciar", help="recogida + panel + navegador (lo más fácil)")
+    p_ini.add_argument("--demo", action="store_true", help="con datos simulados, sin recoger nada")
+    p_ini.add_argument("--puerto", type=int, help="puerto del panel (por defecto 8000)")
+    p_ini.add_argument("--sin-navegador", action="store_true", help="no abrir el navegador")
     sub.add_parser("init-db", help="crea la base de datos")
     p_rec = sub.add_parser("recoger", help="ejecuta recolectores una vez")
     p_rec.add_argument("fuente", nargs="?", default="todas",
@@ -43,6 +48,9 @@ def main(argv: list[str] | None = None) -> int:
     p_saih.add_argument("codigo", help="p. ej. E028")
     p_saih.add_argument("--estacion", help="id del catálogo (urrunaga, ullibarri, zadorra_arce...)")
     args = parser.parse_args(argv)
+
+    if args.orden == "iniciar":
+        return _iniciar(args)
 
     config = cargar_config()
     logging.basicConfig(level=config.log_level,
@@ -67,9 +75,8 @@ def main(argv: list[str] | None = None) -> int:
 
         import uvicorn
         if args.demo:
-            # Igual que DB_PATH=datos/demo.db, pero funciona en cualquier terminal (cmd, PowerShell, Mac...)
-            from .config import RAIZ
-            os.environ["DB_PATH"] = str(RAIZ / "datos" / "demo.db")
+            # Usa datos/demo.db; funciona en cualquier terminal (cmd, PowerShell, Mac...)
+            os.environ["MONITOR_DEMO"] = "1"
             print("Modo demo: usando datos/demo.db")
         uvicorn.run("monitor_vitoria.web.app:app",
                     host=args.host or config.web_host,
@@ -102,6 +109,63 @@ def main(argv: list[str] | None = None) -> int:
     elif args.orden == "probar-saih":
         return _probar_saih(config, args.codigo.upper(), args.estacion)
 
+    return 0
+
+
+def _iniciar(args) -> int:
+    """Arranca todo en un único programa (lo que hacen iniciar.bat / iniciar.command)."""
+    import os
+    import socket
+    import threading
+    import webbrowser
+
+    import uvicorn
+
+    from .config import asegurar_env
+
+    asegurar_env()                                   # crea .env la primera vez
+    if args.demo:
+        os.environ["MONITOR_DEMO"] = "1"
+    config = cargar_config()
+    logging.basicConfig(level=config.log_level,
+                        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    puerto = args.puerto or config.web_port
+    url = f"http://127.0.0.1:{puerto}"
+
+    # ¿Ya está funcionando (p. ej. doble clic dos veces)? Entonces solo abrimos el navegador.
+    with socket.socket() as sock:
+        if sock.connect_ex(("127.0.0.1", puerto)) == 0:
+            print(f"El panel ya está en marcha en {url}. Abriendo el navegador…")
+            webbrowser.open(url)
+            return 0
+
+    sched = None
+    if args.demo:
+        from .demo import generar
+        generar(config.db_path)                      # datos simulados con la hora actual
+        modo = "DEMO (datos simulados, no se recoge nada)"
+    else:
+        from .planificador import crear_planificador
+        db.conectar(config.db_path).close()
+        sched = crear_planificador(config, en_segundo_plano=True)
+        sched.start()
+        modo = "recogiendo datos reales"
+
+    print("\n" + "=" * 62)
+    print("  MONITOR VITORIA-GASTEIZ")
+    print(f"  Modo:  {modo}")
+    print(f"  Panel: {url}")
+    print("  No cierres esta ventana. Para parar: pulsa Ctrl + C")
+    print("=" * 62 + "\n")
+    if not args.sin_navegador:
+        threading.Timer(2.0, webbrowser.open, [url]).start()
+    try:
+        # host 127.0.0.1: el panel solo se ve desde este ordenador
+        uvicorn.run("monitor_vitoria.web.app:app", host=config.web_host, port=puerto,
+                    log_level="warning")
+    finally:
+        if sched:
+            sched.shutdown(wait=False)
     return 0
 
 

@@ -184,3 +184,74 @@ td .sec { color:var(--suave); font-size:.75rem; display:block; margin-top:2px; }
   .embalse .grande { font-size:1.9rem; }
   .agua-mini .fila-mini { grid-template-columns: 1fr auto; } .agua-mini .barra-pct { grid-column: 1 / -1; order:3; }
 }
+
+/* ---------- Barra de periodo (filtros) ---------- */
+.filtros { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; padding:8px 16px 10px;
+  border-top:1px solid var(--borde); background:var(--panel); }
+.filtros[hidden] { display:none; }
+.filtros-t { font-size:.72rem; font-weight:800; letter-spacing:.08em; color:var(--suave); text-transform:uppercase; }
+.filtros .selector { flex-wrap:wrap; }
+.filtros-info { font-size:.78rem; color:var(--suave); margin-left:auto; }
+.rango { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.rango[hidden] { display:none; }
+.rango label, .campo-sel { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--suave); }
+input, select { background:var(--panel-2); color:var(--texto); border:1px solid var(--borde); border-radius:8px;
+  padding:6px 8px; font:inherit; font-size:.85rem; min-width:0; }
+input:focus-visible, select:focus-visible { outline:2px solid var(--info); outline-offset:1px; }
+[data-tema="oscuro"] input[type="datetime-local"] { color-scheme: dark; }
+.boton.primario { background:var(--info); color:#fff; border-color:var(--info); }
+a.boton { text-decoration:none; display:inline-flex; align-items:center; }
+
+/* ---------- Leyendas interactivas ---------- */
+.leyenda-int { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
+.chip { display:inline-flex; align-items:center; gap:6px; background:var(--panel-2); border:1px solid var(--borde);
+  color:var(--texto); border-radius:999px; padding:3px 10px; font:inherit; font-size:.75rem; cursor:pointer; }
+.chip i { width:12px; height:4px; border-radius:2px; display:inline-block; }
+.chip i.barra { height:10px; width:10px; }
+.chip[aria-pressed="false"] { opacity:.45; text-decoration:line-through; }
+.lienzo.muy-alto { height:400px; }
+
+/* ---------- Tablas de resumen ---------- */
+.resumen-tabla { margin-top:10px; }
+.resumen-tabla td.num, .resumen-tabla th.num { text-align:right; }
+.resumen-tabla .color { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+
+/* ---------- Explorar ---------- */
+.explorar { display:grid; gap:12px; grid-template-columns: minmax(260px, 1fr) minmax(0, 3fr); align-items:start; }
+.explorar-der { display:grid; gap:12px; min-width:0; }
+.selector-series { display:grid; gap:10px; position:sticky; top:150px; }
+.buscador { width:100%; }
+.lista-series { max-height:52vh; overflow:auto; display:grid; gap:2px; padding-right:4px; }
+.lista-series .grupo { font-size:.7rem; font-weight:800; letter-spacing:.06em; color:var(--suave); text-transform:uppercase;
+  margin:10px 0 4px; }
+.lista-series label { display:flex; align-items:center; gap:8px; font-size:.84rem; padding:5px 6px; border-radius:6px; cursor:pointer; }
+.lista-series label:hover { background:var(--panel-2); }
+.lista-series label.sin-datos { color:var(--tenue); }
+.lista-series label small { margin-left:auto; color:var(--suave); font-size:.7rem; }
+.lista-series input { accent-color: var(--info); }
+
+/* ---------- Configuración ---------- */
+.config { display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+.config-campo { background:var(--panel-2); border:1px solid var(--borde); border-left:4px solid var(--c); border-radius:8px;
+  padding:12px; display:grid; gap:8px; }
+.config-campo .cab { display:flex; justify-content:space-between; gap:8px; align-items:center; flex-wrap:wrap; }
+.config-campo .ayuda { font-size:.8rem; color:var(--suave); line-height:1.45; }
+.config-campo .ayuda a { color:var(--info); }
+.config-campo form { display:flex; gap:6px; }
+.config-campo form input { flex:1; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.config-campo .resultado { font-size:.8rem; }
+.config-campo .resultado.ok { color:var(--ok); } .config-campo .resultado.mal { color:var(--critico); }
+.filtros-alertas { display:flex; gap:8px; margin-bottom:10px; }
+code { background:var(--panel-2); padding:1px 5px; border-radius:4px; font-size:.9em; }
+a.enlace-config { color:var(--info); font-size:.75rem; font-weight:700; display:block; margin-top:4px; }
+
+@media (max-width: 1200px) { .explorar { grid-template-columns: 1fr; } .selector-series { position:static; }
+  .lista-series { max-height:260px; } }
+@media (max-width: 640px) {
+  .filtros { padding:8px 10px; } .filtros-info { margin-left:0; width:100%; }
+  .config { grid-template-columns: 1fr; } .config-campo form { flex-direction:column; }
+  .lienzo.muy-alto { height:300px; }
+}
+
+/* En el móvil la cabecera no se queda fija: ocuparía media pantalla */
+@media (max-width: 640px) { .cabecera { position:static; } }

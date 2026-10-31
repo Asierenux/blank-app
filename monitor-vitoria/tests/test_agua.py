@@ -106,7 +106,7 @@ def test_historico_agua_alinea_lluvia_y_caudal(config):
     conn = db.conectar(config.db_path)
     _serie_caudal(conn, [5, 5, 12, 20])
     db.guardar_lecturas(conn, [Lectura("aemet", "precipitacion", AHORA - timedelta(hours=3), 8.0, "mm")])
-    h = panel.historico_agua(conn, config, 1, AHORA + timedelta(minutes=30))
+    h = panel.historico_agua(conn, config, AHORA - timedelta(days=1), AHORA + timedelta(minutes=30))
     rio = next(r for r in h["rios"] if r["id"] == "zadorra_arce")
     assert len(h["cubos"]) == len(h["lluvia"]) == len(rio["caudal"])
     assert 8.0 in h["lluvia"] and rio["caudal"][-1] == 20

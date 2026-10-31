@@ -18,8 +18,8 @@ from dotenv import load_dotenv
 
 # Carpeta raíz del proyecto (la que contiene .env, requirements.txt...)
 RAIZ = Path(__file__).resolve().parent.parent
-
-load_dotenv(RAIZ / ".env")
+ARCHIVO_ENV = RAIZ / ".env"
+DB_DEMO = RAIZ / "datos" / "demo.db"
 
 
 def _texto(nombre: str, defecto: str | None = None) -> str | None:
@@ -92,7 +92,11 @@ class Config:
 
 
 def cargar_config() -> Config:
+    # override=True: si cambias el .env (p. ej. desde el panel), se relee al momento
+    load_dotenv(ARCHIVO_ENV, override=True)
     db = Path(_texto("DB_PATH", "datos/monitor.db"))
+    if os.getenv("MONITOR_DEMO") == "1":     # modo demo: siempre la base de datos simulada
+        db = DB_DEMO
     if not db.is_absolute():
         db = RAIZ / db
 
@@ -124,3 +128,28 @@ def cargar_config() -> Config:
         web_port=_entero("WEB_PORT", 8000),
         log_level=_texto("LOG_LEVEL", "INFO").upper(),
     )
+
+
+# --------------------------------------------------------------------------
+# Escribir en .env (lo usa la pantalla de Configuración del panel)
+# --------------------------------------------------------------------------
+
+def asegurar_env() -> None:
+    """Si no existe .env, lo crea copiando .env.example."""
+    if not ARCHIVO_ENV.exists():
+        ejemplo = RAIZ / ".env.example"
+        ARCHIVO_ENV.write_text(ejemplo.read_text(encoding="utf-8") if ejemplo.exists() else "",
+                               encoding="utf-8")
+
+
+def guardar_en_env(cambios: dict[str, str]) -> None:
+    """Cambia (o añade) variables en .env conservando comentarios y orden."""
+    asegurar_env()
+    lineas = ARCHIVO_ENV.read_text(encoding="utf-8").splitlines()
+    pendientes = dict(cambios)
+    for i, linea in enumerate(lineas):
+        clave = linea.split("=", 1)[0].strip()
+        if not linea.lstrip().startswith("#") and "=" in linea and clave in pendientes:
+            lineas[i] = f"{clave}={pendientes.pop(clave)}"
+    lineas += [f"{k}={v}" for k, v in pendientes.items()]
+    ARCHIVO_ENV.write_text("\n".join(lineas) + "\n", encoding="utf-8")

@@ -26,6 +26,27 @@ def crear_cliente() -> httpx.Client:
                         follow_redirects=True)
 
 
+def explicar_error(e: Exception) -> str:
+    """Convierte errores técnicos en mensajes que se entiendan en el panel."""
+    from .modelos import ErrorRecolector
+    if isinstance(e, ErrorRecolector):
+        return str(e)
+    if isinstance(e, httpx.HTTPStatusError):
+        codigo = e.response.status_code
+        if codigo in (401, 403):
+            return f"La web rechazó la clave (error {codigo}). ¿Está bien copiada y activada?"
+        if codigo == 429:
+            return "Demasiadas consultas seguidas (error 429). Se reintentará más tarde."
+        if codigo >= 500:
+            return f"La web de la fuente está fallando ahora mismo (error {codigo})."
+        return f"La web respondió con error {codigo}."
+    if isinstance(e, httpx.TimeoutException):
+        return "La web tardó demasiado en responder. Se reintentará más tarde."
+    if isinstance(e, (httpx.ConnectError, httpx.ProxyError, httpx.NetworkError)):
+        return f"No se pudo conectar con la web ({type(e).__name__}). ¿Hay conexión a internet?"
+    return f"{type(e).__name__}: {e}"
+
+
 def ejecutar_recolector(config: Config, nombre: str) -> bool:
     """Ejecuta un recolector de principio a fin. Nunca lanza excepción:
     los errores se registran en la tabla `ejecuciones` y en el log, para que
@@ -52,7 +73,7 @@ def ejecutar_recolector(config: Config, nombre: str) -> bool:
     except Exception as e:  # noqa: BLE001 — queremos capturar cualquier fallo
         log.exception("[%s] error al recoger", nombre)
         db.registrar_ejecucion(conn, nombre, inicio, ok=False,
-                               error=f"{type(e).__name__}: {e}"[:500])
+                               error=explicar_error(e)[:500])
         return False
     finally:
         conn.close()

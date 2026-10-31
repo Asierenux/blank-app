@@ -14,11 +14,45 @@ Además tiene un panel de operaciones web (FastAPI) y alertas por Telegram.
 ![Pestaña Agua](docs/panel-agua.png)
 
 > ¿Sin claves todavía? `python -m monitor_vitoria demo` crea datos simulados en
-> `datos/demo.db` y `python -m monitor_vitoria web --demo` abre el panel con ellos.
+> `datos/demo.db` y `python -m monitor_vitoria iniciar --demo` abre el panel con ellos.
 
 ---
 
-## Guía paso a paso
+## ⭐ Arrancarlo (la forma fácil)
+
+1. Instala Python desde https://www.python.org/downloads/
+   (en Windows, **marca la casilla «Add python.exe to PATH»**).
+2. Entra en la carpeta `monitor-vitoria` y haz **doble clic** en:
+
+   | | Datos reales | Datos de prueba (sin claves) |
+   |---|---|---|
+   | **Windows** | `iniciar.bat` | `demo.bat` |
+   | **Mac** | `iniciar.command` | `demo.command` |
+   | **Linux** | `./iniciar.sh` | `./iniciar.sh --demo` |
+
+   La primera vez tarda 1-2 minutos (prepara Python y las librerías). Después arranca en segundos,
+   se abre el navegador con el panel y la recogida de datos funciona sola mientras la ventana esté abierta.
+   Si haces doble clic con el panel ya abierto, solo abre el navegador.
+3. En el panel, pestaña **Sistema → Configuración**, pega tus claves y pulsa **Guardar y probar**.
+   No hace falta tocar ningún archivo ni reiniciar.
+
+> En Mac, la primera vez puede salir «no se puede abrir porque es de un desarrollador no identificado»:
+> clic derecho sobre el archivo → **Abrir** → **Abrir**.
+
+## Uso del panel: filtros
+
+- **Periodo** (barra bajo las pestañas en Agua, Aire, Meteo y Explorar): 6 h, 24 h, 48 h, 7, 30 o 90 días,
+  o **Fechas…** para elegir desde/hasta. **Resolución**: automática, cada dato, por horas o por días.
+  El periodo elegido se recuerda la próxima vez.
+- **Leyendas**: pulsa sobre una serie para ocultarla o mostrarla.
+- **Explorar**: marca cualquier dato (temperatura, caudal del Zadorra, % de Urrunaga, precio de la luz…),
+  compáralos en la misma gráfica, elige el cálculo por intervalo (media, máximo, mínimo, suma, último)
+  y **descarga un CSV** que se abre con Excel.
+- **Sistema**: configuración de claves, estado de cada fuente e historial de alertas con filtro por tipo y buscador.
+
+## Guía paso a paso (para entender cómo funciona por dentro)
+
+Si usas `iniciar.bat`/`iniciar.command` no necesitas nada de esto; es para aprender qué hace cada pieza.
 
 ### 1. Preparar Python y el entorno virtual
 

@@ -8,7 +8,8 @@
 "use strict";
 
 const ZONA = "Europe/Madrid";
-const VISTAS = ["resumen", "agua", "energia", "aire", "meteo", "sistema"];
+const VISTAS = ["resumen", "agua", "energia", "aire", "meteo", "explorar", "sistema"];
+const VISTAS_CON_PERIODO = ["agua", "aire", "meteo", "explorar"];
 const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
 const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
 
@@ -59,10 +60,36 @@ function sparkline(serie, color) {
 
 // ---------------------------------------------------------------- gráficas (Chart.js)
 const graficas = {};
+const ocultas = leer("ocultas", {});        // {idGrafica: [etiquetas ocultas]} (se recuerda entre visitas)
 function grafica(id, tipo, datos, opciones) {
-  if (graficas[id]) { Object.assign(graficas[id], {data: datos, options: opciones}); graficas[id].update("none"); return; }
-  if ($(id)) graficas[id] = new Chart($(id), {type: tipo, data: datos, options: opciones});
+  // Respeta las series que el usuario ha ocultado pulsando en la leyenda
+  datos.datasets.forEach(ds => { ds.hidden = (ocultas[id] || []).includes(ds.label); });
+  if (graficas[id]) { Object.assign(graficas[id], {data: datos, options: opciones}); graficas[id].update("none"); }
+  else if ($(id)) graficas[id] = new Chart($(id), {type: tipo, data: datos, options: opciones});
 }
+
+// Leyenda en la que se puede pulsar para ocultar/mostrar cada serie
+function leyendaInteractiva(idLeyenda, idGrafica, items) {
+  const cont = $(idLeyenda); if (!cont) return;
+  cont.innerHTML = items.map(it => {
+    const visible = !(ocultas[idGrafica] || []).includes(it.label);
+    return `<button type="button" class="chip" aria-pressed="${visible}" data-label="${esc(it.label)}">
+      <i class="${it.barra ? "barra" : ""}" style="background:${it.color}"></i>${esc(it.label)}${it.extra ? ` <span class="gris">${esc(it.extra)}</span>` : ""}</button>`;
+  }).join("");
+  cont.onclick = ev => {
+    const b = ev.target.closest(".chip"); if (!b) return;
+    const lista = new Set(ocultas[idGrafica] || []), label = b.dataset.label;
+    lista.has(label) ? lista.delete(label) : lista.add(label);
+    ocultas[idGrafica] = [...lista]; guardar("ocultas", ocultas);
+    b.setAttribute("aria-pressed", !lista.has(label));
+    const g = graficas[idGrafica];
+    if (g) { g.data.datasets.forEach(ds => { ds.hidden = lista.has(ds.label); }); g.update("none"); }
+  };
+}
+
+// Pequeño almacén en el navegador (recuerda periodo, series elegidas, etc.)
+function leer(clave, defecto) { try { return JSON.parse(localStorage.getItem("mv." + clave)) ?? defecto; } catch { return defecto; } }
+function guardar(clave, valor) { try { localStorage.setItem("mv." + clave, JSON.stringify(valor)); } catch {} }
 function destruirGraficas() { for (const k in graficas) { graficas[k].destroy(); delete graficas[k]; } }
 const eje = (extra = {}) => ({ ticks:{ color:css("--suave"), font:{size:11}, ...(extra.ticks || {}) },
   grid:{ color:css("--borde"), ...(extra.grid || {}) }, border:{display:false}, ...Object.fromEntries(Object.entries(extra).filter(([k]) => !["ticks","grid"].includes(k))) });
@@ -149,7 +176,8 @@ function pintarAlertas(idLista, idNum, lista, max) {
 function pintarFuentes(id, lista, completo) {
   $(id).innerHTML = lista.map(f => `<tr class="n-${f.nivel}">
     <td><b>${esc(f.descripcion)}</b><span class="sec">cada ${f.intervalo_min} min</span></td>
-    <td><span class="pastilla">${ICONO[f.nivel]} ${esc(f.texto).toUpperCase()}</span>${f.error ? `<span class="error">${esc(f.error)}</span>` : ""}</td>
+    <td><span class="pastilla">${ICONO[f.nivel]} ${esc(f.texto).toUpperCase()}</span>${f.error ? `<span class="error">${esc(f.error)}</span>` : ""}
+      ${f.texto === "Sin configurar" ? `<a class="enlace-config" href="#sistema" data-ir-config>Configurar →</a>` : ""}</td>
     <td class="num">${f.ultima_ok ? hace(f.ultima_ok) : "nunca"}</td>
     ${completo ? `<td class="num">${f.nuevas ?? 0}</td>` : ""}</tr>`).join("");
 }
@@ -225,33 +253,152 @@ function aguaMini(a) {
   $("resumen-lluvia").textContent = ll.h24 == null ? "" : `Lluvia: ${num(ll.h24, 1)} mm/24 h · ${num(ll.d7, 1)} mm/7 días`;
 }
 
-let diasAgua = 7, historicoAgua = null;
-async function cargarHistoricoAgua() {
-  try {
-    const r = await fetch(`/api/agua/historico?dias=${diasAgua}`, {cache:"no-store"});
-    if (r.ok) historicoAgua = await r.json();
-  } catch { /* el aviso de conexión ya lo gestiona refrescar() */ }
+
+// =====================================================================
+// PERIODO (barra de filtros): se usa en Agua, Aire, Meteo y Explorar
+// =====================================================================
+let periodo = leer("periodo", {horas:48, desde:"", hasta:"", agrupar:"auto"});
+const aInputLocal = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+const fFecha = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, day:"numeric", month:"short", hour:"2-digit", minute:"2-digit"});
+const NOMBRE_AGRUPAR = {hora:"por horas", dia:"por días", ninguno:"cada dato"};
+
+function paramsPeriodo(extra = {}) {
+  const p = new URLSearchParams(extra);
+  if (periodo.desde) { p.set("desde", periodo.desde); if (periodo.hasta) p.set("hasta", periodo.hasta); }
+  else p.set("horas", periodo.horas);
+  p.set("agrupar", periodo.agrupar);
+  return p;
+}
+const textoRango = r => r && r.desde ? `${fFecha.format(new Date(r.desde))} → ${fFecha.format(new Date(r.hasta))} · ${NOMBRE_AGRUPAR[r.agrupar || r.resolucion] || ""}` : "";
+const etiquetaCubo = (t, agrupar) => agrupar === "dia" ? diaMes(t) : diaHora(t);
+
+function pintarFiltros() {
+  const personal = !!periodo.desde;
+  $("presets").querySelectorAll("button").forEach(b => b.setAttribute("aria-pressed",
+    personal ? b.dataset.horas === "personalizado" : Number(b.dataset.horas) === periodo.horas));
+  $("rango").hidden = !personal && !$("rango").dataset.abierto;
+  $("agrupar").value = periodo.agrupar;
+}
+function cambiarPeriodo(cambios) {
+  periodo = {...periodo, ...cambios}; guardar("periodo", periodo);
+  pintarFiltros(); cargarVista(vista).then(pintar);
+}
+$("presets").addEventListener("click", ev => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.horas === "personalizado") {
+    $("rango").dataset.abierto = "1"; $("rango").hidden = false;
+    if (!$("desde").value) $("desde").value = aInputLocal(new Date(Date.now() - 7 * 864e5));
+    $("desde").focus();
+    return;
+  }
+  delete $("rango").dataset.abierto;
+  cambiarPeriodo({horas: Number(b.dataset.horas), desde: "", hasta: ""});
+});
+$("rango").addEventListener("submit", ev => {
+  ev.preventDefault();
+  cambiarPeriodo({desde: $("desde").value, hasta: $("hasta").value});
+});
+$("agrupar").addEventListener("change", () => cambiarPeriodo({agrupar: $("agrupar").value}));
+if (periodo.desde) { $("desde").value = periodo.desde; $("hasta").value = periodo.hasta || ""; }
+
+// =====================================================================
+// CARGA DE DATOS POR VISTA (según el periodo elegido)
+// =====================================================================
+const cache = {};
+async function getJSON(url, opciones) {
+  const r = await fetch(url, {cache:"no-store", ...opciones});
+  if (!r.ok) { let m = `Error ${r.status}`; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+  return r.json();
+}
+const SERIES_AIRE = ["waqi:aqi", "waqi:pm25", "waqi:pm10", "waqi:no2", "waqi:o3"];
+const SERIES_METEO = ["aemet:temperatura", "aemet:racha", "aemet:precipitacion", "aemet:humedad", "aemet:presion"];
+let expSel = leer("exp.sel", ["aemet:temperatura", "aemet:precipitacion"]);
+let expFuncion = leer("exp.fun", "auto"), expBarras = leer("exp.barras", false);
+
+const CARGADORES = {
+  agua: () => getJSON(`/api/agua/historico?${paramsPeriodo()}`),
+  aire: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_AIRE.join(",")})}`),
+  meteo: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_METEO.join(",")})}`),
+  async explorar() {
+    cache.catalogo = await getJSON("/api/catalogo");
+    if (!expSel.length) return null;
+    return getJSON(`/api/datos?${paramsPeriodo({series: expSel.join(","), funcion: expFuncion})}`);
+  },
+  async sistema() { cache.config = await getJSON("/api/config"); return null; },
+};
+async function cargarVista(v) {
+  if (!CARGADORES[v]) return;
+  try { cache[v] = await CARGADORES[v](); }
+  catch (e) { console.error(e); cache[v] = {error: e.message}; }
 }
 
+// =====================================================================
+// GRÁFICA GENÉRICA DE SERIES (Aire, Meteo, Explorar)
+// =====================================================================
+const PALETA = () => [css("--info"), css("--aviso"), css("--ok"), css("--agua-2"), css("--critico"), css("--agua"),
+                      "#f472b6", "#a3e635", "#fb923c", "#94a3b8", "#e879f9", "#2dd4bf"];
+const decimales = u => ({"€/kWh":3, "AQI":0, "%":1, "MWh":0}[u] ?? 1);
+const esBarra = (s, barras) => barras || s.metrica.endsWith("precipitacion");
+
+function graficaSeries(idGraf, idLey, r, series, {colores, barras = false} = {}) {
+  const pal = colores || PALETA();
+  const unidades = [...new Set(series.map(s => s.unidad))];
+  const ejes = {};
+  unidades.forEach((u, i) => {
+    const deBarras = series.some(s => s.unidad === u && esBarra(s, barras));
+    // display "auto": el eje desaparece si ocultas (en la leyenda) todas sus series
+    ejes["y" + i] = eje({ position: i % 2 ? "right" : "left", display: i < 2 ? "auto" : false, beginAtZero: deBarras,
+      grid: { display: i === 0 }, ticks: { callback: v => `${num(v, Number.isInteger(v) ? 0 : decimales(u) > 1 ? 2 : 1)} ${u}` } });
+  });
+  const datasets = series.map((s, i) => {
+    const color = pal[i % pal.length], barra = esBarra(s, barras);
+    return { type: barra ? "bar" : "line", label: s.etiqueta, data: s.valores, yAxisID: "y" + unidades.indexOf(s.unidad),
+      borderColor: color, backgroundColor: barra ? color + "aa" : color, pointRadius: r.agrupar === "dia" ? 2 : 0,
+      borderWidth: 2, tension: .25, spanGaps: true, order: barra ? 2 : 1, unidad: s.unidad };
+  });
+  leyendaInteractiva(idLey, idGraf, datasets.map(d => ({label: d.label, color: d.borderColor, barra: d.type === "bar", extra: d.unidad})));
+  grafica(idGraf, "bar", { labels: r.cubos, datasets },
+    { ...opcionesBase({ title: c => etiquetaCubo(c[0].label, r.agrupar),
+        label: c => `${c.dataset.label}: ${num(c.raw, decimales(c.dataset.unidad))} ${c.dataset.unidad}` }),
+      scales: { x: eje({ offset: true, ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: innerWidth < 640 ? 4 : 10,
+                  callback(v) { return etiquetaCubo(this.getLabelForValue(v), r.agrupar); } } }), ...ejes } });
+}
+
+function tablaResumen(idTabla, series, colores) {
+  const pal = colores || PALETA();
+  $(idTabla).innerHTML = `<thead><tr><th>Dato</th><th class="num">Último</th><th class="num">Mínimo</th>
+      <th class="num">Máximo</th><th>Máximo el</th><th class="num">Media</th><th class="num">Nº datos</th></tr></thead><tbody>` +
+    series.map((s, i) => { const r = s.resumen, d = decimales(s.unidad), u = esc(s.unidad);
+      return `<tr><td><span class="color" style="background:${pal[i % pal.length]}"></span>${esc(s.etiqueta)}</td>
+        <td class="num">${r.n ? num(r.ultimo, d) + " " + u : "—"}</td><td class="num">${r.n ? num(r.min, d) : "—"}</td>
+        <td class="num">${r.n ? num(r.max, d) : "—"}</td><td class="gris">${r.momento_max ? diaHora(r.momento_max) : ""}</td>
+        <td class="num">${r.n ? num(r.media, d) : "—"}</td><td class="num">${r.n}</td></tr>`; }).join("") + "</tbody>";
+}
+
+// =====================================================================
+// AGUA: lluvia vs embalses y ríos
+// =====================================================================
 function graficasAgua() {
-  const h = historicoAgua; if (!h) return;
-  const etiqueta = t => h.resolucion === "hora" ? diaHora(t) : diaMes(t);
+  const h = cache.agua; if (!h || h.error) return;
+  $("agua-resolucion").textContent = textoRango(h);
+  const etq = t => etiquetaCubo(t, h.resolucion);
   const maxLluvia = Math.max(1, ...h.lluvia.filter(v => v != null));
-  const lluvia = { type:"bar", label:"Lluvia", data:h.lluvia, yAxisID:"yLluvia", backgroundColor: css("--lluvia") + "99", order:2 };
+  const lluvia = () => ({ type:"bar", label:"Lluvia", data:h.lluvia, yAxisID:"yLluvia", backgroundColor: css("--lluvia") + "99", order:2 });
   const ejeLluvia = eje({ position:"right", reverse:true, beginAtZero:true, max: Math.ceil(maxLluvia * 2.2),
     grid:{ display:false }, ticks:{ callback: v => v + " mm" } });
   const ejeX = eje({ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit: innerWidth < 640 ? 5 : 10,
-    callback(v) { return etiqueta(this.getLabelForValue(v)); } } });
+    callback(v) { return etq(this.getLabelForValue(v)); } } });
   const colores = SERIE_COLORES();
-  const linea = (s, i, datos, eje) => ({ type:"line", label:s.nombre, data:datos, yAxisID:eje, borderColor:colores[i % colores.length],
+  const linea = (s, i, datos) => ({ type:"line", label:s.nombre, data:datos, yAxisID:"y", borderColor:colores[i % colores.length],
     backgroundColor:colores[i % colores.length], pointRadius:0, borderWidth:2.2, tension:.25, spanGaps:true, order:1 });
-  const leyenda = (lista) => lista.map((s, i) => `<span><i class="linea" style="background:${colores[i % colores.length]}"></i>${esc(s.nombre)}</span>`).join("");
+  const items = ds => ds.map(d => ({label: d.label, color: d.type === "bar" ? css("--lluvia") : d.borderColor, barra: d.type === "bar"}));
 
   const embalses = h.embalses.filter(e => e.porcentaje.some(v => v != null));
   const vals = embalses.flatMap(e => e.porcentaje.filter(v => v != null));
-  $("leyenda-embalses").innerHTML = embalses.length ? leyenda(embalses) + " <span>(% llenado)</span>" : "Sin datos de embalses";
-  grafica("g-agua-embalses", "bar", { labels:h.cubos, datasets:[lluvia, ...embalses.map((e, i) => linea(e, i, e.porcentaje, "y"))] },
-    { ...opcionesBase({ title: c => etiqueta(c[0].label),
+  const dsE = [lluvia(), ...embalses.map((e, i) => linea(e, i, e.porcentaje))];
+  leyendaInteractiva("ley-agua-embalses", "g-agua-embalses", items(dsE));
+  grafica("g-agua-embalses", "bar", { labels:h.cubos, datasets:dsE },
+    { ...opcionesBase({ title: c => etq(c[0].label),
         label: c => c.dataset.yAxisID === "yLluvia" ? `Lluvia ${num(c.raw, 1)} mm` : `${c.dataset.label}: ${num(c.raw, 1)} %` }),
       scales:{ x:ejeX, yLluvia:ejeLluvia,
         // En gráficas de barras Chart.js empieza en 0 por defecto; aquí queremos ver el detalle de la subida
@@ -260,14 +407,17 @@ function graficasAgua() {
                  ticks:{ callback: v => v + " %" } }) } });
 
   const rios = h.rios.filter(r => r.caudal.some(v => v != null));
-  $("leyenda-rios").innerHTML = rios.length ? leyenda(rios) + " <span>(caudal m³/s)</span>" : "Sin datos de ríos";
-  grafica("g-agua-rios", "bar", { labels:h.cubos, datasets:[lluvia, ...rios.map((r, i) => linea(r, i, r.caudal, "y"))] },
-    { ...opcionesBase({ title: c => etiqueta(c[0].label),
+  const dsR = [lluvia(), ...rios.map((r, i) => linea(r, i, r.caudal))];
+  leyendaInteractiva("ley-agua-rios", "g-agua-rios", items(dsR));
+  grafica("g-agua-rios", "bar", { labels:h.cubos, datasets:dsR },
+    { ...opcionesBase({ title: c => etq(c[0].label),
         label: c => c.dataset.yAxisID === "yLluvia" ? `Lluvia ${num(c.raw, 1)} mm` : `${c.dataset.label}: ${num(c.raw, 1)} m³/s` }),
       scales:{ x:ejeX, yLluvia:ejeLluvia, y: eje({ position:"left", beginAtZero:true, ticks:{ callback: v => v + " m³/s" } }) } });
 }
 
-// ---------------------------------------------------------------- ENERGÍA
+// =====================================================================
+// ENERGÍA: generación hidráulica
+// =====================================================================
 function energiaHidro(e) {
   const pv = e.pv, pen = e.peninsula;
   $("energia-hidro-datos").innerHTML =
@@ -277,10 +427,12 @@ function energiaHidro(e) {
     dato("Península · % hidráulica", pen.ultimo?.pct != null ? num(pen.ultimo.pct, 1) + " %" : "—",
          pen.ultimo ? num(pen.ultimo.mwh / 1000, 1) + " GWh · " + diaMes(pen.ultimo.t) : "");
   const pctPen = new Map(pen.serie.map(([t, , p]) => [t, p]));
-  grafica("g-energia-hidro", "bar", { labels: pv.serie.map(s => s[0]), datasets: [
-      { type:"bar", label:"País Vasco", data: pv.serie.map(s => s[1]), backgroundColor: css("--agua") + "cc", yAxisID:"y", order:2 },
-      { type:"line", label:"% península", data: pv.serie.map(s => pctPen.get(s[0]) ?? null), borderColor: css("--agua-2"),
-        backgroundColor: css("--agua-2"), yAxisID:"y2", pointRadius:2, borderWidth:2, tension:.3, order:1 } ] },
+  const ds = [
+    { type:"bar", label:"País Vasco (MWh/día)", data: pv.serie.map(s => s[1]), backgroundColor: css("--agua") + "cc", borderColor: css("--agua"), yAxisID:"y", order:2 },
+    { type:"line", label:"% hidráulica península", data: pv.serie.map(s => pctPen.get(s[0]) ?? null), borderColor: css("--agua-2"),
+      backgroundColor: css("--agua-2"), yAxisID:"y2", pointRadius:2, borderWidth:2, tension:.3, order:1 } ];
+  leyendaInteractiva("ley-energia-hidro", "g-energia-hidro", ds.map(d => ({label: d.label, color: d.borderColor, barra: d.type === "bar"})));
+  grafica("g-energia-hidro", "bar", { labels: pv.serie.map(s => s[0]), datasets: ds },
     { ...opcionesBase({ title: c => diaMes(c[0].label),
         label: c => c.datasetIndex ? `Península: ${num(c.raw, 1)} % hidráulica` : `País Vasco: ${num(c.raw, 0)} MWh` }),
       scales:{ x: eje({ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit:10, callback(v) { return diaMes(this.getLabelForValue(v)); } } }),
@@ -288,44 +440,118 @@ function energiaHidro(e) {
                y2: eje({ position:"right", beginAtZero:true, grid:{display:false}, ticks:{ callback: v => v + " %" } }) } });
 }
 
-// ---------------------------------------------------------------- AIRE y METEO
-function graficaLineas(id, series, nombres, colores, unidad, extra = {}) {
-  const base = series[Object.keys(series)[0]] || [];
-  const mapas = Object.fromEntries(Object.entries(series).map(([k, s]) => [k, new Map(s)]));
-  grafica(id, "line", { labels: base.map(p => p[0]), datasets: Object.keys(series).map((k, i) => ({
-      label: nombres[k], data: base.map(p => mapas[k].get(p[0]) ?? null), borderColor: colores[i], backgroundColor: colores[i],
-      pointRadius:0, borderWidth:2, tension:.3, spanGaps:true, ...(extra[k] || {}) })) },
-    { ...opcionesBase({ title: c => diaHora(c[0].label), label: c => `${c.dataset.label}: ${num(c.raw, 1)} ${unidad}` }),
-      scales:{ x: eje({ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit: innerWidth < 640 ? 4 : 9,
-                 callback(v) { return diaHora(this.getLabelForValue(v)); } } }),
-               y: eje({ beginAtZero:true }) } });
+// =====================================================================
+// EXPLORAR: elegir cualquier dato, comparar y descargar
+// =====================================================================
+const sinTildes = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+function pintarListaSeries() {
+  const cat = cache.catalogo || [], q = sinTildes($("exp-buscar").value.trim());
+  let html = "", grupo = null;
+  for (const s of cat) {
+    if (q && !sinTildes(`${s.grupo} ${s.etiqueta} ${s.metrica}`).includes(q)) continue;
+    if (s.grupo !== grupo) { grupo = s.grupo; html += `<div class="grupo">${esc(grupo)}</div>`; }
+    const marcado = expSel.includes(s.id);
+    html += `<label class="${s.n ? "" : "sin-datos"}"><input type="checkbox" value="${esc(s.id)}" ${marcado ? "checked" : ""}
+      ${!marcado && expSel.length >= 12 ? "disabled" : ""}>${esc(s.etiqueta)} <small>${esc(s.unidad)}</small></label>`;
+  }
+  $("exp-lista").innerHTML = html || `<p class="vacio">Nada coincide con la búsqueda.</p>`;
+}
+$("exp-lista").addEventListener("change", ev => {
+  const id = ev.target.value;
+  expSel = ev.target.checked ? [...expSel, id] : expSel.filter(x => x !== id);
+  guardar("exp.sel", expSel); pintarListaSeries(); cargarVista("explorar").then(pintar);
+});
+$("exp-buscar").addEventListener("input", pintarListaSeries);
+$("exp-limpiar").addEventListener("click", () => { expSel = []; guardar("exp.sel", expSel); cargarVista("explorar").then(pintar); });
+$("exp-funcion").addEventListener("change", () => { expFuncion = $("exp-funcion").value; guardar("exp.fun", expFuncion); cargarVista("explorar").then(pintar); });
+$("exp-tipo").addEventListener("click", () => { expBarras = !expBarras; guardar("exp.barras", expBarras); destruirGraficas(); pintar(); });
+
+function pintarExplorar() {
+  $("exp-funcion").value = expFuncion;
+  $("exp-tipo").setAttribute("aria-pressed", expBarras);
+  if (document.activeElement !== $("exp-buscar")) pintarListaSeries();
+  const r = cache.explorar;
+  $("exp-csv").href = expSel.length ? `/api/datos.csv?${paramsPeriodo({series: expSel.join(","), funcion: expFuncion})}` : "#";
+  $("exp-titulo").textContent = expSel.length ? `Comparar ${expSel.length} serie${expSel.length > 1 ? "s" : ""} · ${textoRango(r)}` : "Comparar series";
+  if (!expSel.length || !r || r.error) {
+    graficas["g-explorar"]?.destroy(); delete graficas["g-explorar"];
+    $("ley-explorar").innerHTML = ""; $("exp-tabla").innerHTML = "";
+    $("exp-vacio").textContent = r?.error ? "No se pudo consultar: " + r.error : "Marca uno o varios datos en la lista de la izquierda.";
+    return;
+  }
+  $("exp-vacio").textContent = r.series.every(s => !s.resumen.n) ? "No hay datos en este periodo. Prueba con otro periodo." : "";
+  graficaSeries("g-explorar", "ley-explorar", r, r.series, {barras: expBarras});
+  tablaResumen("exp-tabla", r.series);
 }
 
-function graficasMeteo(m) {
-  const racha = new Map(m.racha), base = m.temperatura;
-  const ejeX = eje({ ticks:{ maxRotation:0, autoSkip:true, maxTicksLimit: innerWidth < 640 ? 4 : 9,
-    callback(v) { return diaHora(this.getLabelForValue(v)); } } });
-  grafica("g-meteo-temp", "line", { labels: base.map(p => p[0]), datasets: [
-      { label:"Temperatura", data: base.map(p => p[1]), borderColor: css("--info"), backgroundColor: css("--info") + "22",
-        fill:true, yAxisID:"y", pointRadius:0, borderWidth:2, tension:.3 },
-      { label:"Racha", data: base.map(p => racha.get(p[0]) ?? null), borderColor: css("--aviso"), borderDash:[5, 4],
-        yAxisID:"y2", pointRadius:0, borderWidth:1.6, tension:.3 } ] },
-    { ...opcionesBase({ title: c => diaHora(c[0].label),
-        label: c => c.datasetIndex ? `Racha ${num(c.raw)} m/s (${num(c.raw * 3.6, 0)} km/h)` : `Temp. ${num(c.raw)} °C` }),
-      scales:{ x: ejeX, y: eje({ ticks:{ callback: v => v + "°" } }),
-               y2: eje({ position:"right", grid:{display:false}, beginAtZero:true, ticks:{ callback: v => v + " m/s" } }) } });
-  const hum = new Map(m.humedad), lluvia = m.precipitacion;
-  grafica("g-meteo-lluvia", "bar", { labels: lluvia.map(p => p[0]), datasets: [
-      { type:"bar", label:"Lluvia", data: lluvia.map(p => p[1]), backgroundColor: css("--lluvia") + "cc", yAxisID:"y", order:2 },
-      { type:"line", label:"Humedad", data: lluvia.map(p => hum.get(p[0]) ?? null), borderColor: css("--agua-2"),
-        yAxisID:"y2", pointRadius:0, borderWidth:2, tension:.3, order:1 } ] },
-    { ...opcionesBase({ title: c => diaHora(c[0].label),
-        label: c => c.datasetIndex ? `Humedad ${num(c.raw, 0)} %` : `Lluvia ${num(c.raw, 1)} mm` }),
-      scales:{ x: ejeX, y: eje({ beginAtZero:true, suggestedMax:2, ticks:{ callback: v => v + " mm" } }),
-               y2: eje({ position:"right", min:0, max:100, grid:{display:false}, ticks:{ callback: v => v + " %" } }) } });
+// =====================================================================
+// SISTEMA: configuración y alertas
+// =====================================================================
+const resultadosConfig = {};             // último resultado de cada campo (sobrevive a los repintados)
+function pintarConfig() {
+  const c = cache.config; if (!c || c.error) return;
+  $("config-nota").textContent = c.editable ? "" : "Solo se puede cambiar desde el ordenador donde está el programa";
+  // No repintamos mientras se escribe en un campo (se perdería lo escrito)
+  if ($("config-campos").contains(document.activeElement)) return;
+  $("config-campos").innerHTML = c.campos.map(f => {
+    const nivel = f.configurado ? "ok" : f.obligatorio ? "aviso" : "sin_datos";
+    const texto = f.configurado ? "CONFIGURADO" : f.obligatorio ? "FALTA" : "OPCIONAL";
+    const enlace = f.enlace ? ` <a href="${esc(f.enlace)}" target="_blank" rel="noopener">${f.enlace.startsWith("mailto:") ? "Escribir email" : "Conseguirla"} →</a>` : "";
+    const boton = f.fuente ? "Guardar y probar" : f.clave === "TELEGRAM_CHAT_ID" ? "Guardar y enviar prueba" : "Guardar";
+    return `<div class="config-campo n-${nivel}">
+      <div class="cab"><b>${esc(f.etiqueta)}</b>${pastilla(nivel, texto)}</div>
+      <div class="ayuda">${esc(f.ayuda)}${enlace}</div>
+      ${f.configurado ? `<div class="ayuda">Valor actual: <code>${esc(f.valor)}</code></div>` : ""}
+      <form data-clave="${esc(f.clave)}" data-fuente="${esc(f.fuente || "")}">
+        <input type="${f.secreto ? "password" : "text"}" name="valor" autocomplete="off" spellcheck="false"
+          placeholder="${f.configurado ? "Pega un valor nuevo para cambiarlo" : "Pega aquí…"}" ${c.editable ? "" : "disabled"}
+          aria-label="${esc(f.etiqueta)}">
+        <button class="boton primario" ${c.editable ? "" : "disabled"}>${boton}</button>
+      </form>
+      <div class="resultado ${resultadosConfig[f.clave]?.clase || ""}" aria-live="polite">${esc(resultadosConfig[f.clave]?.texto || "")}</div></div>`;
+  }).join("");
 }
+$("config-campos").addEventListener("submit", async ev => {
+  ev.preventDefault();
+  const form = ev.target, salida = form.nextElementSibling, valor = form.valor.value.trim(), clave = form.dataset.clave;
+  const avisar = (clase, texto) => { resultadosConfig[clave] = {clase, texto}; salida.className = "resultado " + clase; salida.textContent = texto; };
+  if (!valor) { avisar("mal", "Escribe o pega un valor primero."); return; }
+  const btn = form.querySelector("button"); btn.disabled = true;
+  avisar("", "Guardando…");
+  try {
+    cache.config = await getJSON("/api/config", { method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({[form.dataset.clave]: valor}) });
+    form.valor.value = "";
+    if (form.dataset.fuente) {
+      avisar("", "Guardado. Probando la conexión (puede tardar unos segundos)…");
+      const r = await getJSON(`/api/recoger/${form.dataset.fuente}`, {method:"POST"});
+      avisar(r.ok ? "ok" : "mal", r.ok ? `✓ Guardado y funciona: ${r.nuevas} datos nuevos.` : `✗ Guardado, pero aún no funciona: ${r.error}`);
+    } else if (form.dataset.clave === "TELEGRAM_CHAT_ID") {
+      const r = await getJSON("/api/probar-telegram", {method:"POST"});
+      avisar(r.ok ? "ok" : "mal", r.ok ? "✓ Mensaje de prueba enviado. Mira tu Telegram." : "✗ No se pudo enviar. Revisa el token y el chat_id.");
+    } else { avisar("ok", "✓ Guardado."); }
+    document.activeElement.blur(); refrescar();
+  } catch (e) { avisar("mal", "✗ " + e.message); }
+  finally { btn.disabled = false; }
+});
 
-// ---------------------------------------------------------------- pintar cada vista
+const CATEGORIA = r => r.categoria;
+function alertasFiltradas(lista) {
+  const cat = $("alertas-cat").value, q = sinTildes($("alertas-buscar").value.trim());
+  return lista.filter(a => (!cat || CATEGORIA(a) === cat) && (!q || sinTildes(a.titulo).includes(q)));
+}
+["alertas-cat", "alertas-buscar"].forEach(id => $(id).addEventListener("input", () => pintar()));
+
+// Enlaces "Configurar →" de la tabla de fuentes
+document.addEventListener("click", ev => {
+  if (!ev.target.closest("[data-ir-config]")) return;
+  ev.preventDefault(); mostrar("sistema");
+  setTimeout(() => $("configuracion").scrollIntoView({behavior:"smooth"}), 150);
+});
+
+// =====================================================================
+// PINTAR CADA VISTA
+// =====================================================================
 let ultimo = null, vista = "resumen";
 
 const PINTORES = {
@@ -349,20 +575,27 @@ const PINTORES = {
   },
   aire(d) {
     $("aire-fichas").innerHTML = indicadores(d, ["waqi.aqi", "waqi.pm25", "waqi.no2"]).map(fichaIndicador).join("");
-    const nombres = {aqi:"AQI global", pm25:"PM2.5", pm10:"PM10", no2:"NO₂", o3:"O₃"};
+    const r = cache.aire; if (!r || r.error) return;
+    $("aire-resolucion").textContent = textoRango(r);
     const colores = [css("--texto"), css("--critico"), css("--aviso"), css("--agua-2"), css("--agua")];
-    $("leyenda-aire").innerHTML = Object.keys(nombres).map((k, i) =>
-      `<span><i class="linea" style="background:${colores[i]}"></i>${nombres[k]}</span>`).join("");
-    graficaLineas("g-aire", d.aire_72h, nombres, colores, "AQI", {aqi:{borderWidth:3}});
+    graficaSeries("g-aire", "ley-aire", r, r.series, {colores});
+    tablaResumen("aire-tabla", r.series, colores);
   },
   meteo(d) {
     $("meteo-fichas").innerHTML = indicadores(d, ["aemet.temperatura", "aemet.racha", "aemet.precipitacion", "aemet.humedad"])
       .map(fichaIndicador).join("");
-    graficasMeteo(d.meteo_48h);
+    const r = cache.meteo; if (!r || r.error) return;
+    $("meteo-resolucion").textContent = textoRango(r);
+    const s = id => r.series.find(x => x.id === id);
+    graficaSeries("g-meteo-temp", "ley-meteo-temp", r, [s("aemet:temperatura"), s("aemet:racha")], {colores:[css("--info"), css("--aviso")]});
+    graficaSeries("g-meteo-lluvia", "ley-meteo-lluvia", r, [s("aemet:precipitacion"), s("aemet:humedad")], {colores:[css("--lluvia"), css("--agua-2")]});
+    tablaResumen("meteo-tabla", r.series);
   },
+  explorar() { pintarExplorar(); },
   sistema(d) {
+    pintarConfig();
     pintarFuentes("sistema-fuentes", d.fuentes, true);
-    pintarAlertas("sistema-alertas", "sistema-alertas-num", d.alertas, 100);
+    pintarAlertas("sistema-alertas", "sistema-alertas-num", alertasFiltradas(d.alertas), 200);
   },
 };
 
@@ -371,13 +604,16 @@ function pintar() {
   const g = ultimo.estado_global;
   $("global").className = `global n-${g.nivel}`;
   $("global-texto").textContent = g.texto;
-  // Puntito de color en cada pestaña con el peor estado de esa sección
   const niveles = { resumen: g.nivel, ...ultimo.pestanas };
   for (const v of VISTAS) $(`tab-${v}`).className = `n-${niveles[v] || "ok"}`;
+  const r = cache[vista];
+  $("periodo-info").textContent = r?.error ? "⚠ " + r.error : textoRango(r);
   PINTORES[vista](ultimo);
 }
 
-// ---------------------------------------------------------------- pestañas
+// =====================================================================
+// PESTAÑAS, ROTACIÓN Y TEMA
+// =====================================================================
 function mostrar(nueva, {foco = false} = {}) {
   if (!VISTAS.includes(nueva)) nueva = "resumen";
   vista = nueva;
@@ -388,38 +624,36 @@ function mostrar(nueva, {foco = false} = {}) {
     tab.setAttribute("aria-selected", activa); tab.tabIndex = activa ? 0 : -1;
     if (activa && foco) tab.focus();
   }
+  $("filtros").hidden = !VISTAS_CON_PERIODO.includes(nueva);
+  pintarFiltros();
   if (location.hash !== "#" + nueva) history.replaceState(null, "", "#" + nueva);
   destruirGraficas();                      // los lienzos ocultos no tienen tamaño: se rehacen al mostrarse
-  if (nueva === "agua") cargarHistoricoAgua().then(pintar);
   pintar();
+  cargarVista(nueva).then(pintar);
 }
 document.querySelectorAll('[role="tab"]').forEach(tab => {
   tab.addEventListener("click", () => { pararRotacion(); mostrar(tab.dataset.vista); });
-  tab.addEventListener("keydown", ev => {                     // flechas izquierda/derecha entre pestañas
+  tab.addEventListener("keydown", ev => {
     const i = VISTAS.indexOf(vista), paso = {ArrowRight:1, ArrowLeft:-1}[ev.key];
     if (paso) { ev.preventDefault(); pararRotacion(); mostrar(VISTAS[(i + paso + VISTAS.length) % VISTAS.length], {foco:true}); }
   });
 });
-window.addEventListener("hashchange", () => mostrar(location.hash.slice(1)));
+window.addEventListener("hashchange", () => { if (location.hash.slice(1) !== vista) mostrar(location.hash.slice(1)); });
 
-$("agua-rango").addEventListener("click", ev => {
-  const b = ev.target.closest("button"); if (!b) return;
-  diasAgua = Number(b.dataset.dias);
-  $("agua-rango").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b));
-  destruirGraficas(); cargarHistoricoAgua().then(pintar);
-});
-
-// Modo pared: rota las pestañas cada N segundos (?rotar=20 en la URL o botón ⟳)
+// Modo pared: rota por las pestañas de consulta (no por Explorar ni Sistema)
+const VISTAS_ROTAR = ["resumen", "agua", "energia", "aire", "meteo"];
 let temporizadorRotar = null;
 function rotar(segundos) {
   pararRotacion();
   $("rotar").setAttribute("aria-pressed", "true");
-  temporizadorRotar = setInterval(() => mostrar(VISTAS[(VISTAS.indexOf(vista) + 1) % VISTAS.length]), segundos * 1000);
+  temporizadorRotar = setInterval(() => {
+    const i = VISTAS_ROTAR.indexOf(vista);
+    mostrar(VISTAS_ROTAR[(i + 1) % VISTAS_ROTAR.length]);
+  }, segundos * 1000);
 }
 function pararRotacion() { clearInterval(temporizadorRotar); temporizadorRotar = null; $("rotar").setAttribute("aria-pressed", "false"); }
 $("rotar").addEventListener("click", () => temporizadorRotar ? pararRotacion() : rotar(20));
 
-// ---------------------------------------------------------------- tema
 try { const t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.tema = t; } catch {}
 $("tema").addEventListener("click", () => {
   const nuevo = document.documentElement.dataset.tema === "claro" ? "oscuro" : "claro";
@@ -428,13 +662,13 @@ $("tema").addEventListener("click", () => {
   destruirGraficas(); pintar();
 });
 
-// ---------------------------------------------------------------- ciclo de actualización
+// =====================================================================
+// CICLO DE ACTUALIZACIÓN
+// =====================================================================
 async function refrescar() {
   try {
-    const r = await fetch("/api/panel", {cache:"no-store"});
-    if (!r.ok) throw new Error(r.status);
-    ultimo = await r.json();
-    if (vista === "agua") await cargarHistoricoAgua();
+    ultimo = await getJSON("/api/panel");
+    await cargarVista(vista);
     pintar();
     $("aviso-conexion").classList.remove("visible");
     $("actualizado").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", {timeZone:ZONA});

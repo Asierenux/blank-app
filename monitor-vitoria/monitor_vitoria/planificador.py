@@ -17,7 +17,7 @@ from datetime import datetime
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from .config import Config
+from .config import Config, cargar_config
 from .recolectores import RECOLECTORES
 from .servicio import crear_cliente, ejecutar_recolector
 
@@ -25,15 +25,25 @@ log = logging.getLogger(__name__)
 ZONA = "Europe/Madrid"
 
 
-def crear_planificador(config: Config) -> BlockingScheduler:
-    sched = BlockingScheduler(timezone=ZONA)
+def recoger_con_config_actual(nombre: str) -> None:
+    """Relee .env en cada ejecución: si pegas una clave en el panel,
+    la siguiente recogida ya la usa sin reiniciar nada."""
+    ejecutar_recolector(cargar_config(), nombre)
+
+
+def crear_planificador(config: Config, en_segundo_plano: bool = False):
+    # BlockingScheduler ocupa el proceso; BackgroundScheduler corre en un hilo
+    # aparte (así el panel web y la recogida van en el mismo programa).
+    from apscheduler.schedulers.background import BackgroundScheduler
+    TipoPlanificador = BackgroundScheduler if en_segundo_plano else BlockingScheduler
+    sched = TipoPlanificador(timezone=ZONA)
     with crear_cliente() as cliente:  # solo para leer el intervalo de cada uno
         for nombre, clase in RECOLECTORES.items():
             minutos = clase(config, cliente).intervalo_minutos
             sched.add_job(
-                ejecutar_recolector,
+                recoger_con_config_actual,
                 trigger=IntervalTrigger(minutes=minutos, timezone=ZONA),
-                args=[config, nombre],
+                args=[nombre],
                 id=nombre,
                 name=f"recoger {nombre}",
                 next_run_time=datetime.now().astimezone(),

@@ -46,11 +46,13 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 | `telegram.py` | `sendMessage`. Sin config → solo log. |
 | `recolectores/saih.py` | SAIH Ebro: embalses (cota, volumen, %, entrada, salida) y ríos (nivel, caudal). **Scraping** tolerante de la web pública (no hay API documentada): regex sobre texto normalizado, exige la unidad tras el número y comprueba que la página sea de la estación (`claves`). Catálogo de estaciones con códigos; `SAIH_CODIGOS` en `.env` los completa. |
 | `recolectores/generacion.py` | REData: generación hidráulica diaria (MWh y %) del País Vasco (`geo_limit=ccaa`, `geo_ids=10`) y península. |
+| `consultas.py` | Consultas flexibles: series `fuente:metrica`, periodo (`horas` o `desde`/`hasta`; fechas sin zona = Madrid), `agrupar` (auto/ninguno/hora/dia), `funcion` (auto/media/max/min/suma/ultimo), resumen y CSV (`;`, coma decimal, BOM). Lo usan Agua, Aire, Meteo y Explorar. |
+| `ajustes.py` | Pantalla Configuración: campos permitidos, ayuda, enmascarado de secretos y escritura en `.env` (`config.guardar_en_env`). Solo editable desde 127.0.0.1. |
 | `panel.py` | Interpreta los datos para el panel: nivel ok/aviso/critico de cada indicador, dato antiguo, tendencia 1 h, tramos PVPC (terciles de cada día), mejor franja de 3 h, salud de fuentes y estado global. Pura lógica, testeable. |
 | `web/app.py` | FastAPI: `/` (esqueleto HTML), `/api/panel` (todo lo de `panel.py`), `/api/ultimas`, `/api/serie/{fuente}/{metrica}`, `/api/ejecuciones`, `/salud`, `/docs`. |
 | `web/templates/index.html` + `web/static/` | Panel por pestañas: solo pinta. Pide `/api/panel` cada 60 s (y `/api/agua/historico` en Agua). Chart.js + sparklines SVG propios. |
 | `demo.py` | `python -m monitor_vitoria demo` → `datos/demo.db` con datos simulados. |
-| `__main__.py` | CLI: `init-db`, `recoger [fuente]`, `planificador`, `web`, `probar-telegram`, `estado`. |
+| `__main__.py` | CLI. **`iniciar [--demo]`** = planificador en segundo plano + panel + abre navegador (lo que ejecutan `iniciar.bat` / `iniciar.command` / `iniciar.sh`). Resto: `init-db`, `recoger [fuente]`, `planificador`, `web`, `probar-telegram`, `estado`. |
 
 ## Base de datos (SQLite, `datos/monitor.db`)
 
@@ -82,7 +84,7 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
   y los datos antiguos.
 - Fuente "Caída" = sin éxito en 4× su intervalo; "Retrasada" = 2×.
 - Se actualiza por `fetch` sin recargar; si el servidor no responde sale una franja roja.
-- **Pestañas**: Resumen · Agua · Energía · Aire · Meteo · Sistema (`#agua` en la URL). Cada pestaña lleva un
+- **Pestañas**: Resumen · Agua · Energía · Aire · Meteo · Explorar · Sistema (`#agua` en la URL). Cada pestaña lleva un
   punto con su peor estado (`pestanas` en `/api/panel`). Solo se dibujan las gráficas de la pestaña visible.
 - Modo pared: `?rotar=20` o botón ⟳ (cambia de pestaña cada N s).
 - Frontend en `web/static/panel.js` + `panel.css`; `index.html` es solo estructura.
@@ -119,6 +121,20 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 4. JSON de ejemplo en `tests/datos/`, ruta en `cliente_falso` (`tests/conftest.py`) y test.
 5. Reglas de alerta opcionales en `alertas.construir_reglas`.
 
+## Arranque fácil
+
+- `iniciar.bat` / `demo.bat` (Windows, CRLF, `-text` en `.gitattributes`), `iniciar.command` / `demo.command` (Mac),
+  `iniciar.sh` (Linux/Mac): crean `.venv`, instalan `requirements.txt` solo si cambió (copia en
+  `.venv/requisitos-instalados.txt`) y lanzan `python -m monitor_vitoria iniciar`.
+- `cargar_config()` relee `.env` con `override=True` en cada llamada; el planificador la relee en cada
+  ejecución, así una clave guardada desde el panel vale sin reiniciar.
+- Modo demo: variable `MONITOR_DEMO=1` → `datos/demo.db` (no usar DB_PATH: el `.env` la pisaría).
+
+## API del panel (además de `/api/panel`)
+
+`/api/datos`, `/api/datos.csv`, `/api/catalogo`, `/api/agua/historico` (periodo), `GET/POST /api/config`,
+`POST /api/recoger/{fuente}`, `POST /api/probar-telegram` (las POST solo desde localhost).
+
 ## Comandos
 
 ```bash
@@ -129,7 +145,7 @@ python -m monitor_vitoria estado
 python -m monitor_vitoria recoger pvpc
 python -m monitor_vitoria planificador
 python -m monitor_vitoria web --reload
-python -m monitor_vitoria demo && python -m monitor_vitoria web --demo
+python -m monitor_vitoria iniciar --demo
 pytest
 ```
 

@@ -176,3 +176,11 @@ def valor_en(conn: sqlite3.Connection, fuente: str, metrica: str,
         (fuente, metrica, momento),
     ).fetchone()
     return fila["valor"] if fila else None
+
+
+def resumen_series(conn: sqlite3.Connection) -> list[sqlite3.Row]:
+    """Cuántos datos hay de cada serie y entre qué fechas (para el catálogo)."""
+    return conn.execute(
+        "SELECT fuente, metrica, COUNT(*) AS n, MIN(momento) AS primero, MAX(momento) AS ultimo "
+        "FROM lecturas GROUP BY fuente, metrica"
+    ).fetchall()

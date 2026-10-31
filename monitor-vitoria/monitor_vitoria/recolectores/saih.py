@@ -182,7 +182,7 @@ class RecolectorSaih(Recolector):
 
     def falta_configuracion(self) -> str | None:
         if not any(e.codigo for e in self.estaciones):
-            return "Ninguna estación SAIH tiene código (SAIH_CODIGOS en .env)"
+            return "Ninguna estación SAIH tiene código → pestaña Sistema › Configuración"
         return None
 
     def url(self, e: Estacion) -> str:

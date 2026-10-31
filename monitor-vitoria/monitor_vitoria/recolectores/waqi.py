@@ -49,7 +49,7 @@ class RecolectorWaqi(Recolector):
 
     def falta_configuracion(self) -> str | None:
         if not self.config.waqi_token:
-            return "Falta WAQI_TOKEN en .env"
+            return "Falta el token de WAQI → pestaña Sistema › Configuración"
         return None
 
     def recoger(self) -> list[Lectura]:

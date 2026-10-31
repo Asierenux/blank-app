@@ -59,7 +59,7 @@ class RecolectorAemet(Recolector):
 
     def falta_configuracion(self) -> str | None:
         if not self.config.aemet_api_key:
-            return "Falta AEMET_API_KEY en .env"
+            return "Falta la clave de AEMET → pestaña Sistema › Configuración"
         return None
 
     def recoger(self) -> list[Lectura]:
