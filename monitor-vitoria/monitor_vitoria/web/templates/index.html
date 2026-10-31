@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor Vitoria</title>
+  <meta http-equiv="refresh" content="600"><!-- recarga cada 10 min -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root { --fondo:#f5f6f8; --tarjeta:#fff; --texto:#1d2330; --suave:#6b7280; --borde:#e5e7eb; --acento:#2563eb; --ok:#16a34a; --mal:#dc2626; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fondo:#0f1115; --tarjeta:#181b22; --texto:#e7e9ee; --suave:#9aa3b2; --borde:#2a2f3a; --acento:#60a5fa; --ok:#4ade80; --mal:#f87171; }
+    }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, sans-serif; background:var(--fondo); color:var(--texto); }
+    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    h1 { margin: 8px 0 16px; font-size: 1.5rem; }
+    h2 { font-size: 1rem; margin: 0 0 12px; }
+    .rejilla { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+    .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:12px; padding:16px; }
+    .metricas { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
+    .valor { font-size:1.4rem; font-weight:600; font-variant-numeric: tabular-nums; }
+    .etiqueta, .hora, td.suave { color:var(--suave); font-size:.8rem; }
+    .vacio { color:var(--suave); }
+    canvas { width:100% !important; height:240px !important; }
+    table { width:100%; border-collapse:collapse; font-size:.85rem; }
+    td, th { text-align:left; padding:6px 4px; border-bottom:1px solid var(--borde); }
+    .ok { color:var(--ok); } .mal { color:var(--mal); }
+    .desplazable { overflow-x:auto; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Monitor Vitoria-Gasteiz</h1>
+
+  <section class="rejilla">
+    {% for nombre, g in grupos.items() %}
+    <div class="tarjeta">
+      <h2>{{ g.descripcion }}</h2>
+      {% if g.lecturas %}
+        <div class="metricas">
+          {% for l in g.lecturas %}
+          <div>
+            <div class="etiqueta">{{ l.etiqueta }}</div>
+            <div class="valor">{{ '%g' % l.valor }} <small>{{ l.unidad }}</small></div>
+            <div class="hora" data-utc="{{ l.momento }}"></div>
+          </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="vacio">Sin datos todavía. Ejecuta <code>python -m monitor_vitoria recoger {{ nombre }}</code>.</p>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="rejilla" style="margin-top:16px">
+    <div class="tarjeta"><h2>Temperatura (48 h)</h2><canvas id="g-temp"></canvas></div>
+    <div class="tarjeta"><h2>Precio PVPC hoy y mañana</h2><canvas id="g-pvpc"></canvas></div>
+    <div class="tarjeta"><h2>Calidad del aire (72 h)</h2><canvas id="g-aqi"></canvas></div>
+  </section>
+
+  <section class="tarjeta" style="margin-top:16px">
+    <h2>Últimas ejecuciones</h2>
+    <div class="desplazable">
+    <table>
+      <tr><th>Fuente</th><th>Inicio</th><th>Estado</th><th>Nuevas</th><th>Detalle</th></tr>
+      {% for e in ejecuciones %}
+      <tr>
+        <td>{{ e.fuente }}</td>
+        <td class="suave" data-utc="{{ e.inicio }}"></td>
+        <td class="{{ 'ok' if e.ok else 'mal' }}">{{ 'OK' if e.ok else 'Error' }}</td>
+        <td>{{ e.nuevas }}</td>
+        <td class="suave">{{ e.error or '' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="vacio">Aún no se ha ejecutado ningún recolector.</td></tr>
+      {% endfor %}
+    </table>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Convierte las horas UTC guardadas en la base de datos a hora local
+  const fmt = new Intl.DateTimeFormat("es-ES", { weekday:"short", day:"2-digit", hour:"2-digit", minute:"2-digit" });
+  document.querySelectorAll("[data-utc]").forEach(el => { el.textContent = fmt.format(new Date(el.dataset.utc)); });
+
+  const estilo = getComputedStyle(document.documentElement);
+  const acento = estilo.getPropertyValue("--acento").trim();
+  const suave = estilo.getPropertyValue("--suave").trim();
+
+  async function grafica(idCanvas, url, tipo = "line") {
+    const r = await fetch(url);
+    const datos = await r.json();
+    const lienzo = document.getElementById(idCanvas);
+    if (!datos.puntos.length) {
+      lienzo.replaceWith(Object.assign(document.createElement("p"), { className:"vacio", textContent:"Sin datos todavía." }));
+      return;
+    }
+    new Chart(lienzo, {
+      type: tipo,
+      data: {
+        labels: datos.puntos.map(p => fmt.format(new Date(p.t))),
+        datasets: [{ label: `${datos.etiqueta} (${datos.unidad})`, data: datos.puntos.map(p => p.v),
+                     borderColor: acento, backgroundColor: acento, pointRadius: 0, borderWidth: 2, tension: .3 }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        plugins: { legend: { labels: { color: suave } } },
+        scales: { x: { ticks: { color: suave, maxTicksLimit: 8 } }, y: { ticks: { color: suave } } }
+      }
+    });
+  }
+
+  grafica("g-temp", "/api/serie/aemet/temperatura?horas=48");
+  grafica("g-pvpc", "/api/serie/pvpc/precio?horas=24&adelante=48", "bar");
+  grafica("g-aqi",  "/api/serie/waqi/aqi?horas=72");
+</script>
+</body>
+</html>

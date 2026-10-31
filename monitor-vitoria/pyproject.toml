@@ -1,0 +1,9 @@
+[project]
+name = "monitor-vitoria"
+version = "0.1.0"
+description = "Recoge datos públicos de Vitoria-Gasteiz (meteo, luz, aire) y los guarda en SQLite"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

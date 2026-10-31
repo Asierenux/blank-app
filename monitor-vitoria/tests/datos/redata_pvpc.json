@@ -1,0 +1,12 @@
+{"data": {"type": "Precios mercado peninsular en tiempo real"},
+ "included": [
+  {"type": "PVPC (€/MWh)", "id": "1001",
+   "attributes": {"title": "PVPC (€/MWh)", "values": [
+     {"value": 132.5, "percentage": 0.5, "datetime": "2026-10-31T00:00:00.000+01:00"},
+     {"value": 61.2,  "percentage": 0.5, "datetime": "2026-10-31T01:00:00.000+01:00"}
+   ]}},
+  {"type": "Precio mercado spot (€/MWh)", "id": "600",
+   "attributes": {"title": "Precio mercado spot (€/MWh)", "values": [
+     {"value": 80.0, "percentage": 0.5, "datetime": "2026-10-31T00:00:00.000+01:00"}
+   ]}}
+ ]}

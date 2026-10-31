@@ -1,0 +1,6 @@
+[
+  {"idema": "9091R", "ubi": "VITORIA AEROPUERTO", "fint": "2026-10-31T07:00:00+0000",
+   "ta": 6.4, "hr": 92.0, "prec": 0.0, "vv": 2.1, "vmax": 4.5, "pres": 951.3},
+  {"idema": "9091R", "ubi": "VITORIA AEROPUERTO", "fint": "2026-10-31T08:00:00+0000",
+   "ta": 7.9, "hr": 88.0, "prec": 0.2, "vv": 3.0, "vmax": 6.1, "pres": 951.6}
+]
