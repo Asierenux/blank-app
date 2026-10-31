@@ -125,12 +125,27 @@ def evaluar(reglas: list[Regla], lecturas: list[Lectura],
     return resultado
 
 
+DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+
+
+def cuando(momento: datetime) -> str:
+    """'sáb 31 14:00' (en español, sin depender del idioma del ordenador)."""
+    t = momento.astimezone(MADRID)
+    return f"{DIAS[t.weekday()]} {t.day} {t:%H:%M}"
+
+
+def cifra(valor: float, unidad: str) -> str:
+    """Número a la española: 0,021 €/kWh · 21,5 m/s"""
+    decimales = 3 if unidad == "€/kWh" else 1
+    return f"{valor:.{decimales}f}".replace(".", ",")
+
+
 def formatear(regla: Regla, lecturas: list[Lectura]) -> str:
     signo = ">" if regla.comparar is operator.gt else "<"
-    lineas = [f"{regla.titulo} ({signo} {regla.umbral:g} {lecturas[0].unidad})"]
+    unidad = lecturas[0].unidad
+    lineas = [f"{regla.titulo} ({signo} {cifra(regla.umbral, unidad)} {unidad})"]
     for l in sorted(lecturas, key=lambda x: x.momento):
-        hora = l.momento.astimezone(MADRID).strftime("%a %d %H:%M")
-        lineas.append(f"• {hora}: {l.valor:g} {l.unidad}")
+        lineas.append(f"• {cuando(l.momento)}: {cifra(l.valor, l.unidad)} {l.unidad}")
     return "\n".join(lineas)
 
 
@@ -147,7 +162,6 @@ def procesar(conn: sqlite3.Connection, config: Config, nuevas: list[Lectura]) ->
 
     for regla_id, l, titulo in detectar_crecidas(conn, config, nuevas):
         if db.marcar_alerta(conn, regla_id, l.momento_utc):
-            hora = l.momento.astimezone(MADRID).strftime("%a %d %H:%M")
-            telegram.enviar(config, f"{titulo}\n• {hora}: {l.valor:g} {l.unidad}")
+            telegram.enviar(config, f"{titulo}\n• {cuando(l.momento)}: {cifra(l.valor, l.unidad)} {l.unidad}")
             enviados += 1
     return enviados

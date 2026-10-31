@@ -130,6 +130,7 @@ def _iniciar(args) -> int:
     logging.basicConfig(level=config.log_level, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     # El planificador escribe "Job ... executed successfully" cada vez: ruido para el día a día
     logging.getLogger("apscheduler").setLevel(logging.WARNING)
+    logging.getLogger("httpx").setLevel(logging.WARNING)      # quita las líneas "HTTP Request: GET…"
     puerto = args.puerto or config.web_port
     url = f"http://127.0.0.1:{puerto}"
 

@@ -133,3 +133,13 @@ def test_api_panel_con_demo(config, monkeypatch, tmp_path):
     assert urrunaga["porcentaje"] > 90 and urrunaga["maniobra"]
     h = TestClient(modulo_web.app).get("/api/agua/historico?dias=2").json()
     assert h["resolucion"] == "hora" and len(h["cubos"]) == len(h["lluvia"])
+
+
+def test_alerta_en_espanol(config):
+    from datetime import datetime, timezone
+
+    from monitor_vitoria import alertas
+    regla = next(r for r in alertas.construir_reglas(config) if r.id == "pvpc_barato")
+    l = Lectura("pvpc", "precio", datetime(2026, 10, 31, 13, tzinfo=timezone.utc), 0.02148, "€/kWh")
+    texto = alertas.formatear(regla, [l])
+    assert "sáb 31 14:00: 0,021 €/kWh" in texto and "(< 0,080 €/kWh)" in texto
