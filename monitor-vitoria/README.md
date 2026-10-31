@@ -14,7 +14,7 @@ Además tiene un panel de operaciones web (FastAPI) y alertas por Telegram.
 ![Pestaña Agua](docs/panel-agua.png)
 
 > ¿Sin claves todavía? `python -m monitor_vitoria demo` crea datos simulados en
-> `datos/demo.db` y `DB_PATH=datos/demo.db python -m monitor_vitoria web` abre el panel con ellos.
+> `datos/demo.db` y `python -m monitor_vitoria web --demo` abre el panel con ellos.
 
 ---
 

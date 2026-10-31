@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     p_web.add_argument("--host")
     p_web.add_argument("--port", type=int)
     p_web.add_argument("--reload", action="store_true", help="recarga al editar código")
+    p_web.add_argument("--demo", action="store_true", help="usa los datos simulados de datos/demo.db")
     sub.add_parser("probar-telegram", help="mensaje de prueba")
     sub.add_parser("estado", help="resumen de configuración")
     sub.add_parser("demo", help="datos simulados en datos/demo.db")
@@ -62,7 +63,14 @@ def main(argv: list[str] | None = None) -> int:
         arrancar(config)
 
     elif args.orden == "web":
+        import os
+
         import uvicorn
+        if args.demo:
+            # Igual que DB_PATH=datos/demo.db, pero funciona en cualquier terminal (cmd, PowerShell, Mac...)
+            from .config import RAIZ
+            os.environ["DB_PATH"] = str(RAIZ / "datos" / "demo.db")
+            print("Modo demo: usando datos/demo.db")
         uvicorn.run("monitor_vitoria.web.app:app",
                     host=args.host or config.web_host,
                     port=args.port or config.web_port,
@@ -89,8 +97,7 @@ def main(argv: list[str] | None = None) -> int:
         generar(ruta)
         print(f"Datos de demostración en {ruta}")
         print("Abre el panel con ellos:")
-        print("  Linux/macOS:  DB_PATH=datos/demo.db python -m monitor_vitoria web")
-        print("  Windows:      $env:DB_PATH='datos/demo.db'; python -m monitor_vitoria web")
+        print("  python -m monitor_vitoria web --demo")
 
     elif args.orden == "probar-saih":
         return _probar_saih(config, args.codigo.upper(), args.estacion)

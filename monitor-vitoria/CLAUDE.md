@@ -129,7 +129,7 @@ python -m monitor_vitoria estado
 python -m monitor_vitoria recoger pvpc
 python -m monitor_vitoria planificador
 python -m monitor_vitoria web --reload
-python -m monitor_vitoria demo && DB_PATH=datos/demo.db python -m monitor_vitoria web
+python -m monitor_vitoria demo && python -m monitor_vitoria web --demo
 pytest
 ```
 
