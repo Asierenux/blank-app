@@ -411,7 +411,23 @@ def lluvia_acumulada(conn, ahora: datetime, horas: int) -> float | None:
     return round(sum(r["valor"] for r in filas), 1) if filas else None
 
 
-def estado_embalse(pct: float | None, c: Config) -> tuple[str, str]:
+def estado_embalse(pct: float | None, c: Config, nivel: float | None = None,
+                   e=None) -> tuple[str, str]:
+    # Si conocemos las cotas de la presa, mandan sobre el porcentaje
+    if nivel is not None and e is not None:
+        if e.cota_nmn is not None and nivel >= e.cota_nmn - 0.10:
+            return "critico", "En el máximo normal (NMN)"
+        if e.cota_aliviadero is not None and nivel >= e.cota_aliviadero:
+            return "aviso", "Sobre el aliviadero · retienen las compuertas"
+        if e.cota_aliviadero is not None:
+            # Con cotas conocidas y por debajo del aliviadero NO puede estar vertiendo
+            if pct is not None and c.alerta_embalse_pct is not None and pct >= c.alerta_embalse_pct:
+                return "aviso", "Muy lleno · bajo el aliviadero"
+            if pct is not None and pct >= 85:
+                return "aviso", "Resguardo alto"
+            if pct is not None and pct <= 30:
+                return "aviso", "Reserva baja"
+            return ("ok", "Normal") if pct is not None or nivel is not None else ("sin_datos", "Sin datos")
     if pct is None:
         return "sin_datos", "Sin datos"
     if c.alerta_embalse_pct is not None and pct >= c.alerta_embalse_pct:
@@ -453,7 +469,7 @@ def construir_embalse(conn, c: Config, e, ahora: datetime) -> dict:
         nivel, texto = ("sin_datos", "Sin código SAIH" if not e.codigo else "Sin datos")
         return {**datos, "nivel_estado": nivel, "texto": texto, "serie": []}
 
-    nivel, texto = estado_embalse(datos["porcentaje"], c)
+    nivel, texto = estado_embalse(datos["porcentaje"], c, datos["nivel"], e)
     hace24_nivel = _valor_hace(conn, "saih", f"{e.id}.nivel", momento, 24)
     hace24_pct = _valor_hace(conn, "saih", f"{e.id}.porcentaje", momento, 24)
     edad = (ahora - momento).total_seconds() / 60
@@ -470,6 +486,13 @@ def construir_embalse(conn, c: Config, e, ahora: datetime) -> dict:
         "var_24h_pct": round(datos["porcentaje"] - hace24_pct, 1)
         if datos["porcentaje"] is not None and hace24_pct is not None else None,
         "maniobra": maniobra(datos["entrada"], datos["salida"]),
+        "cotas": {"minima": e.cota_minima, "aliviadero": e.cota_aliviadero,
+                  "nmn": e.cota_nmn, "coronacion": e.cota_coronacion},
+        # Metros que faltan (positivo) o que sobrepasa (negativo) cada cota
+        "margen_aliviadero": round(e.cota_aliviadero - datos["nivel"], 2)
+        if e.cota_aliviadero is not None and datos["nivel"] is not None else None,
+        "margen_nmn": round(e.cota_nmn - datos["nivel"], 2)
+        if e.cota_nmn is not None and datos["nivel"] is not None else None,
         "serie": [[r["momento"], r["valor"]] for r in serie],
     }
 

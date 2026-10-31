@@ -59,6 +59,11 @@ class Estacion:
     capacidad_hm3: float | None = None
     caudal_aviso: float | None = None   # m³/s; None = se usa la crecida relativa
     caudal_alerta: float | None = None
+    # Cotas de la presa (m sobre el nivel del mar), de la ficha "Información general" del SAIH
+    cota_minima: float | None = None
+    cota_aliviadero: float | None = None   # labio del aliviadero: por encima retienen las compuertas
+    cota_nmn: float | None = None          # Nivel Máximo Normal: embalse "a tope"
+    cota_coronacion: float | None = None   # parte de arriba de la presa
 
     @property
     def slug(self) -> str:
@@ -73,9 +78,10 @@ class Estacion:
 CATALOGO: tuple[Estacion, ...] = (
     Estacion("ullibarri", "Embalse de Ullíbarri-Gamboa", "embalse", "Zadorra", None,
              ("ullivarri", "ullibarri"), capacidad_hm3=147.0),
-    # Urrunaga: 39,100 hm³ = 54,27 % en la web del SAIH → capacidad ≈ 72,05 hm³
+    # Urrunaga: datos de la ficha oficial del SAIH (Información general › Datos embalse)
     Estacion("urrunaga", "Embalse de Urrunaga", "embalse", "Santa Engracia", "E028",
-             ("urrunaga",), capacidad_hm3=72.05),
+             ("urrunaga",), capacidad_hm3=71.77,
+             cota_minima=530.0, cota_aliviadero=544.5, cota_nmn=546.5, cota_coronacion=548.0),
     Estacion("zadorra_vitoria", "Zadorra en Vitoria", "rio", "Zadorra", None,
              ("zadorra",)),
     Estacion("zadorra_arce", "Zadorra en Arce", "rio", "Zadorra", None,

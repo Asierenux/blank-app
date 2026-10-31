@@ -48,7 +48,7 @@ def test_saih_porcentaje_calculado_si_falta(config, cliente_falso):
     pagina = "<h1>Urrunaga</h1> Volumen 36,0 hm3"
     [l] = [l for l in RecolectorSaih(config, cliente_falso).parsear(urrunaga, pagina)
            if l.metrica.endswith("porcentaje")]
-    assert l.valor == 50.0       # 36 de 72 hm³
+    assert l.valor == 50.2       # 36 de 71,77 hm³ (capacidad oficial)
 
 
 def test_extraer_tolerante():
@@ -123,3 +123,22 @@ def test_saih_formato_real_de_urrunaga(config, cliente_falso):
     assert l["lluvia_24h"].valor == 2.4
     assert "entrada" not in l and "salida" not in l   # Urrunaga no publica caudales
     assert l["nivel"].momento_utc == "2026-10-31T15:00:00Z"   # 16:00 en Madrid
+
+
+def test_cotas_de_la_presa(config):
+    """Urrunaga: aliviadero 544,5 m y NMN 546,5 m (ficha oficial del SAIH)."""
+    urrunaga = next(e for e in CATALOGO if e.id == "urrunaga")
+    assert panel.estado_embalse(54.27, config, 541.95, urrunaga) == ("ok", "Normal")
+    assert panel.estado_embalse(80, config, 545.0, urrunaga) == ("aviso", "Sobre el aliviadero · retienen las compuertas")
+    assert panel.estado_embalse(99, config, 546.45, urrunaga)[0] == "critico"
+    conn = db.conectar(config.db_path)
+    db.guardar_lecturas(conn, [Lectura("saih", "urrunaga.nivel", AHORA, 541.95, "msnm"),
+                               Lectura("saih", "urrunaga.porcentaje", AHORA, 54.27, "%")])
+    e = next(x for x in panel.construir_agua(conn, config, AHORA)["embalses"] if x["id"] == "urrunaga")
+    assert e["margen_aliviadero"] == 2.55 and e["margen_nmn"] == 4.55
+
+
+def test_con_cotas_no_dice_vertido_si_esta_bajo_el_aliviadero(config):
+    urrunaga = next(e for e in CATALOGO if e.id == "urrunaga")
+    nivel, texto = panel.estado_embalse(96, config, 542.5, urrunaga)
+    assert nivel == "aviso" and "vertido" not in texto

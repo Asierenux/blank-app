@@ -255,3 +255,11 @@ a.enlace-config { color:var(--info); font-size:.75rem; font-weight:700; display:
 
 /* En el móvil la cabecera no se queda fija: ocuparía media pantalla */
 @media (max-width: 640px) { .cabecera { position:static; } }
+
+/* Márgenes hasta aliviadero y NMN en la tarjeta del embalse */
+.margenes { display:grid; grid-template-columns: 1fr 1fr; gap:6px; margin-top:8px; }
+.margenes div { background:var(--panel-2); border:1px solid var(--borde); border-radius:6px; padding:6px 8px;
+  font-size:.72rem; color:var(--suave); }
+.margenes div[class^="n-"] { border-color:var(--c); }
+.margenes b { display:block; color:var(--texto); font-size:.92rem; }
+.margenes div[class^="n-"] b { color:var(--c); }

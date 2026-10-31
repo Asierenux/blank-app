@@ -72,7 +72,11 @@ def generar_agua(ahora: datetime, L) -> list[float]:
             L("saih", f"{eid}.salida", t, salida, "m³/s")
             L("saih", f"{eid}.volumen", t, vol, "hm³")
             L("saih", f"{eid}.porcentaje", t, vol / cap * 100, "%")
-            L("saih", f"{eid}.nivel", t, cota0 + 18 * (vol / cap) ** 0.6, "msnm")
+            if eid == "urrunaga":   # 530 m vacío → 546,5 m (NMN) lleno, como en su ficha
+                nivel = 530 + 16.5 * (vol / cap) ** 0.8
+            else:
+                nivel = cota0 + 18 * (vol / cap) ** 0.6
+            L("saih", f"{eid}.nivel", t, nivel, "msnm")
     # Precipitación AEMET de los últimos 30 días (más allá de las 48 h del resto)
     for i in range(horas + 1 - 48):
         L("aemet", "precipitacion", ahora - timedelta(hours=horas - i), lluvias[i], "mm")

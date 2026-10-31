@@ -214,6 +214,12 @@ function tarjetaEmbalse(e) {
         <div>Llenado 24 h<b class="num">${e.var_24h_pct == null ? "—" : conSigno(e.var_24h_pct, 1) + " pts"}</b></div>
         <div>Dato<b>${e.antiguo ? '<span class="etiqueta-antiguo">ANTIGUO</span>' : hace(e.momento)}</b></div>
       </div>
+      ${e.margen_aliviadero != null ? `<div class="margenes">
+        <div class="${e.margen_aliviadero <= 0 ? "n-aviso" : ""}">Aliviadero (${num(e.cotas.aliviadero, 1)} m)
+          <b class="num">${e.margen_aliviadero > 0 ? "faltan " + num(e.margen_aliviadero, 2) + " m" : "superado en " + num(-e.margen_aliviadero, 2) + " m"}</b></div>
+        <div class="${e.margen_nmn <= 0.1 ? "n-critico" : ""}">Máximo normal (${num(e.cotas.nmn, 1)} m)
+          <b class="num">${e.margen_nmn > 0 ? "faltan " + num(e.margen_nmn, 2) + " m" : "alcanzado"}</b></div>
+      </div>` : ""}
       ${sparkline(e.serie, css("--agua"))}
     </div></article>`;
 }
