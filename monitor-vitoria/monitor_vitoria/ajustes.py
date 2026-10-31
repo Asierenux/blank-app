@@ -32,7 +32,8 @@ CAMPOS = [
      "secreto": False, "obligatorio": False,
      "enlace": "https://www.saihebro.com",
      "ayuda": "Formato estacion=CODIGO separados por comas. Estaciones: ullibarri, urrunaga, "
-              "zadorra_vitoria, zadorra_arce. Ejemplo: urrunaga=E028,ullibarri=E0xx"},
+              "zadorra_vitoria, zadorra_arce. Ullíbarri (E027) y Urrunaga (E028) ya vienen puestos; "
+              "añade los ríos así: zadorra_arce=A0xx"},
     {"clave": "TELEGRAM_BOT_TOKEN", "fuente": None, "etiqueta": "Token del bot de Telegram",
      "secreto": True, "obligatorio": False,
      "enlace": "https://t.me/BotFather",

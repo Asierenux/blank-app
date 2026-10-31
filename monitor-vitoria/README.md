@@ -184,7 +184,7 @@ cada estación y busca los valores en el texto ("web scraping"). Pasos:
    p. ej. `…/estacion-embalses-E028-urrunaga` → `E028`.
 2. Compruébalo: `python -m monitor_vitoria probar-saih E028 --estacion urrunaga`
    Te dice si la página es de esa estación y qué valores ha encontrado.
-3. Añádelo a `.env`: `SAIH_CODIGOS=urrunaga=E028,ullibarri=E0xx,zadorra_arce=A0xx`
+3. Añádelo a `.env`: `SAIH_CODIGOS=zadorra_arce=A0xx` (Ullíbarri E027 y Urrunaga E028 ya vienen puestos), o pégalo en Sistema → Configuración
 
 Si un día la CHE cambia su web y deja de encontrar valores, `probar-saih` te enseña un trozo de la
 página para ajustar los patrones de `recolectores/saih.py`.

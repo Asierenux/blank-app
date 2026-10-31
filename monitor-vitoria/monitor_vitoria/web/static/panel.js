@@ -187,7 +187,7 @@ function tarjetaEmbalse(e) {
   if (!e.momento) return `<article class="tarjeta embalse n-sin_datos"><div class="deposito"></div><div>
       <div class="tarjeta-cab"><b>${esc(e.nombre)}</b>${pastilla("sin_datos", e.texto)}</div>
       <p class="sin-codigo">${e.codigo ? "Esperando la primera lectura del SAIH Ebro." :
-        `Falta el código SAIH de esta estación. Añádelo en <code>.env</code>:<br><code>SAIH_CODIGOS=…,${esc(e.id)}=E0xx</code>`}</p></div></article>`;
+        `Falta el código SAIH de esta estación. Añádelo en <a href="#sistema" data-ir-config>Sistema › Configuración</a>:<br><code>${esc(e.id)}=E0xx</code>`}</p></div></article>`;
   const pct = e.porcentaje ?? 0, m = e.maniobra;
   const marcas = [30, 85, 95].map(x => `<div class="marca" style="bottom:${x}%"><span>${x}</span></div>`).join("");
   const flecha = m ? {Desembalsando:"⇒", Almacenando:"⇐", Equilibrio:"⇔"}[m.texto] : "→";

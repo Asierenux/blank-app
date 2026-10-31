@@ -70,13 +70,14 @@ class Estacion:
         return self.claves[0]
 
 
-# Códigos: E028 = Urrunaga está comprobado (es la URL pública de su ficha).
+# Códigos comprobados con la web pública: E027 = Ullíbarri ("ullivarri"), E028 = Urrunaga.
 # El resto hay que buscarlo en https://www.saihebro.com (sección Tiempo real):
 # el código aparece en la dirección de la ficha de cada estación.
-# Se pueden poner/cambiar en .env con SAIH_CODIGOS=ullibarri=E0xx,zadorra_arce=A0xx
+# Se pueden poner/cambiar en .env (o en Sistema › Configuración) con SAIH_CODIGOS=zadorra_arce=A0xx
 # Capacidades aproximadas (hm³); revísalas con los datos oficiales de la CHE.
 CATALOGO: tuple[Estacion, ...] = (
-    Estacion("ullibarri", "Embalse de Ullíbarri-Gamboa", "embalse", "Zadorra", None,
+    # Ullíbarri: E027 (…/estacion-embalses-E027-ullivarri). Capacidad aproximada: falta la ficha oficial
+    Estacion("ullibarri", "Embalse de Ullíbarri-Gamboa", "embalse", "Zadorra", "E027",
              ("ullivarri", "ullibarri"), capacidad_hm3=147.0),
     # Urrunaga: datos de la ficha oficial del SAIH (Información general › Datos embalse)
     Estacion("urrunaga", "Embalse de Urrunaga", "embalse", "Santa Engracia", "E028",

@@ -95,11 +95,13 @@ def test_estado_rio_y_embalse(config):
     assert panel.maniobra(None, 3.0) is None
 
 
-def test_embalse_sin_codigo(config):
+def test_estacion_sin_codigo(config):
     sin = dataclasses.replace(config, saih_codigos={})
     conn = db.conectar(config.db_path)
-    ulli = next(e for e in panel.construir_agua(conn, sin, AHORA)["embalses"] if e["id"] == "ullibarri")
-    assert ulli["texto"] == "Sin código SAIH"
+    agua = panel.construir_agua(conn, sin, AHORA)
+    assert next(r for r in agua["rios"] if r["id"] == "zadorra_vitoria")["texto"] == "Sin código SAIH"
+    # Los dos embalses ya traen su código por defecto
+    assert {e["codigo"] for e in agua["embalses"]} == {"E027", "E028"}
 
 
 def test_historico_agua_alinea_lluvia_y_caudal(config):
