@@ -299,9 +299,16 @@ def construir_fuentes(conn, c: Config, ahora: datetime) -> list[dict]:
 # --------------------------------------------------------------------------
 
 def construir_alertas(conn, c: Config) -> list[dict]:
+    from .alertas import Regla
+    from .recolectores.saih import CATALOGO
     reglas = {r.id: r for r in construir_reglas(c)}
+    # Las crecidas no son reglas fijas: les damos una "regla" para mostrarlas
+    for e in CATALOGO:
+        if e.tipo == "rio":
+            reglas[f"crecida_{e.id}"] = Regla(f"crecida_{e.id}", "saih", f"{e.id}.caudal",
+                                              max, 0, f"🌊 Crecida en {e.nombre}")
     salida = []
-    for fila in db.alertas_recientes(conn):
+    for fila in db.alertas_recientes(conn, 30):
         regla = reglas.get(fila["regla"])
         valor = db.valor_en(conn, regla.fuente, regla.metrica, fila["momento"]) if regla else None
         nivel = "ok" if fila["regla"] == "pvpc_barato" else "critico"
@@ -328,6 +335,9 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
     indicadores = [construir_indicador(conn, c, ind, ahora) for ind in INDICADORES]
     fuentes = construir_fuentes(conn, c, ahora)
     pvpc = construir_pvpc(conn, ahora)
+    agua = construir_agua(conn, c, ahora)
+    estados_agua = [x["nivel_estado"] for x in agua["embalses"] + agua["rios"]
+                    if x["nivel_estado"] not in ("sin_datos", "info")]
 
     # Estado global: el peor de los indicadores que cuentan + la salud de fuentes.
     # El precio de la luz NO cuenta: que la luz esté cara no es una avería.
@@ -336,7 +346,24 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
         *[i["nivel"] for i in indicadores if i["cuenta_global"] and i["nivel"] != "sin_datos"],
         *[("aviso" if i["antiguo"] else "ok") for i in indicadores],
         *[f["nivel"] for f in fuentes if f["nivel"] != "sin_datos"],
+        *estados_agua,
     )
+
+    def series(fuente, metricas, horas):
+        return {m: [[r["momento"], r["valor"]] for r in db.serie_rango(
+            conn, fuente, m, ahora - timedelta(hours=horas), ahora)] for m in metricas}
+
+    # Nivel de cada pestaña (para el puntito de color en la pestaña)
+    def nivel_de(ids):
+        return peor("ok", *[i["nivel"] for i in indicadores
+                            if i["id"] in ids and i["nivel"] not in ("sin_datos", "info")])
+    pestanas = {
+        "agua": peor("ok", *estados_agua),
+        "energia": "ok",
+        "aire": nivel_de({"waqi.aqi", "waqi.pm25", "waqi.no2"}),
+        "meteo": nivel_de({"aemet.temperatura", "aemet.racha", "aemet.precipitacion"}),
+        "sistema": peor("ok", *[f["nivel"] for f in fuentes if f["nivel"] != "sin_datos"]),
+    }
     textos = {"ok": "OPERATIVO", "aviso": "ATENCIÓN", "critico": "CRÍTICO"}
     return {
         "generado": a_utc_iso(ahora),
@@ -344,11 +371,225 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
         "indicadores": indicadores,
         "pvpc": pvpc,
         "fuentes": fuentes,
+        "pestanas": pestanas,
+        "agua": agua,
+        "energia": construir_energia(conn, ahora),
         "alertas": construir_alertas(conn, c),
-        "meteo_48h": {
-            "temperatura": [[r["momento"], r["valor"]] for r in db.serie_rango(
-                conn, "aemet", "temperatura", ahora - timedelta(hours=48), ahora)],
-            "racha": [[r["momento"], r["valor"]] for r in db.serie_rango(
-                conn, "aemet", "racha", ahora - timedelta(hours=48), ahora)],
-        },
+        "meteo_48h": series("aemet", ["temperatura", "racha", "humedad", "presion",
+                                      "precipitacion"], 48),
+        "aire_72h": series("waqi", ["aqi", "pm25", "pm10", "no2", "o3"], 72),
     }
+
+
+# ==========================================================================
+# AGUA: embalses y ríos (SAIH Ebro) + lluvia (AEMET)
+# ==========================================================================
+
+def _ultimo(conn, fuente: str, metrica: str, ahora: datetime,
+            horas: int = 48) -> tuple[float, datetime] | None:
+    filas = db.serie_rango(conn, fuente, metrica, ahora - timedelta(hours=horas), ahora)
+    return (filas[-1]["valor"], _dt(filas[-1]["momento"])) if filas else None
+
+
+def _valor_hace(conn, fuente: str, metrica: str, momento: datetime,
+                horas: float) -> float | None:
+    """Valor más cercano (anterior) a `momento - horas`."""
+    objetivo = momento - timedelta(hours=horas)
+    filas = db.serie_rango(conn, fuente, metrica, objetivo - timedelta(hours=3), objetivo)
+    return filas[-1]["valor"] if filas else None
+
+
+def lluvia_acumulada(conn, ahora: datetime, horas: int) -> float | None:
+    filas = db.serie_rango(conn, "aemet", "precipitacion", ahora - timedelta(hours=horas), ahora)
+    return round(sum(r["valor"] for r in filas), 1) if filas else None
+
+
+def estado_embalse(pct: float | None, c: Config) -> tuple[str, str]:
+    if pct is None:
+        return "sin_datos", "Sin datos"
+    if c.alerta_embalse_pct is not None and pct >= c.alerta_embalse_pct:
+        return "critico", "Al máximo · posible vertido"
+    if pct >= 85:
+        return "aviso", "Resguardo alto"
+    if pct <= 30:
+        return "aviso", "Reserva baja"
+    return "ok", "Normal"
+
+
+def maniobra(entrada: float | None, salida: float | None) -> dict | None:
+    """Lo más parecido al 'estado de compuertas' que se puede saber con datos
+    públicos: comparar el agua que entra con la que sale."""
+    if entrada is None or salida is None:
+        return None
+    balance = entrada - salida                      # m³/s (+ entra más de lo que sale)
+    if salida > 1 and salida > entrada * 1.2:
+        texto = "Desembalsando"
+    elif entrada > 1 and salida < entrada * 0.8:
+        texto = "Almacenando"
+    else:
+        texto = "Equilibrio"
+    return {"texto": texto, "balance_m3s": round(balance, 2),
+            "balance_hm3_dia": round(balance * 86400 / 1e6, 3)}
+
+
+def construir_embalse(conn, c: Config, e, ahora: datetime) -> dict:
+    from .recolectores.saih import SENALES
+    datos: dict = {"id": e.id, "nombre": e.nombre, "rio": e.rio, "codigo": e.codigo,
+                   "capacidad_hm3": e.capacidad_hm3}
+    momento = None
+    for senal in SENALES["embalse"]:
+        u = _ultimo(conn, "saih", f"{e.id}.{senal}", ahora)
+        datos[senal] = u[0] if u else None
+        if u and (momento is None or u[1] > momento):
+            momento = u[1]
+    if momento is None:
+        nivel, texto = ("sin_datos", "Sin código SAIH" if not e.codigo else "Sin datos")
+        return {**datos, "nivel_estado": nivel, "texto": texto, "serie": []}
+
+    nivel, texto = estado_embalse(datos["porcentaje"], c)
+    hace24_nivel = _valor_hace(conn, "saih", f"{e.id}.nivel", momento, 24)
+    hace24_pct = _valor_hace(conn, "saih", f"{e.id}.porcentaje", momento, 24)
+    edad = (ahora - momento).total_seconds() / 60
+    serie = db.serie_rango(conn, "saih", f"{e.id}.porcentaje", ahora - timedelta(days=7), ahora)
+    return {
+        **datos,
+        "momento": a_utc_iso(momento),
+        "edad_min": round(edad),
+        "antiguo": edad > 120,
+        "nivel_estado": nivel,
+        "texto": texto,
+        "var_24h_cm": round((datos["nivel"] - hace24_nivel) * 100)
+        if datos["nivel"] is not None and hace24_nivel is not None else None,
+        "var_24h_pct": round(datos["porcentaje"] - hace24_pct, 1)
+        if datos["porcentaje"] is not None and hace24_pct is not None else None,
+        "maniobra": maniobra(datos["entrada"], datos["salida"]),
+        "serie": [[r["momento"], r["valor"]] for r in serie],
+    }
+
+
+def construir_rio(conn, c: Config, e, ahora: datetime) -> dict:
+    from .alertas import CAUDAL_MINIMO_CRECIDA
+    base = {"id": e.id, "nombre": e.nombre, "rio": e.rio, "codigo": e.codigo,
+            "caudal_aviso": e.caudal_aviso, "caudal_alerta": e.caudal_alerta}
+    caudal = _ultimo(conn, "saih", f"{e.id}.caudal", ahora)
+    nivel_m = _ultimo(conn, "saih", f"{e.id}.nivel", ahora)
+    if not caudal and not nivel_m:
+        return {**base, "nivel_estado": "sin_datos",
+                "texto": "Sin código SAIH" if not e.codigo else "Sin datos", "serie": []}
+
+    momento = max(x[1] for x in (caudal, nivel_m) if x)
+    q = caudal[0] if caudal else None
+    semana = [r["valor"] for r in db.serie_rango(conn, "saih", f"{e.id}.caudal",
+                                                  ahora - timedelta(days=7), ahora)]
+    normal = median(semana) if len(semana) >= 12 else None
+    ratio = (q / normal) if (q is not None and normal) else None
+    hace3 = _valor_hace(conn, "saih", f"{e.id}.caudal", momento, 3)
+    factor = c.alerta_crecida_factor or 3
+
+    if q is None:
+        estado = ("info", "")
+    elif e.caudal_alerta and q >= e.caudal_alerta:
+        estado = ("critico", "Caudal de alerta")
+    elif ratio and ratio >= factor and q >= CAUDAL_MINIMO_CRECIDA:
+        estado = ("critico", "Crecida")
+    elif (e.caudal_aviso and q >= e.caudal_aviso) or \
+            (ratio and ratio >= factor / 2 and q >= CAUDAL_MINIMO_CRECIDA):
+        estado = ("aviso", "Caudal alto")
+    elif hace3 is not None and q - hace3 > max(1.0, 0.3 * hace3):
+        estado = ("aviso", "Subiendo")
+    else:
+        estado = ("ok", "Normal")
+
+    edad = (ahora - momento).total_seconds() / 60
+    serie = db.serie_rango(conn, "saih", f"{e.id}.caudal", ahora - timedelta(hours=48), ahora)
+    return {
+        **base,
+        "caudal": q,
+        "nivel": nivel_m[0] if nivel_m else None,
+        "momento": a_utc_iso(momento),
+        "edad_min": round(edad),
+        "antiguo": edad > 120,
+        "caudal_normal": round(normal, 2) if normal else None,
+        "ratio": round(ratio, 1) if ratio else None,
+        "tendencia_3h": round(q - hace3, 2) if (q is not None and hace3 is not None) else None,
+        "nivel_estado": estado[0],
+        "texto": estado[1],
+        "serie": [[r["momento"], r["valor"]] for r in serie],
+    }
+
+
+def construir_agua(conn, c: Config, ahora: datetime) -> dict:
+    from .recolectores.saih import catalogo_con_codigos
+    estaciones = catalogo_con_codigos(c.saih_codigos)
+    return {
+        "embalses": [construir_embalse(conn, c, e, ahora) for e in estaciones if e.tipo == "embalse"],
+        "rios": [construir_rio(conn, c, e, ahora) for e in estaciones if e.tipo == "rio"],
+        "lluvia": {"h24": lluvia_acumulada(conn, ahora, 24),
+                   "h72": lluvia_acumulada(conn, ahora, 72),
+                   "d7": lluvia_acumulada(conn, ahora, 24 * 7)},
+    }
+
+
+def historico_agua(conn, c: Config, dias: int, ahora: datetime | None = None) -> dict:
+    """Lluvia + embalses + ríos alineados en el tiempo, para ver cómo responden
+    los niveles a la lluvia. Hasta 3 días: por horas. Más: por días."""
+    from .recolectores.saih import catalogo_con_codigos
+    ahora = ahora or datetime.now(timezone.utc)
+    desde = ahora - timedelta(days=dias)
+    por_horas = dias <= 3
+
+    def cubo(momento_txt: str) -> str:
+        t = _dt(momento_txt)
+        if por_horas:
+            return a_utc_iso(t.replace(minute=0, second=0))
+        return t.astimezone(MADRID).date().isoformat()
+
+    # Rejilla de cubos (para que salgan también las horas/días sin datos)
+    cubos: list[str] = []
+    t = desde
+    while t <= ahora:
+        k = cubo(a_utc_iso(t))
+        if not cubos or cubos[-1] != k:
+            cubos.append(k)
+        t += timedelta(hours=1)
+
+    def agrupar(fuente, metrica, modo):
+        grupos: dict[str, list[float]] = {}
+        for r in db.serie_rango(conn, fuente, metrica, desde, ahora):
+            grupos.setdefault(cubo(r["momento"]), []).append(r["valor"])
+        f = {"suma": lambda v: round(sum(v), 1), "max": max, "ultimo": lambda v: v[-1]}[modo]
+        return [f(grupos[k]) if k in grupos else None for k in cubos]
+
+    estaciones = catalogo_con_codigos(c.saih_codigos)
+    return {
+        "resolucion": "hora" if por_horas else "dia",
+        "cubos": cubos,
+        "lluvia": agrupar("aemet", "precipitacion", "suma"),
+        "embalses": [{"id": e.id, "nombre": e.nombre,
+                      "porcentaje": agrupar("saih", f"{e.id}.porcentaje", "ultimo")}
+                     for e in estaciones if e.tipo == "embalse"],
+        "rios": [{"id": e.id, "nombre": e.nombre,
+                  "caudal": agrupar("saih", f"{e.id}.caudal", "max")}
+                 for e in estaciones if e.tipo == "rio"],
+    }
+
+
+# ==========================================================================
+# ENERGÍA: generación hidráulica (REE)
+# ==========================================================================
+
+def construir_energia(conn, ahora: datetime) -> dict:
+    salida = {}
+    for zona in ("pv", "peninsula"):
+        mwh = db.serie_rango(conn, "generacion", f"hidraulica_{zona}",
+                             ahora - timedelta(days=31), ahora + timedelta(days=1))
+        pct = {r["momento"]: r["valor"] for r in db.serie_rango(
+            conn, "generacion", f"hidraulica_{zona}_pct",
+            ahora - timedelta(days=31), ahora + timedelta(days=1))}
+        salida[zona] = {
+            "serie": [[r["momento"], r["valor"], pct.get(r["momento"])] for r in mwh],
+            "ultimo": {"t": mwh[-1]["momento"], "mwh": mwh[-1]["valor"],
+                       "pct": pct.get(mwh[-1]["momento"])} if mwh else None,
+            "media_30d": round(sum(r["valor"] for r in mwh) / len(mwh), 1) if mwh else None,
+        }
+    return salida

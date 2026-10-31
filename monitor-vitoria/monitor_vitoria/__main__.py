@@ -8,6 +8,7 @@
     probar-telegram         envía un mensaje de prueba a tu bot
     estado                  muestra qué claves están configuradas
     demo                    crea datos/demo.db con datos simulados para ver el panel
+    probar-saih CODIGO      descarga la ficha SAIH Ebro de una estación y enseña qué se extrae
 """
 
 from __future__ import annotations
@@ -37,6 +38,9 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("probar-telegram", help="mensaje de prueba")
     sub.add_parser("estado", help="resumen de configuración")
     sub.add_parser("demo", help="datos simulados en datos/demo.db")
+    p_saih = sub.add_parser("probar-saih", help="comprueba una estación del SAIH Ebro")
+    p_saih.add_argument("codigo", help="p. ej. E028")
+    p_saih.add_argument("--estacion", help="id del catálogo (urrunaga, ullibarri, zadorra_arce...)")
     args = parser.parse_args(argv)
 
     config = cargar_config()
@@ -88,7 +92,51 @@ def main(argv: list[str] | None = None) -> int:
         print("  Linux/macOS:  DB_PATH=datos/demo.db python -m monitor_vitoria web")
         print("  Windows:      $env:DB_PATH='datos/demo.db'; python -m monitor_vitoria web")
 
+    elif args.orden == "probar-saih":
+        return _probar_saih(config, args.codigo.upper(), args.estacion)
+
     return 0
+
+
+def _probar_saih(config, codigo: str, estacion_id: str | None) -> int:
+    """Herramienta de diagnóstico: no guarda nada, solo enseña lo que ve."""
+    from dataclasses import replace
+
+    from .recolectores.saih import CATALOGO, RecolectorSaih, extraer, extraer_fecha, normalizar
+    from .servicio import crear_cliente
+
+    candidatas = [e for e in CATALOGO if e.id == estacion_id or (not estacion_id and e.codigo == codigo)]
+    if candidatas:
+        estacion = replace(candidatas[0], codigo=codigo)
+    else:
+        tipo = "embalse" if codigo.startswith("E") else "rio"
+        estacion = next(e for e in CATALOGO if e.tipo == tipo)
+        estacion = replace(estacion, codigo=codigo, id="prueba", claves=("",))
+        print("(Código fuera del catálogo: no se comprueba el nombre de la estación)")
+
+    with crear_cliente() as cliente:
+        rec = RecolectorSaih(config, cliente)
+        url = rec.url(estacion)
+        print(f"URL: {url}")
+        try:
+            r = cliente.get(url)
+        except Exception as e:  # noqa: BLE001
+            print(f"✘ No se pudo conectar: {type(e).__name__}: {e}")
+            return 1
+        print(f"HTTP {r.status_code} · {len(r.text)} caracteres")
+        texto = normalizar(r.text)
+        claves_ok = any(c in texto for c in estacion.claves)
+        print(f"¿La página es de {estacion.nombre}? {'sí' if claves_ok else 'NO (revisa el código)'}")
+        valores = extraer(texto, estacion.tipo)
+        print(f"Fecha del dato: {extraer_fecha(texto) or 'no encontrada'}")
+        if valores:
+            for k, v in valores.items():
+                print(f"  ✔ {k:<11} {v}")
+        else:
+            print("✘ No se encontró ningún valor. Fragmento de la página para ajustar los patrones:")
+            i = max(0, texto.find("nivel") - 200)
+            print("   " + texto[i:i + 800])
+        return 0 if valores and claves_ok else 1
 
 
 if __name__ == "__main__":

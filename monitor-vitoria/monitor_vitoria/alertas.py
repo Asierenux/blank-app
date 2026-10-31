@@ -65,8 +65,52 @@ def construir_reglas(c: Config) -> list[Regla]:
         ("pvpc_caro", "pvpc", "precio", operator.gt, c.alerta_pvpc_caro,
          "⚡ Luz cara"),
     ]
+    # Embalses: una regla por embalse del catálogo
+    from .recolectores.saih import CATALOGO
+    for e in CATALOGO:
+        if e.tipo == "embalse":
+            candidatas.append((f"embalse_{e.id}", "saih", f"{e.id}.porcentaje", operator.gt,
+                               c.alerta_embalse_pct, f"🌊 {e.nombre} casi lleno"))
+        if e.tipo == "rio" and e.caudal_alerta:
+            candidatas.append((f"caudal_{e.id}", "saih", f"{e.id}.caudal", operator.gt,
+                               e.caudal_alerta, f"🌊 Caudal alto: {e.nombre}"))
     # Un umbral vacío (None) en .env desactiva la regla
     return [Regla(*args) for args in candidatas if args[4] is not None]
+
+
+# Por debajo de este caudal no avisamos de "crecida" aunque se triplique
+# (pasar de 0,5 a 1,5 m³/s no es una crecida que importe).
+CAUDAL_MINIMO_CRECIDA = 5.0
+
+
+def detectar_crecidas(conn: sqlite3.Connection, c: Config,
+                      nuevas: list[Lectura]) -> list[tuple[str, Lectura, str]]:
+    """Crecida relativa: caudal actual > FACTOR x mediana de los últimos 7 días.
+
+    No necesita conocer los umbrales oficiales de cada río: compara el río
+    consigo mismo. Devuelve [(id_regla, lectura, título)].
+    """
+    if not c.alerta_crecida_factor:
+        return []
+    from statistics import median
+
+    from .recolectores.saih import CATALOGO
+    nombres = {e.id: e.nombre for e in CATALOGO}
+    salida = []
+    for l in nuevas:
+        if l.fuente != "saih" or not l.metrica.endswith(".caudal"):
+            continue
+        historico = [r["valor"] for r in db.serie_rango(
+            conn, "saih", l.metrica, l.momento - timedelta(days=7), l.momento)]
+        if len(historico) < 12:          # poco histórico: no sabemos qué es "normal"
+            continue
+        normal = median(historico)
+        if l.valor >= CAUDAL_MINIMO_CRECIDA and l.valor > c.alerta_crecida_factor * normal:
+            estacion = l.metrica.split(".")[0]
+            titulo = (f"🌊 Crecida en {nombres.get(estacion, estacion)} "
+                      f"(x{l.valor / normal:.1f} sobre lo normal: {normal:g} m³/s)")
+            salida.append((f"crecida_{estacion}", l, titulo))
+    return salida
 
 
 def evaluar(reglas: list[Regla], lecturas: list[Lectura],
@@ -99,5 +143,11 @@ def procesar(conn: sqlite3.Connection, config: Config, nuevas: list[Lectura]) ->
             texto = formatear(regla, pendientes)
             log.info("Alerta %s: %d lecturas", regla.id, len(pendientes))
             telegram.enviar(config, texto)
+            enviados += 1
+
+    for regla_id, l, titulo in detectar_crecidas(conn, config, nuevas):
+        if db.marcar_alerta(conn, regla_id, l.momento_utc):
+            hora = l.momento.astimezone(MADRID).strftime("%a %d %H:%M")
+            telegram.enviar(config, f"{titulo}\n• {hora}: {l.valor:g} {l.unidad}")
             enviados += 1
     return enviados

@@ -23,6 +23,7 @@ def config(tmp_path):
         aemet_api_key="clave-falsa",
         esios_token=None,
         waqi_token="token-falso",
+        saih_codigos={"urrunaga": "E028", "zadorra_arce": "A0XX"},
         telegram_bot_token=None,
         telegram_chat_id=None,
     )
@@ -39,8 +40,13 @@ def cliente_falso():
         if host == "opendata.aemet.es" and "/sh/" in ruta:
             texto = (DATOS / "aemet_observacion.json").read_text(encoding="utf-8")
             return httpx.Response(200, content=texto.encode("iso-8859-15"))
+        if host == "apidatos.ree.es" and "estructura-generacion" in ruta:
+            return httpx.Response(200, json=cargar_json("redata_generacion.json"))
         if host == "apidatos.ree.es":
             return httpx.Response(200, json=cargar_json("redata_pvpc.json"))
+        if host == "www.saihebro.com":
+            nombre = "saih_embalse.html" if "embalses" in ruta else "saih_aforo.html"
+            return httpx.Response(200, text=(DATOS / nombre).read_text(encoding="utf-8"))
         if host == "api.esios.ree.es":
             return httpx.Response(200, json=cargar_json("esios_1001.json"))
         if host == "api.waqi.info":

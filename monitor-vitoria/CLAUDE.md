@@ -44,9 +44,11 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 | `planificador.py` | APScheduler (v3, `BlockingScheduler`), un job de intervalo por recolector. |
 | `alertas.py` | Reglas construidas desde umbrales del `.env`; dedupe en `alertas_enviadas`. |
 | `telegram.py` | `sendMessage`. Sin config → solo log. |
+| `recolectores/saih.py` | SAIH Ebro: embalses (cota, volumen, %, entrada, salida) y ríos (nivel, caudal). **Scraping** tolerante de la web pública (no hay API documentada): regex sobre texto normalizado, exige la unidad tras el número y comprueba que la página sea de la estación (`claves`). Catálogo de estaciones con códigos; `SAIH_CODIGOS` en `.env` los completa. |
+| `recolectores/generacion.py` | REData: generación hidráulica diaria (MWh y %) del País Vasco (`geo_limit=ccaa`, `geo_ids=10`) y península. |
 | `panel.py` | Interpreta los datos para el panel: nivel ok/aviso/critico de cada indicador, dato antiguo, tendencia 1 h, tramos PVPC (terciles de cada día), mejor franja de 3 h, salud de fuentes y estado global. Pura lógica, testeable. |
 | `web/app.py` | FastAPI: `/` (esqueleto HTML), `/api/panel` (todo lo de `panel.py`), `/api/ultimas`, `/api/serie/{fuente}/{metrica}`, `/api/ejecuciones`, `/salud`, `/docs`. |
-| `web/templates/index.html` | Panel de operaciones: solo pinta. Pide `/api/panel` cada 60 s. Chart.js para barras PVPC y meteo 48 h; sparklines en SVG propio. |
+| `web/templates/index.html` + `web/static/` | Panel por pestañas: solo pinta. Pide `/api/panel` cada 60 s (y `/api/agua/historico` en Agua). Chart.js + sparklines SVG propios. |
 | `demo.py` | `python -m monitor_vitoria demo` → `datos/demo.db` con datos simulados. |
 | `__main__.py` | CLI: `init-db`, `recoger [fuente]`, `planificador`, `web`, `probar-telegram`, `estado`. |
 
@@ -56,6 +58,18 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
   `INSERT OR IGNORE`, así repetir una consulta es idempotente.
 - `ejecuciones` — una fila por ejecución de un recolector (ok, nuevas, error).
 - `alertas_enviadas` — PK `(regla, momento)` para no repetir alertas.
+
+## Agua: qué se puede y qué no se puede saber
+
+- Embalses del Zadorra (Ullíbarri-Gamboa, Urrunaga) y ríos: **SAIH Ebro**, cada 15 min.
+  `E028` = Urrunaga (comprobado). Ullíbarri y aforos del Zadorra: **códigos pendientes** (rellenar en `.env`
+  y validar con `python -m monitor_vitoria probar-saih CODIGO --estacion id`).
+- **Compuertas**: no es dato público. `panel.maniobra()` lo estima con salida vs entrada
+  (Desembalsando / Almacenando / Equilibrio). No presentarlo nunca como dato real de compuertas.
+- **Producción de cada presa**: no es pública. Se usa la hidráulica total del País Vasco (REE).
+- Crecidas: relativas (caudal > `ALERTA_CRECIDA_FACTOR` × mediana 7 días y ≥ 5 m³/s), además de
+  umbrales absolutos por estación si se rellenan `caudal_aviso/alerta` en el catálogo.
+- `/api/agua/historico?dias=N`: lluvia (AEMET) + % embalses + caudal ríos alineados (≤3 días por horas; más, por días).
 
 ## Panel de operaciones (criterios de diseño)
 
@@ -68,6 +82,10 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
   y los datos antiguos.
 - Fuente "Caída" = sin éxito en 4× su intervalo; "Retrasada" = 2×.
 - Se actualiza por `fetch` sin recargar; si el servidor no responde sale una franja roja.
+- **Pestañas**: Resumen · Agua · Energía · Aire · Meteo · Sistema (`#agua` en la URL). Cada pestaña lleva un
+  punto con su peor estado (`pestanas` en `/api/panel`). Solo se dibujan las gráficas de la pestaña visible.
+- Modo pared: `?rotar=20` o botón ⟳ (cambia de pestaña cada N s).
+- Frontend en `web/static/panel.js` + `panel.css`; `index.html` es solo estructura.
 
 ## Convenciones
 
@@ -86,6 +104,8 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 |---|---|---|---|
 | AEMET | `opendata.aemet.es/opendata/api/observacion/convencional/datos/estacion/9091R` | cabecera `api_key` | Dos pasos: la respuesta trae una URL `datos`. Datos en ISO-8859-15. 9091R = Vitoria Aeropuerto. |
 | PVPC (ESIOS) | `api.esios.ree.es/indicators/1001` | cabecera `x-api-key` | geo 8741 = Península. Mañana se publica ~20:20. |
+| SAIH Ebro | `www.saihebro.com/tiempo-real/estacion-{embalses|aforos}-{codigo}-{slug}` | ninguna | Sin API: scraping. URL y patrones sin verificar en vivo salvo E028. |
+| REData generación | `apidatos.ree.es/es/datos/generacion/estructura-generacion` | ninguna | `time_trunc=day`; serie `type` "Hidráulica". |
 | PVPC (REData) | `apidatos.ree.es/es/datos/mercados/precios-mercados-tiempo-real` | ninguna | Respaldo si no hay `ESIOS_TOKEN`. Serie `type` que empieza por "PVPC". |
 | WAQI | `api.waqi.info/feed/geo:{lat};{lon}/?token=` | query `token` | Estación más cercana. `"-"` = sin dato. |
 

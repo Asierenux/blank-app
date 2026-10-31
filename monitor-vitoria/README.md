@@ -5,10 +5,13 @@ Recoge datos públicos de Vitoria-Gasteiz y los guarda en SQLite:
 - 🌦️ **Meteorología**: AEMET OpenData, estación Vitoria-Gasteiz Aeropuerto (Foronda)
 - 💡 **Precio de la luz (PVPC)**: Red Eléctrica (ESIOS, o REData sin token)
 - 😷 **Calidad del aire**: WAQI (aqicn.org)
+- 🌊 **Embalses y ríos**: SAIH Ebro (Ullíbarri-Gamboa, Urrunaga, río Zadorra)
+- ⚡ **Generación hidráulica**: Red Eléctrica (País Vasco y península)
 
 Además tiene un panel de operaciones web (FastAPI) y alertas por Telegram.
 
 ![Panel de operaciones](docs/panel.png)
+![Pestaña Agua](docs/panel-agua.png)
 
 > ¿Sin claves todavía? `python -m monitor_vitoria demo` crea datos simulados en
 > `datos/demo.db` y `DB_PATH=datos/demo.db python -m monitor_vitoria web` abre el panel con ellos.
@@ -106,6 +109,12 @@ Abre http://127.0.0.1:8000. Cómo leer el panel:
   va recuadrada y las pasadas, atenuadas. "Mejor franja 3 h" = cuándo poner lavadora, coche, etc.
 - **Alertas recientes** y **estado de las fuentes** (Operativa / Retrasada / Caída / Sin configurar).
 - Se actualiza solo cada 60 s. Si se pierde la conexión con el servidor aparece una franja roja.
+- **Pestañas**: Resumen, Agua, Energía, Aire, Meteo y Sistema. El punto de color de cada pestaña
+  avisa si dentro hay algo en aviso o crítico. Se puede enlazar directamente: `http://…:8000/#agua`.
+- **Agua**: depósito de cada embalse con su % de llenado, entrada → salida (m³/s), maniobra estimada,
+  cambio de cota en 24 h; caudal de los ríos comparado con lo normal; y la gráfica **lluvia vs. respuesta**
+  (48 h / 7 días / 30 días) para ver cómo suben ríos y embalses después de un día de mucha lluvia.
+- **Modo pantalla de pared**: botón ⟳ o `http://…:8000/?rotar=20` (cambia de pestaña cada 20 s).
 
 También tienes:
 
@@ -131,7 +140,26 @@ Los umbrales están en `.env` (`ALERTA_*`). Deja uno vacío para desactivarlo.
 Cada alerta se envía una sola vez (tabla `alertas_enviadas`), y las lecturas
 de más de 3 horas no generan alerta (para no avisarte de lo de ayer al arrancar).
 
-### 7. Tests
+### 7. Embalses y ríos (SAIH Ebro)
+
+La Confederación Hidrográfica del Ebro publica cada 15 minutos los datos de sus estaciones en
+https://www.saihebro.com. **No tiene una API oficial**, así que el programa lee la página pública de
+cada estación y busca los valores en el texto ("web scraping"). Pasos:
+
+1. Busca la estación en saihebro.com (sección *Tiempo real*). El código aparece en la dirección,
+   p. ej. `…/estacion-embalses-E028-urrunaga` → `E028`.
+2. Compruébalo: `python -m monitor_vitoria probar-saih E028 --estacion urrunaga`
+   Te dice si la página es de esa estación y qué valores ha encontrado.
+3. Añádelo a `.env`: `SAIH_CODIGOS=urrunaga=E028,ullibarri=E0xx,zadorra_arce=A0xx`
+
+Si un día la CHE cambia su web y deja de encontrar valores, `probar-saih` te enseña un trozo de la
+página para ajustar los patrones de `recolectores/saih.py`.
+
+**Lo que no es público:** la posición de las compuertas y la producción eléctrica de cada presa. El panel
+lo aproxima: compara el caudal que entra en el embalse con el que sale (si sale mucho más, está
+desembalsando) y muestra la generación hidráulica total del País Vasco que publica Red Eléctrica.
+
+### 8. Tests
 
 ```bash
 pytest

@@ -42,6 +42,16 @@ def _decimal(nombre: str, defecto: float | None) -> float | None:
     return float(valor) if valor else defecto
 
 
+def _pares(nombre: str) -> dict[str, str]:
+    """'a=E01,b=A02' -> {'a': 'E01', 'b': 'A02'}"""
+    salida = {}
+    for trozo in (_texto(nombre) or "").split(","):
+        if "=" in trozo:
+            clave, valor = trozo.split("=", 1)
+            salida[clave.strip()] = valor.strip().upper()
+    return salida
+
+
 @dataclass(frozen=True)
 class Config:
     db_path: Path
@@ -52,6 +62,7 @@ class Config:
     aemet_estacion: str
     esios_token: str | None
     waqi_token: str | None
+    saih_codigos: dict[str, str]
 
     telegram_bot_token: str | None
     telegram_chat_id: str | None
@@ -59,6 +70,8 @@ class Config:
     intervalo_aemet_min: int
     intervalo_pvpc_min: int
     intervalo_waqi_min: int
+    intervalo_saih_min: int
+    intervalo_generacion_min: int
 
     alerta_temp_max: float | None
     alerta_temp_min: float | None
@@ -66,6 +79,8 @@ class Config:
     alerta_aqi_max: float | None
     alerta_pvpc_barato: float | None
     alerta_pvpc_caro: float | None
+    alerta_embalse_pct: float | None
+    alerta_crecida_factor: float | None
 
     web_host: str
     web_port: int
@@ -89,17 +104,22 @@ def cargar_config() -> Config:
         aemet_estacion=_texto("AEMET_ESTACION", "9091R"),
         esios_token=_texto("ESIOS_TOKEN"),
         waqi_token=_texto("WAQI_TOKEN"),
+        saih_codigos=_pares("SAIH_CODIGOS"),
         telegram_bot_token=_texto("TELEGRAM_BOT_TOKEN"),
         telegram_chat_id=_texto("TELEGRAM_CHAT_ID"),
         intervalo_aemet_min=_entero("INTERVALO_AEMET_MIN", 60),
         intervalo_pvpc_min=_entero("INTERVALO_PVPC_MIN", 60),
         intervalo_waqi_min=_entero("INTERVALO_WAQI_MIN", 30),
+        intervalo_saih_min=_entero("INTERVALO_SAIH_MIN", 30),
+        intervalo_generacion_min=_entero("INTERVALO_GENERACION_MIN", 360),
         alerta_temp_max=_decimal("ALERTA_TEMP_MAX", 35),
         alerta_temp_min=_decimal("ALERTA_TEMP_MIN", -3),
         alerta_viento_racha_ms=_decimal("ALERTA_VIENTO_RACHA_MS", 20),
         alerta_aqi_max=_decimal("ALERTA_AQI_MAX", 100),
         alerta_pvpc_barato=_decimal("ALERTA_PVPC_BARATO", 0.08),
         alerta_pvpc_caro=_decimal("ALERTA_PVPC_CARO", 0.25),
+        alerta_embalse_pct=_decimal("ALERTA_EMBALSE_PCT", 95),
+        alerta_crecida_factor=_decimal("ALERTA_CRECIDA_FACTOR", 3),
         web_host=_texto("WEB_HOST", "127.0.0.1"),
         web_port=_entero("WEB_PORT", 8000),
         log_level=_texto("LOG_LEVEL", "INFO").upper(),

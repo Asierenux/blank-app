@@ -18,16 +18,19 @@ from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from .. import db
 from ..config import cargar_config
-from ..panel import construir_panel
+from ..panel import construir_panel, historico_agua
 from ..recolectores import RECOLECTORES
 
 config = cargar_config()
 app = FastAPI(title="monitor-vitoria", description="Datos públicos de Vitoria-Gasteiz")
 plantillas = Jinja2Templates(directory=Path(__file__).parent / "templates")
+# CSS y JavaScript del panel, servidos en /static/...
+app.mount("/static", StaticFiles(directory=Path(__file__).parent / "static"), name="static")
 
 
 def obtener_conexion() -> Iterator[sqlite3.Connection]:
@@ -58,6 +61,13 @@ def api_panel(conn: sqlite3.Connection = Depends(obtener_conexion)):
     """Todo lo que necesita el panel de operaciones, ya interpretado
     (niveles verde/ámbar/rojo, frescura, tramos de la luz...)."""
     return construir_panel(conn, config)
+
+
+@app.get("/api/agua/historico")
+def api_agua_historico(dias: int = Query(7, ge=1, le=90),
+                       conn: sqlite3.Connection = Depends(obtener_conexion)):
+    """Lluvia, embalses y ríos alineados: hasta 3 días por horas, más por días."""
+    return historico_agua(conn, config, dias)
 
 
 @app.get("/api/ultimas")

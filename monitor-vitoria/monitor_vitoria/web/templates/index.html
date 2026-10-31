@@ -4,359 +4,159 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Monitor Vitoria · Operaciones</title>
+  <link rel="stylesheet" href="/static/panel.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-  <style>
-    /* ---------- Tokens de color ----------
-       Oscuro por defecto (sala de control: menos fatiga visual, los colores
-       de estado destacan más). Botón arriba a la derecha para el modo claro. */
-    :root {
-      --fondo:#0b0e13; --panel:#131821; --panel-2:#1a202b; --borde:#252d3a;
-      --texto:#e8ecf2; --suave:#8b95a7; --tenue:#5b6577;
-      --ok:#22c55e; --aviso:#f59e0b; --critico:#ef4444; --info:#60a5fa; --sin_datos:#6b7280;
-      --ok-fondo:rgba(34,197,94,.10); --aviso-fondo:rgba(245,158,11,.12); --critico-fondo:rgba(239,68,68,.14);
-    }
-    [data-tema="claro"] {
-      --fondo:#eef1f5; --panel:#ffffff; --panel-2:#f5f7fa; --borde:#d9dee6;
-      --texto:#111827; --suave:#4b5563; --tenue:#9ca3af;
-      --ok:#15803d; --aviso:#b45309; --critico:#b91c1c; --info:#1d4ed8; --sin_datos:#6b7280;
-      --ok-fondo:rgba(21,128,61,.08); --aviso-fondo:rgba(180,83,9,.10); --critico-fondo:rgba(185,28,28,.10);
-    }
-    * { box-sizing:border-box; }
-    html, body { margin:0; background:var(--fondo); color:var(--texto);
-      font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
-    .num { font-variant-numeric: tabular-nums; }
-    main { padding:12px 16px 16px; max-width:1920px; margin:0 auto; display:grid; gap:12px; }
-
-    /* ---------- Barra superior ---------- */
-    .barra { display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:12px;
-      padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--borde);
-      position:sticky; top:0; z-index:5; }
-    .marca b { font-size:1.05rem; letter-spacing:.06em; }
-    .marca span { display:block; color:var(--suave); font-size:.8rem; }
-    .global { display:flex; align-items:center; gap:10px; padding:8px 18px; border-radius:999px;
-      font-weight:800; letter-spacing:.12em; font-size:1rem; border:2px solid currentColor; }
-    .reloj { justify-self:end; text-align:right; display:flex; align-items:center; gap:14px; }
-    .reloj .hora { font-size:1.8rem; font-weight:700; line-height:1; }
-    .reloj .fecha, .reloj .act { color:var(--suave); font-size:.78rem; }
-    .boton { background:var(--panel-2); color:var(--texto); border:1px solid var(--borde);
-      border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; font-size:.8rem; }
-
-    .aviso-conexion { display:none; background:var(--critico); color:#fff; font-weight:700;
-      text-align:center; padding:8px; letter-spacing:.05em; }
-    .aviso-conexion.visible { display:block; }
-
-    /* ---------- Colores por nivel ---------- */
-    .n-ok { --c:var(--ok); --cf:var(--ok-fondo); }
-    .n-aviso { --c:var(--aviso); --cf:var(--aviso-fondo); }
-    .n-critico { --c:var(--critico); --cf:var(--critico-fondo); }
-    .n-info { --c:var(--info); --cf:transparent; }
-    .n-sin_datos { --c:var(--sin_datos); --cf:transparent; }
-    .global { color:var(--c); background:var(--cf); }
-
-    .pastilla { display:inline-flex; align-items:center; gap:5px; font-size:.68rem; font-weight:800;
-      letter-spacing:.08em; padding:3px 7px; border-radius:5px; color:var(--c);
-      background:var(--cf); border:1px solid color-mix(in srgb, var(--c) 45%, transparent); white-space:nowrap; }
-    .n-info .pastilla, .pastilla.n-info { display:none; }
-
-    /* ---------- Fichas de indicadores ---------- */
-    .fichas { display:grid; gap:12px; grid-template-columns: repeat(4, minmax(0,1fr)); }
-    .ficha { background:var(--panel); border:1px solid var(--borde); border-left:5px solid var(--c);
-      border-radius:10px; padding:12px 14px 10px; display:grid; gap:4px; min-height:168px;
-      grid-template-rows: auto auto auto 1fr auto; }
-    .ficha.n-critico { background:linear-gradient(var(--cf), var(--cf)), var(--panel); }
-    .ficha header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .ficha .etq { color:var(--suave); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
-    .ficha .valor { font-size:2.6rem; font-weight:750; line-height:1.05; }
-    .ficha .valor small { font-size:.95rem; font-weight:600; color:var(--suave); margin-left:4px; }
-    .ficha .sub { font-size:.85rem; color:var(--c); font-weight:600; min-height:1.1em; }
-    .ficha .sub .gris { color:var(--suave); font-weight:500; }
-    .ficha svg { width:100%; height:34px; display:block; align-self:end; }
-    .ficha footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:2px 8px; font-size:.75rem; color:var(--suave); }
-    .ficha.antiguo .valor, .ficha.antiguo svg { opacity:.45; }
-    .etiqueta-antiguo { color:var(--aviso); font-weight:800; }
-
-    /* ---------- Paneles ---------- */
-    .fila { display:grid; gap:12px; grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
-    .tarjeta { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:14px; min-width:0; }
-    .tarjeta h2 { margin:0 0 10px; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; color:var(--suave);
-      display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .lienzo { position:relative; height:260px; }
-    .datos-luz { display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:8px; margin-bottom:10px; }
-    .dato { background:var(--panel-2); border:1px solid var(--borde); border-radius:8px; padding:8px 10px; }
-    .dato .t { font-size:.7rem; color:var(--suave); text-transform:uppercase; letter-spacing:.06em; }
-    .dato .v { font-size:1.15rem; font-weight:700; }
-    .dato .h { font-size:.75rem; color:var(--suave); }
-    .dato.destacado { border-color:var(--ok); }
-    .leyenda { display:flex; gap:14px; font-size:.75rem; color:var(--suave); flex-wrap:wrap; }
-    .leyenda i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
-
-    .lista { list-style:none; margin:0; padding:0; display:grid; gap:6px; max-height:300px; overflow:auto; }
-    .lista li { display:grid; grid-template-columns: 6px 1fr auto; gap:10px; align-items:center;
-      background:var(--panel-2); border-radius:8px; padding:8px 10px; }
-    .lista li::before { content:""; width:6px; height:100%; min-height:28px; border-radius:3px; background:var(--c); }
-    .lista .tit { font-weight:650; font-size:.88rem; }
-    .lista .det { font-size:.75rem; color:var(--suave); }
-    .lista .der { text-align:right; font-size:.8rem; }
-    .vacio { color:var(--suave); font-size:.88rem; padding:10px 0; }
-
-    table { width:100%; border-collapse:collapse; font-size:.84rem; }
-    th { text-align:left; font-size:.7rem; color:var(--suave); text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
-    td, th { padding:8px 6px; border-bottom:1px solid var(--borde); vertical-align:top; }
-    td .error { color:var(--aviso); font-size:.75rem; display:block; margin-top:2px; word-break:break-word; }
-
-    @keyframes latido { 50% { opacity:.35; } }
-    .n-critico .pastilla, .global.n-critico .punto { animation: latido 1.6s ease-in-out infinite; }
-    .punto { width:12px; height:12px; border-radius:50%; background:currentColor; }
-    @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
-
-    /* ---------- Pantallas más pequeñas ---------- */
-    @media (max-width: 1200px) { .fichas { grid-template-columns: repeat(2, minmax(0,1fr)); }
-      .fila { grid-template-columns: 1fr; } .datos-luz { grid-template-columns: repeat(3, minmax(0,1fr)); } }
-    @media (max-width: 640px) {
-      .barra { grid-template-columns: 1fr auto; } .global { grid-column: 1 / -1; justify-self:stretch; justify-content:center; order:3; }
-      .reloj .hora { font-size:1.3rem; } .ficha .valor { font-size:2rem; }
-      .marca b { font-size:.9rem; } .marca span { display:none; }
-      .ficha footer { flex-direction:column; }
-      .datos-luz { grid-template-columns: repeat(2, minmax(0,1fr)); } .fichas { gap:8px; }
-      .ficha { min-height:150px; padding:10px; }
-    }
-  </style>
 </head>
 <body>
 <div class="aviso-conexion" id="aviso-conexion">⚠ SIN CONEXIÓN CON EL SERVIDOR — los datos mostrados pueden estar desactualizados</div>
-<header class="barra">
-  <div class="marca"><b>MONITOR VITORIA-GASTEIZ</b><span>Panel de operaciones · datos públicos</span></div>
-  <div class="global n-sin_datos" id="global"><span class="punto"></span><span id="global-texto">CARGANDO…</span></div>
-  <div class="reloj">
-    <div><div class="hora num" id="reloj">--:--:--</div>
-      <div class="fecha" id="fecha"></div><div class="act" id="actualizado">Esperando datos…</div></div>
-    <button class="boton" id="tema" type="button" title="Cambiar tema claro/oscuro">◐ Tema</button>
+
+<header class="cabecera">
+  <div class="barra">
+    <div class="marca"><b>MONITOR VITORIA-GASTEIZ</b><span>Panel de operaciones · datos públicos</span></div>
+    <div class="global n-sin_datos" id="global"><span class="punto"></span><span id="global-texto">CARGANDO…</span></div>
+    <div class="reloj">
+      <div><div class="hora num" id="reloj">--:--:--</div>
+        <div class="fecha" id="fecha"></div><div class="act" id="actualizado">Esperando datos…</div></div>
+      <button class="boton" id="rotar" type="button" aria-pressed="false" title="Ir cambiando de pestaña automáticamente (modo pantalla de pared)" aria-label="Rotar pestañas">⟳<span class="txt"> Rotar</span></button>
+      <button class="boton" id="tema" type="button" title="Cambiar tema claro/oscuro" aria-label="Cambiar tema">◐<span class="txt"> Tema</span></button>
+    </div>
   </div>
+  <nav class="pestanas" role="tablist" aria-label="Secciones">
+    <button role="tab" id="tab-resumen" data-vista="resumen" class="n-ok"><span class="marca-nivel"></span>Resumen</button>
+    <button role="tab" id="tab-agua" data-vista="agua" class="n-ok"><span class="marca-nivel"></span>Agua</button>
+    <button role="tab" id="tab-energia" data-vista="energia" class="n-ok"><span class="marca-nivel"></span>Energía</button>
+    <button role="tab" id="tab-aire" data-vista="aire" class="n-ok"><span class="marca-nivel"></span>Aire</button>
+    <button role="tab" id="tab-meteo" data-vista="meteo" class="n-ok"><span class="marca-nivel"></span>Meteo</button>
+    <button role="tab" id="tab-sistema" data-vista="sistema" class="n-ok"><span class="marca-nivel"></span>Sistema</button>
+  </nav>
 </header>
 
 <main>
-  <section class="fichas" id="fichas" aria-label="Indicadores"></section>
+  <!-- ============================ RESUMEN ============================ -->
+  <section class="vista" id="vista-resumen" role="tabpanel" aria-labelledby="tab-resumen">
+    <div class="fichas" id="resumen-fichas"></div>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span>Precio de la luz (PVPC) · hoy y mañana</span><span class="leyenda" data-leyenda="luz"></span></h2>
+        <div class="datos" id="resumen-luz-datos"></div>
+        <div class="lienzo"><canvas id="g-resumen-luz"></canvas></div>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Alertas recientes</span><span id="resumen-alertas-num"></span></h2>
+        <ul class="lista" id="resumen-alertas"></ul>
+      </article>
+    </div>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span>Embalses y ríos</span><span id="resumen-lluvia" class="leyenda"></span></h2>
+        <div class="agua-mini" id="resumen-agua"></div>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Estado de las fuentes</span></h2>
+        <table><tbody id="resumen-fuentes"></tbody></table>
+      </article>
+    </div>
+  </section>
 
-  <section class="fila">
+  <!-- ============================== AGUA ============================== -->
+  <section class="vista" id="vista-agua" role="tabpanel" aria-labelledby="tab-agua" hidden>
+    <div class="datos d4" id="agua-lluvia"></div>
+    <div class="embalses" id="agua-embalses"></div>
+    <div class="embalses" id="agua-rios"></div>
     <article class="tarjeta">
-      <h2><span>Precio de la luz (PVPC) · hoy y mañana</span>
-        <span class="leyenda"><span><i style="background:var(--ok)"></i>Barato</span>
-          <span><i style="background:var(--aviso)"></i>Medio</span>
-          <span><i style="background:var(--critico)"></i>Caro</span>
-          <span>(comparado con su día)</span></span></h2>
-      <div class="datos-luz" id="datos-luz"></div>
-      <div class="lienzo"><canvas id="g-luz" aria-label="Gráfica de precio de la luz"></canvas></div>
-      <div class="vacio" id="luz-nota"></div>
-    </article>
-    <article class="tarjeta">
-      <h2><span>Alertas recientes</span><span id="alertas-num"></span></h2>
-      <ul class="lista" id="alertas"></ul>
+      <h2><span>Lluvia y respuesta de embalses y ríos</span>
+        <span class="selector" id="agua-rango">
+          <button class="boton" data-dias="2">48 h</button>
+          <button class="boton" data-dias="7" aria-pressed="true">7 días</button>
+          <button class="boton" data-dias="30">30 días</button>
+        </span></h2>
+      <div class="fila mitades">
+        <div>
+          <div class="leyenda" style="margin-bottom:6px"><span><i style="background:var(--lluvia)"></i>Lluvia (mm)</span><span id="leyenda-embalses"></span></div>
+          <div class="lienzo alto"><canvas id="g-agua-embalses"></canvas></div>
+        </div>
+        <div>
+          <div class="leyenda" style="margin-bottom:6px"><span><i style="background:var(--lluvia)"></i>Lluvia (mm)</span><span id="leyenda-rios"></span></div>
+          <div class="lienzo alto"><canvas id="g-agua-rios"></canvas></div>
+        </div>
+      </div>
+      <p class="nota">Las barras de lluvia cuelgan desde arriba (como en los hidrogramas) para que se vea el
+        <b>retraso</b> entre el aguacero y la subida del río o del embalse.</p>
+      <p class="nota"><b>Sobre las compuertas:</b> su posición no es un dato público. El panel lo estima comparando
+        el <b>caudal de entrada</b> con el de <b>salida</b>: si sale bastante más de lo que entra, la presa está
+        desembalsando (compuertas abiertas o turbinando); si el embalse está al máximo, puede estar vertiendo.</p>
     </article>
   </section>
 
-  <section class="fila">
+  <!-- ============================= ENERGÍA ============================ -->
+  <section class="vista" id="vista-energia" role="tabpanel" aria-labelledby="tab-energia" hidden>
     <article class="tarjeta">
-      <h2><span>Meteorología · últimas 48 h</span>
-        <span class="leyenda"><span><i style="background:var(--info)"></i>Temperatura (°C)</span>
-          <span><i style="background:var(--aviso)"></i>Racha (m/s)</span></span></h2>
-      <div class="lienzo"><canvas id="g-meteo" aria-label="Gráfica de temperatura y racha"></canvas></div>
+      <h2><span>Precio de la luz (PVPC) · hoy y mañana</span><span class="leyenda" data-leyenda="luz"></span></h2>
+      <div class="datos" id="energia-luz-datos"></div>
+      <div class="lienzo alto"><canvas id="g-energia-luz"></canvas></div>
+      <div class="vacio" id="energia-luz-nota"></div>
     </article>
     <article class="tarjeta">
-      <h2><span>Estado de las fuentes</span></h2>
-      <table><thead><tr><th>Fuente</th><th>Estado</th><th>Última recogida OK</th></tr></thead>
-        <tbody id="fuentes"></tbody></table>
+      <h2><span>Generación hidráulica · últimos 30 días</span>
+        <span class="leyenda"><span><i style="background:var(--agua)"></i>País Vasco (MWh/día)</span>
+          <span><i class="linea" style="background:var(--agua-2)"></i>% hidráulica en la península</span></span></h2>
+      <div class="datos d4" id="energia-hidro-datos"></div>
+      <div class="lienzo"><canvas id="g-energia-hidro"></canvas></div>
+      <p class="nota">Red Eléctrica no publica la producción de cada presa concreta. Esto es el total de energía
+        hidráulica del País Vasco y de la península, por días.</p>
     </article>
+  </section>
+
+  <!-- ============================== AIRE ============================== -->
+  <section class="vista" id="vista-aire" role="tabpanel" aria-labelledby="tab-aire" hidden>
+    <div class="fichas f3" id="aire-fichas"></div>
+    <article class="tarjeta">
+      <h2><span>Contaminantes · últimas 72 h (índice AQI)</span><span class="leyenda" id="leyenda-aire"></span></h2>
+      <div class="lienzo alto"><canvas id="g-aire"></canvas></div>
+      <p class="nota">Escala AQI (EE. UU.): <b style="color:var(--ok)">0–50 bueno</b> · <b style="color:var(--aviso)">51–100 moderado</b> ·
+        <b style="color:var(--critico)">101–150 malo para grupos sensibles</b> · &gt;150 malo para todos. Los valores son índices, no µg/m³.</p>
+    </article>
+  </section>
+
+  <!-- ============================== METEO ============================= -->
+  <section class="vista" id="vista-meteo" role="tabpanel" aria-labelledby="tab-meteo" hidden>
+    <div class="fichas" id="meteo-fichas"></div>
+    <div class="fila mitades">
+      <article class="tarjeta">
+        <h2><span>Temperatura y viento · 48 h</span>
+          <span class="leyenda"><span><i style="background:var(--info)"></i>Temperatura (°C)</span>
+            <span><i class="linea" style="background:var(--aviso)"></i>Racha (m/s)</span></span></h2>
+        <div class="lienzo"><canvas id="g-meteo-temp"></canvas></div>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Lluvia y humedad · 48 h</span>
+          <span class="leyenda"><span><i style="background:var(--lluvia)"></i>Lluvia (mm/h)</span>
+            <span><i class="linea" style="background:var(--agua-2)"></i>Humedad (%)</span></span></h2>
+        <div class="lienzo"><canvas id="g-meteo-lluvia"></canvas></div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ============================= SISTEMA ============================ -->
+  <section class="vista" id="vista-sistema" role="tabpanel" aria-labelledby="tab-sistema" hidden>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span>Estado de las fuentes</span></h2>
+        <div class="desplazable"><table>
+          <thead><tr><th>Fuente</th><th>Estado</th><th>Última recogida OK</th><th>Nuevas</th></tr></thead>
+          <tbody id="sistema-fuentes"></tbody></table></div>
+        <p class="nota">Fuente <b>Retrasada</b>: sin éxito en 2× su intervalo. <b>Caída</b>: sin éxito en 4×.
+          Documentación de la API en <a href="/docs" style="color:var(--info)">/docs</a>.</p>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Historial de alertas</span><span id="sistema-alertas-num"></span></h2>
+        <ul class="lista larga" id="sistema-alertas"></ul>
+      </article>
+    </div>
   </section>
 </main>
 
-<script>
-const REFRESCO_S = {{ refresco_s }};
-const ZONA = "Europe/Madrid";
-const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
-const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
-
-// ---------- Utilidades ----------
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const num = (v, d=1) => v == null ? "—" : new Intl.NumberFormat("es-ES", {minimumFractionDigits:d, maximumFractionDigits:d}).format(v);
-const fHora = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, hour:"2-digit", minute:"2-digit"});
-const fDiaHora = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, weekday:"short", hour:"2-digit", minute:"2-digit"});
-const fDia = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, weekday:"short"});
-const hora = t => fHora.format(new Date(t));
-const dia = t => fDia.format(new Date(t)).replace(".", "");
-const diaHora = t => fDiaHora.format(new Date(t));
-function hace(t) {
-  if (!t) return "nunca";
-  const min = Math.round((Date.now() - new Date(t)) / 60000);
-  if (min < 1) return "ahora mismo";
-  if (min < 60) return `hace ${min} min`;
-  const h = Math.floor(min / 60);
-  return h < 48 ? `hace ${h} h ${min % 60 ? (min % 60) + " min" : ""}`.trim() : `hace ${Math.round(h/24)} días`;
-}
-const pastilla = n => n === "info" ? "" : `<span class="pastilla n-${n}">${ICONO[n]} ${TEXTO_NIVEL[n]}</span>`;
-
-// ---------- Reloj ----------
-function reloj() {
-  const d = new Date();
-  $("reloj").textContent = d.toLocaleTimeString("es-ES", {timeZone:ZONA});
-  $("fecha").textContent = d.toLocaleDateString("es-ES", {timeZone:ZONA, weekday:"long", day:"numeric", month:"long"});
-}
-setInterval(reloj, 1000); reloj();
-
-// ---------- Minigráfica (sparkline) en SVG ----------
-function sparkline(serie, color) {
-  if (serie.length < 2) return `<svg viewBox="0 0 100 34"></svg>`;
-  const vs = serie.map(p => p[1]), min = Math.min(...vs), max = Math.max(...vs), r = (max - min) || 1;
-  const t0 = new Date(serie[0][0]), t1 = new Date(serie.at(-1)[0]), rt = (t1 - t0) || 1;
-  const pts = serie.map(([t, v]) => `${((new Date(t) - t0) / rt * 100).toFixed(1)},${(31 - (v - min) / r * 28).toFixed(1)}`);
-  return `<svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
-    <polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
-}
-
-// ---------- Fichas ----------
-function fichaIndicador(i) {
-  const color = css(`--${i.nivel}`) || css("--info");
-  const tend = i.tendencia == null ? "" :
-    `${i.tendencia > 0 ? "▲" : i.tendencia < 0 ? "▼" : "▬"} ${i.tendencia > 0 ? "+" : ""}${num(i.tendencia, i.decimales)} en 1 h`;
-  const sub = [i.texto, i.secundario && `<span class="gris">${esc(i.secundario)}</span>`].filter(Boolean).join(" · ");
-  return `<article class="ficha n-${i.nivel} ${i.antiguo ? "antiguo" : ""}">
-    <header><span class="etq">${esc(i.etiqueta)}</span>${pastilla(i.nivel)}</header>
-    <div class="valor num">${num(i.valor, i.decimales)}<small>${esc(i.unidad)}</small></div>
-    <div class="sub">${sub || "&nbsp;"}</div>
-    ${sparkline(i.serie, color)}
-    <footer><span class="num">${tend}</span>
-      <span>${i.antiguo ? '<span class="etiqueta-antiguo">DATO ANTIGUO · </span>' : ""}${i.valor == null ? "" : hace(i.momento)}</span></footer>
-  </article>`;
-}
-
-function fichaLuz(p) {
-  const a = p.actual, f = p.mejor_franja;
-  const tramo = a ? {barato:"Tramo barato", medio:"Tramo medio", caro:"Tramo caro"}[a.tramo] : "Sin datos";
-  const color = css(`--${p.nivel}`);
-  return `<article class="ficha n-${p.nivel}">
-    <header><span class="etq">Luz ahora</span>${pastilla(p.nivel).replace(/OK|AVISO|CRÍTICO/, m => ({OK:"BARATA",AVISO:"MEDIA","CRÍTICO":"CARA"}[m]))}</header>
-    <div class="valor num">${a ? num(a.v, 3) : "—"}<small>€/kWh</small></div>
-    <div class="sub">${tramo}${p.media_hoy ? ` <span class="gris">· media hoy ${num(p.media_hoy, 3)}</span>` : ""}</div>
-    ${sparkline((p.puntos || []).map(x => [x.t, x.v]), color)}
-    <footer><span>${f ? `Mejor ${f.horas} h: <b>${hora(f.inicio)}–${hora(f.fin)}</b>` : ""}</span>
-      <span>${a ? "hasta " + hora(new Date(new Date(a.t).getTime() + p.paso_min * 60000)) : ""}</span></footer>
-  </article>`;
-}
-
-// ---------- Panel de la luz ----------
-function datosLuz(p) {
-  const d = (t, v, h, extra = "") => `<div class="dato ${extra}"><div class="t">${t}</div><div class="v num">${v}</div><div class="h">${h}</div></div>`;
-  if (!p.puntos?.length) { $("datos-luz").innerHTML = ""; return; }
-  const f = p.mejor_franja;
-  $("datos-luz").innerHTML =
-    d("Ahora", p.actual ? num(p.actual.v, 3) : "—", "€/kWh") +
-    d("Mínimo hoy", p.minimo_hoy ? num(p.minimo_hoy.v, 3) : "—", p.minimo_hoy ? "a las " + hora(p.minimo_hoy.t) : "") +
-    d("Máximo hoy", p.maximo_hoy ? num(p.maximo_hoy.v, 3) : "—", p.maximo_hoy ? "a las " + hora(p.maximo_hoy.t) : "") +
-    d("Media hoy", num(p.media_hoy, 3), "€/kWh") +
-    d(`Mejor franja ${f ? f.horas + " h" : ""}`, f ? `${hora(f.inicio)}–${hora(f.fin)}` : "—",
-      f ? `${dia(f.inicio)} · media ${num(f.media, 3)}` : "", "destacado");
-}
-
-let gLuz, gMeteo;
-const ejes = () => ({ ticks:{ color:css("--suave"), font:{size:11} }, grid:{ color:css("--borde") }, border:{ display:false } });
-
-function graficaLuz(p) {
-  const pts = p.puntos || [];
-  $("luz-nota").textContent = !pts.length ? "Sin datos de precio todavía."
-    : p.hay_manana ? "" : "Los precios de mañana los publica REE hacia las 20:30.";
-  const ahora = Date.now(), paso = (p.paso_min || 60) * 60000;
-  const colores = pts.map(x => {
-    const base = css({barato:"--ok", medio:"--aviso", caro:"--critico"}[x.tramo]);
-    const t = new Date(x.t).getTime();
-    const pasado = t + paso <= ahora, actual = t <= ahora && ahora < t + paso;
-    return actual ? base : base + (pasado ? "40" : "b0");  // pasado = tenue, futuro = medio, actual = sólido
-  });
-  const bordes = pts.map(x => { const t = new Date(x.t).getTime(); return (t <= ahora && ahora < t + paso) ? css("--texto") : "transparent"; });
-  const datos = { labels: pts.map(x => x.t),
-    datasets: [{ data: pts.map(x => x.v), backgroundColor: colores, borderColor: bordes, borderWidth: 2, borderSkipped:false, barPercentage:.92, categoryPercentage:1 }] };
-  const opciones = { maintainAspectRatio:false, animation:false,
-    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ title: c => diaHora(c[0].label), label: c => `${num(c.raw, 4)} €/kWh` } } },
-    scales:{ x:{ ...ejes(), ticks:{ ...ejes().ticks, autoSkip:false, maxRotation:0,
-               callback(v, i) { const t = this.getLabelForValue(v), d = new Date(t);
-                 const h = Number(fHora.format(d).slice(0,2)), m = d.getUTCMinutes();
-                 const cada = this.chart.width < 600 ? 6 : 3;   // menos etiquetas en pantallas estrechas
-                 if (m !== 0 || h % cada) return "";
-                 return h === 0 ? dia(t).toUpperCase() : String(h).padStart(2,"0") + "h"; } } },
-             y:{ ...ejes(), beginAtZero:true, ticks:{ ...ejes().ticks, callback: v => num(v, 2) } } } };
-  if (gLuz) { gLuz.data = datos; gLuz.options = opciones; gLuz.update("none"); }
-  else gLuz = new Chart($("g-luz"), { type:"bar", data:datos, options:opciones });
-}
-
-function graficaMeteo(m) {
-  const racha = new Map(m.racha.map(([t, v]) => [t, v]));
-  const datos = { labels: m.temperatura.map(p => p[0]), datasets: [
-    { label:"Temperatura", data: m.temperatura.map(p => p[1]), borderColor: css("--info"), backgroundColor: css("--info") + "22",
-      fill:true, yAxisID:"y", pointRadius:0, borderWidth:2, tension:.3 },
-    { label:"Racha", data: m.temperatura.map(p => racha.get(p[0]) ?? null), borderColor: css("--aviso"),
-      borderDash:[5,4], yAxisID:"y2", pointRadius:0, borderWidth:1.6, tension:.3 } ] };
-  const opciones = { maintainAspectRatio:false, animation:false, interaction:{ mode:"index", intersect:false },
-    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ title: c => diaHora(c[0].label),
-      label: c => c.datasetIndex ? `Racha ${num(c.raw)} m/s (${num(c.raw * 3.6, 0)} km/h)` : `Temp. ${num(c.raw)} °C` } } },
-    scales:{ x:{ ...ejes(), ticks:{ ...ejes().ticks, maxTicksLimit: innerWidth < 640 ? 4 : 9, maxRotation:0, callback(v) { return diaHora(this.getLabelForValue(v)); } } },
-             y:{ ...ejes(), ticks:{ ...ejes().ticks, callback: v => v + "°" } },
-             y2:{ ...ejes(), position:"right", grid:{ display:false }, beginAtZero:true, ticks:{ ...ejes().ticks, callback: v => v + " m/s" } } } };
-  if (gMeteo) { gMeteo.data = datos; gMeteo.options = opciones; gMeteo.update("none"); }
-  else gMeteo = new Chart($("g-meteo"), { type:"line", data:datos, options:opciones });
-}
-
-// ---------- Alertas y fuentes ----------
-function alertas(lista) {
-  $("alertas-num").textContent = lista.length ? `${lista.length} últimas` : "";
-  $("alertas").innerHTML = lista.length ? lista.map(a => `<li class="n-${a.nivel}">
-      <div><div class="tit">${esc(a.titulo)}</div><div class="det">Dato de ${diaHora(a.momento)}</div></div>
-      <div class="der"><div class="num"><b>${a.valor == null ? "" : num(a.valor, a.unidad === "€/kWh" ? 3 : 1) + " " + esc(a.unidad)}</b></div>
-        <div class="det">${hace(a.enviado_en)}</div></div></li>`).join("")
-    : `<li class="n-ok"><div><div class="tit">Sin alertas</div><div class="det">Ningún umbral superado</div></div><div></div></li>`;
-}
-
-function fuentes(lista) {
-  $("fuentes").innerHTML = lista.map(f => `<tr class="n-${f.nivel}">
-    <td><b>${esc(f.descripcion)}</b><span class="error" style="color:var(--suave)">cada ${f.intervalo_min} min</span></td>
-    <td><span class="pastilla">${ICONO[f.nivel]} ${esc(f.texto).toUpperCase()}</span>${f.error ? `<span class="error">${esc(f.error)}</span>` : ""}</td>
-    <td class="num">${f.ultima_ok ? hace(f.ultima_ok) : "nunca"}</td></tr>`).join("");
-}
-
-// ---------- Ciclo de actualización ----------
-let ultimo = null;
-function pintar(d) {
-  const g = d.estado_global;
-  $("global").className = `global n-${g.nivel}`;
-  $("global-texto").textContent = g.texto;
-  $("fichas").innerHTML = d.indicadores.map(fichaIndicador).join("") + fichaLuz(d.pvpc);
-  datosLuz(d.pvpc); graficaLuz(d.pvpc); graficaMeteo(d.meteo_48h);
-  alertas(d.alertas); fuentes(d.fuentes);
-}
-async function refrescar() {
-  try {
-    const r = await fetch("/api/panel", {cache:"no-store"});
-    if (!r.ok) throw new Error(r.status);
-    ultimo = await r.json();
-    pintar(ultimo);
-    $("aviso-conexion").classList.remove("visible");
-    $("actualizado").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", {timeZone:ZONA});
-  } catch (e) {
-    $("aviso-conexion").classList.add("visible");
-  }
-}
-
-// ---------- Tema ----------
-try { const t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.tema = t; } catch {}
-$("tema").addEventListener("click", () => {
-  const nuevo = document.documentElement.dataset.tema === "claro" ? "oscuro" : "claro";
-  document.documentElement.dataset.tema = nuevo;
-  try { localStorage.setItem("tema", nuevo); } catch {}
-  gLuz?.destroy(); gMeteo?.destroy(); gLuz = gMeteo = null;
-  if (ultimo) pintar(ultimo);
-});
-
-refrescar();
-setInterval(refrescar, REFRESCO_S * 1000);
-</script>
+<script>window.REFRESCO_S = {{ refresco_s }};</script>
+<script src="/static/panel.js"></script>
 </body>
 </html>

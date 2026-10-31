@@ -51,7 +51,8 @@ def test_panel_web(config, monkeypatch):
 
     cliente = TestClient(modulo_web.app)
     assert cliente.get("/salud").json() == {"ok": True}
-    assert "/api/panel" in cliente.get("/").text   # la página pide los datos por JS
+    assert "/static/panel.js" in cliente.get("/").text   # la página pide los datos por JS
+    assert cliente.get("/static/panel.js").status_code == 200
     panel = cliente.get("/api/panel").json()
     temp = next(i for i in panel["indicadores"] if i["id"] == "aemet.temperatura")
     assert temp["valor"] == 12.5 and temp["nivel"] == "ok"
@@ -127,4 +128,8 @@ def test_api_panel_con_demo(config, monkeypatch, tmp_path):
     temp = next(i for i in d["indicadores"] if i["id"] == "aemet.temperatura")
     assert temp["valor"] is not None and len(temp["serie"]) > 10
     assert d["pvpc"]["mejor_franja"] and d["pvpc"]["hay_manana"]
-    assert len(d["alertas"]) == 4
+    assert len(d["alertas"]) == 6
+    urrunaga = next(e for e in d["agua"]["embalses"] if e["id"] == "urrunaga")
+    assert urrunaga["porcentaje"] > 90 and urrunaga["maniobra"]
+    h = TestClient(modulo_web.app).get("/api/agua/historico?dias=2").json()
+    assert h["resolucion"] == "hora" and len(h["cubos"]) == len(h["lluvia"])
