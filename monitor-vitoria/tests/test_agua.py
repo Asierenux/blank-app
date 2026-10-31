@@ -144,3 +144,17 @@ def test_con_cotas_no_dice_vertido_si_esta_bajo_el_aliviadero(config):
     urrunaga = next(e for e in CATALOGO if e.id == "urrunaga")
     nivel, texto = panel.estado_embalse(96, config, 542.5, urrunaga)
     assert nivel == "aviso" and "vertido" not in texto
+
+
+def test_salida_de_ullibarri_medida_en_mendivil(config):
+    """Ullíbarri no da salida propia: se usa el caudal del aforo A315 (Mendivil), aguas abajo."""
+    conn = db.conectar(config.db_path)
+    db.guardar_lecturas(conn, [
+        Lectura("saih", "ullibarri.porcentaje", AHORA, 80.0, "%"),
+        Lectura("saih", "ullibarri.entrada", AHORA, 3.0, "m³/s"),
+        Lectura("saih", "zadorra_mendivil.caudal", AHORA, 9.5, "m³/s")])
+    e = next(x for x in panel.construir_agua(conn, config, AHORA)["embalses"] if x["id"] == "ullibarri")
+    assert e["salida"] == 9.5 and e["salida_medida_en"] == "Zadorra en Mendivil"
+    assert e["maniobra"]["texto"] == "Desembalsando"
+    mendivil = next(x for x in CATALOGO if x.id == "zadorra_mendivil")
+    assert RecolectorSaih(config, None).url(mendivil).endswith("estacion-aforos-A315-zadorra-mendivil")

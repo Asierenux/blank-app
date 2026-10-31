@@ -64,13 +64,18 @@ class Estacion:
     cota_aliviadero: float | None = None   # labio del aliviadero: por encima retienen las compuertas
     cota_nmn: float | None = None          # Nivel Máximo Normal: embalse "a tope"
     cota_coronacion: float | None = None   # parte de arriba de la presa
+    # Para embalses sin dato de salida: aforo situado justo aguas abajo de la presa,
+    # cuyo caudal es, en la práctica, el agua que suelta el embalse.
+    aforo_salida: str | None = None
+    slug_url: str | None = None            # final de la dirección de su ficha en la web
 
     @property
     def slug(self) -> str:
-        return self.claves[0]
+        return self.slug_url or self.claves[0]
 
 
-# Códigos comprobados con la web pública: E027 = Ullíbarri ("ullivarri"), E028 = Urrunaga.
+# Códigos comprobados con la web pública: E027 = Ullíbarri ("ullivarri"), E028 = Urrunaga,
+# A315 = Zadorra en Mendivil.
 # El resto hay que buscarlo en https://www.saihebro.com (sección Tiempo real):
 # el código aparece en la dirección de la ficha de cada estación.
 # Se pueden poner/cambiar en .env (o en Sistema › Configuración) con SAIH_CODIGOS=zadorra_arce=A0xx
@@ -78,11 +83,14 @@ class Estacion:
 CATALOGO: tuple[Estacion, ...] = (
     # Ullíbarri: E027 (…/estacion-embalses-E027-ullivarri). Capacidad aproximada: falta la ficha oficial
     Estacion("ullibarri", "Embalse de Ullíbarri-Gamboa", "embalse", "Zadorra", "E027",
-             ("ullivarri", "ullibarri"), capacidad_hm3=147.0),
+             ("ullivarri", "ullibarri"), capacidad_hm3=147.0, aforo_salida="zadorra_mendivil"),
     # Urrunaga: datos de la ficha oficial del SAIH (Información general › Datos embalse)
     Estacion("urrunaga", "Embalse de Urrunaga", "embalse", "Santa Engracia", "E028",
              ("urrunaga",), capacidad_hm3=71.77,
              cota_minima=530.0, cota_aliviadero=544.5, cota_nmn=546.5, cota_coronacion=548.0),
+    # A315 (…/estacion-aforos-A315-zadorra-mendivil): justo aguas abajo de la presa de Ullíbarri
+    Estacion("zadorra_mendivil", "Zadorra en Mendivil", "rio", "Zadorra", "A315",
+             ("mendivil", "mendibil"), slug_url="zadorra-mendivil"),
     Estacion("zadorra_vitoria", "Zadorra en Vitoria", "rio", "Zadorra", None,
              ("zadorra",)),
     Estacion("zadorra_arce", "Zadorra en Arce", "rio", "Zadorra", None,

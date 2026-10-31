@@ -70,6 +70,9 @@ def generar_agua(ahora: datetime, L) -> list[float]:
             vol = min(cap, vol + (entrada - salida) * 3600 / 1e6)
             L("saih", f"{eid}.entrada", t, entrada, "m³/s")
             L("saih", f"{eid}.salida", t, salida, "m³/s")
+            if eid == "ullibarri":   # el aforo de Mendivil, aguas abajo de la presa, mide esa salida
+                L("saih", "zadorra_mendivil.caudal", t, salida * 1.02, "m³/s")
+                L("saih", "zadorra_mendivil.nivel", t, 0.3 + 0.12 * salida ** 0.7, "m")
             L("saih", f"{eid}.volumen", t, vol, "hm³")
             L("saih", f"{eid}.porcentaje", t, vol / cap * 100, "%")
             if eid == "urrunaga":   # 530 m vacío → 546,5 m (NMN) lleno, como en su ficha

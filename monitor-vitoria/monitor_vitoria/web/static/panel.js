@@ -203,7 +203,8 @@ function tarjetaEmbalse(e) {
         : `<div class="flujo">
         <div><div class="t">Entrada</div><div class="v num">${num(e.entrada, 2)}</div><div class="t">m³/s</div></div>
         <div class="flecha" title="${m ? esc(m.texto) : ""}">${flecha}</div>
-        <div><div class="t">Salida · desembalse</div><div class="v num">${num(e.salida, 2)}</div><div class="t">m³/s</div></div>
+        <div><div class="t">Salida · desembalse</div><div class="v num">${num(e.salida, 2)}</div>
+          <div class="t">m³/s${e.salida_medida_en ? " · medida en " + esc(e.salida_medida_en.replace("Zadorra en ", "")) : ""}</div></div>
       </div>`}
       <div class="mini-datos">
         <div>Maniobra<b>${m ? esc(m.texto) : "—"}</b></div>

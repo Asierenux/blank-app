@@ -469,6 +469,16 @@ def construir_embalse(conn, c: Config, e, ahora: datetime) -> dict:
         nivel, texto = ("sin_datos", "Sin código SAIH" if not e.codigo else "Sin datos")
         return {**datos, "nivel_estado": nivel, "texto": texto, "serie": []}
 
+    # Sin dato de salida propio: usamos el aforo de justo aguas abajo de la presa
+    datos["salida_medida_en"] = None
+    if datos["salida"] is None and e.aforo_salida:
+        aguas_abajo = _ultimo(conn, "saih", f"{e.aforo_salida}.caudal", ahora, horas=6)
+        if aguas_abajo:
+            from .recolectores.saih import CATALOGO
+            datos["salida"] = aguas_abajo[0]
+            datos["salida_medida_en"] = next((x.nombre for x in CATALOGO if x.id == e.aforo_salida),
+                                             e.aforo_salida)
+
     nivel, texto = estado_embalse(datos["porcentaje"], c, datos["nivel"], e)
     hace24_nivel = _valor_hace(conn, "saih", f"{e.id}.nivel", momento, 24)
     hace24_pct = _valor_hace(conn, "saih", f"{e.id}.porcentaje", momento, 24)
