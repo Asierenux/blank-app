@@ -55,6 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     config = cargar_config()
     logging.basicConfig(level=config.log_level,
                         format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    logging.getLogger("httpx").setLevel(logging.WARNING)
 
     if args.orden == "init-db":
         db.conectar(config.db_path).close()
@@ -213,8 +214,9 @@ def _probar_saih(config, codigo: str, estacion_id: str | None) -> int:
 
 
 def _investigar_pagina(cliente, url: str, html: str, codigo: str, texto: str) -> None:
-    """Busca en la página y en sus JavaScript las direcciones de las que puede
-    cargar los datos, y lo deja todo en datos/ para revisarlo."""
+    """Busca de dónde carga la web sus datos: revisa la página, sus JavaScript y
+    las secciones de datos/gráficas (2 niveles, máx. 20 descargas). Lo deja
+    todo en datos/diagnostico_saih.txt."""
     import re
     from urllib.parse import urljoin, urlparse
 
@@ -223,28 +225,60 @@ def _investigar_pagina(cliente, url: str, html: str, codigo: str, texto: str) ->
     carpeta.mkdir(exist_ok=True)
     (carpeta / f"saih_{codigo}.html").write_text(html, encoding="utf-8")
 
-    patron = re.compile(r"""["'`]((?:https?:)?//[^"'`\s<>]+|/[A-Za-z0-9_\-./]*(?:api|json|ajax|dato|tiempo|senal|estacion|php)[A-Za-z0-9_\-./?=&{}$]*)["'`]""", re.I)
-    candidatas = set(patron.findall(html))
-    host = urlparse(url).netloc
-    scripts = [urljoin(url, s) for s in re.findall(r"<script[^>]+src=[\"']([^\"']+)", html, re.I)]
-    for js in scripts:
-        if urlparse(js).netloc != host:
-            continue                       # solo los JavaScript de la propia web
-        try:
-            candidatas |= {f"[{js.rsplit('/', 1)[-1]}] {u}" for u in patron.findall(cliente.get(js).text)}
-        except Exception as e:  # noqa: BLE001
-            candidatas.add(f"[{js}] no se pudo descargar: {type(e).__name__}")
+    # 1) ¿Qué se lee alrededor de las palabras clave? (por si los datos SÍ están)
+    trozos = []
+    for m in re.finditer(r"nivel|volumen|caudal|cota|hm3|msnm|m3/s", texto):
+        trozo = texto[max(0, m.start() - 60): m.end() + 90]
+        if not any(trozo[20:60] in t for t in trozos):
+            trozos.append(trozo)
+    print("\n  Texto alrededor de nivel/volumen/caudal en la página:")
+    for t in trozos[:12] or ["(ninguna de esas palabras aparece en el texto visible)"]:
+        print("    …" + t + "…")
 
-    utiles = sorted(c for c in candidatas if not re.search(r"\.(png|jpe?g|svg|gif|css|woff2?|ico)(\?|$)", c, re.I))
-    lineas = [f"URL: {url}", f"Scripts: {len(scripts)}", "", "Direcciones candidatas:"] + \
-             [f"  {c}" for c in utiles[:120]] + ["", "Texto visible (inicio):", texto[:1500]]
+    # 2) Rastrear direcciones de datos en la página, sus JS y las secciones de datos
+    host = urlparse(url).netloc
+    patron = re.compile(r"""["'`]((?:https?:)?//[^"'`\s<>]+|/[A-Za-z0-9_\-./]*(?:api|json|ajax|dato|tiempo|senal|estacion|grafica|export|php|csv)[A-Za-z0-9_\-./?=&{}$:]*)["'`]""", re.I)
+    pendientes = [(url, html)]
+    for extra in ("/datos/graficas", "/datos/historicos", "/js/app.datos.graficas.sedh.js",
+                  "/js/app.datos.historicos.js", "/js/app.datos.opendata.js"):
+        pendientes.append((urljoin(url, extra), None))
+    vistos, hallazgos, descargas = set(), {}, 0
+    while pendientes and descargas < 20:
+        direccion, contenido = pendientes.pop(0)
+        if direccion in vistos:
+            continue
+        vistos.add(direccion)
+        if contenido is None:
+            try:
+                resp = cliente.get(direccion)
+                descargas += 1
+                contenido = resp.text if resp.status_code == 200 else ""
+            except Exception:  # noqa: BLE001
+                continue
+        origen = direccion.rsplit("/", 1)[-1] or direccion
+        for src in re.findall(r"<script[^>]+src=[\"']([^\"']+)", contenido, re.I):
+            js = urljoin(direccion, src)
+            if urlparse(js).netloc == host and "vendor" not in js:
+                pendientes.append((js, None))
+        for u in patron.findall(contenido):
+            if re.search(r"\.(png|jpe?g|svg|gif|css|woff2?|ico)(\?|$)|google|github|w3\.org|LICENSE", u, re.I):
+                continue
+            hallazgos.setdefault(u, origen)
+            if u.startswith("/js/") and u.endswith(".js"):
+                pendientes.append((urljoin(url, u), None))
+
+    ordenados = sorted(hallazgos.items(), key=lambda kv: (not re.search(r"api|json|ajax|export|csv|php|\?", kv[0], re.I), kv[0]))
+    print(f"\n  Descargas revisadas: {descargas + 1} · direcciones encontradas: {len(ordenados)}")
+    print("  (las primeras son las que más pinta tienen de traer datos)")
+    for u, origen in ordenados[:30]:
+        print(f"    {u}    ← {origen}")
+
+    lineas = [f"URL: {url}", "", "TEXTO ALREDEDOR DE PALABRAS CLAVE:"] + [f"  …{t}…" for t in trozos[:40]] + \
+             ["", "DIRECCIONES (dirección ← dónde apareció):"] + [f"  {u}  <- {o}" for u, o in ordenados[:200]] + \
+             ["", "TEXTO VISIBLE (inicio):", texto[:3000]]
     informe = carpeta / "diagnostico_saih.txt"
     informe.write_text("\n".join(lineas), encoding="utf-8")
-    print(f"  Scripts revisados: {len(scripts)} · direcciones candidatas: {len(utiles)}")
-    for c in utiles[:25]:
-        print("   ", c)
     print(f"\n  Informe completo: {informe}")
-    print(f"  Página guardada:  {carpeta / f'saih_{codigo}.html'}")
 
 
 if __name__ == "__main__":

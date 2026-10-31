@@ -166,10 +166,16 @@ def test_investigar_pagina_saih(tmp_path, monkeypatch):
     html = ('<html><script src="/js/app.js"></script><body>Urrunaga cargando…'
             '<div data-x="/api/estaciones/E028/senales"></div></body></html>')
     js = 'fetch("/api/tiempo-real/E028.json").then(r=>r.json()); var logo="/img/logo.png";'
-    cliente = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, text=js)))
+
+    def responder(req):
+        if req.url.path == "/js/app.datos.graficas.sedh.js":
+            return httpx.Response(200, text='$.post("/datos/graficas/exportar?senal="+id)')
+        return httpx.Response(200, text=js)
+    cliente = httpx.Client(transport=httpx.MockTransport(responder))
     cli._investigar_pagina(cliente, "https://www.saihebro.com/tiempo-real/x", html, "E028", "urrunaga")
     informe = (tmp_path / "datos" / "diagnostico_saih.txt").read_text(encoding="utf-8")
     assert "/api/estaciones/E028/senales" in informe and "/api/tiempo-real/E028.json" in informe
+    assert "/datos/graficas/exportar?senal=" in informe          # encontrado en un JS de 2º nivel
     assert "logo.png" not in informe
 
 
