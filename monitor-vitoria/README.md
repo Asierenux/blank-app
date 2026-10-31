@@ -6,7 +6,12 @@ Recoge datos públicos de Vitoria-Gasteiz y los guarda en SQLite:
 - 💡 **Precio de la luz (PVPC)**: Red Eléctrica (ESIOS, o REData sin token)
 - 😷 **Calidad del aire**: WAQI (aqicn.org)
 
-Además tiene un panel web (FastAPI) y alertas por Telegram.
+Además tiene un panel de operaciones web (FastAPI) y alertas por Telegram.
+
+![Panel de operaciones](docs/panel.png)
+
+> ¿Sin claves todavía? `python -m monitor_vitoria demo` crea datos simulados en
+> `datos/demo.db` y `DB_PATH=datos/demo.db python -m monitor_vitoria web` abre el panel con ellos.
 
 ---
 
@@ -92,7 +97,17 @@ En **otra terminal** (con el entorno activado):
 python -m monitor_vitoria web
 ```
 
-Abre http://127.0.0.1:8000. También tienes:
+Abre http://127.0.0.1:8000. Cómo leer el panel:
+
+- **Arriba**: estado global (OPERATIVO / ATENCIÓN / CRÍTICO), reloj y hora de la última actualización.
+- **Fichas**: cada indicador con su semáforo (✓ OK, ▲ AVISO, ✖ CRÍTICO), tendencia de la última hora,
+  minigráfica de 24 h y antigüedad del dato. Si un dato es viejo sale "DATO ANTIGUO" y se atenúa.
+- **Luz**: barras de hoy y mañana coloreadas barato/medio/caro *respecto a ese día*; la hora actual
+  va recuadrada y las pasadas, atenuadas. "Mejor franja 3 h" = cuándo poner lavadora, coche, etc.
+- **Alertas recientes** y **estado de las fuentes** (Operativa / Retrasada / Caída / Sin configurar).
+- Se actualiza solo cada 60 s. Si se pierde la conexión con el servidor aparece una franja roja.
+
+También tienes:
 
 - http://127.0.0.1:8000/docs → documentación automática de la API (cortesía de FastAPI)
 - http://127.0.0.1:8000/api/ultimas → los últimos valores en JSON

@@ -7,6 +7,7 @@
     web                     arranca el panel en http://127.0.0.1:8000
     probar-telegram         envía un mensaje de prueba a tu bot
     estado                  muestra qué claves están configuradas
+    demo                    crea datos/demo.db con datos simulados para ver el panel
 """
 
 from __future__ import annotations
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     p_web.add_argument("--reload", action="store_true", help="recarga al editar código")
     sub.add_parser("probar-telegram", help="mensaje de prueba")
     sub.add_parser("estado", help="resumen de configuración")
+    sub.add_parser("demo", help="datos simulados en datos/demo.db")
     args = parser.parse_args(argv)
 
     config = cargar_config()
@@ -75,6 +77,16 @@ def main(argv: list[str] | None = None) -> int:
               + ("" if config.esios_token else " → se usará REData sin token"))
         print(f"WAQI          : {marca(config.waqi_token)}")
         print(f"Telegram      : {marca(config.telegram_activo)}")
+
+    elif args.orden == "demo":
+        from .config import RAIZ
+        from .demo import generar
+        ruta = RAIZ / "datos" / "demo.db"
+        generar(ruta)
+        print(f"Datos de demostración en {ruta}")
+        print("Abre el panel con ellos:")
+        print("  Linux/macOS:  DB_PATH=datos/demo.db python -m monitor_vitoria web")
+        print("  Windows:      $env:DB_PATH='datos/demo.db'; python -m monitor_vitoria web")
 
     return 0
 

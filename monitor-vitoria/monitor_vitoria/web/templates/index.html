@@ -1,121 +1,362 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-tema="oscuro">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Monitor Vitoria</title>
-  <meta http-equiv="refresh" content="600"><!-- recarga cada 10 min -->
+  <title>Monitor Vitoria · Operaciones</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <style>
-    :root { --fondo:#f5f6f8; --tarjeta:#fff; --texto:#1d2330; --suave:#6b7280; --borde:#e5e7eb; --acento:#2563eb; --ok:#16a34a; --mal:#dc2626; }
-    @media (prefers-color-scheme: dark) {
-      :root { --fondo:#0f1115; --tarjeta:#181b22; --texto:#e7e9ee; --suave:#9aa3b2; --borde:#2a2f3a; --acento:#60a5fa; --ok:#4ade80; --mal:#f87171; }
+    /* ---------- Tokens de color ----------
+       Oscuro por defecto (sala de control: menos fatiga visual, los colores
+       de estado destacan más). Botón arriba a la derecha para el modo claro. */
+    :root {
+      --fondo:#0b0e13; --panel:#131821; --panel-2:#1a202b; --borde:#252d3a;
+      --texto:#e8ecf2; --suave:#8b95a7; --tenue:#5b6577;
+      --ok:#22c55e; --aviso:#f59e0b; --critico:#ef4444; --info:#60a5fa; --sin_datos:#6b7280;
+      --ok-fondo:rgba(34,197,94,.10); --aviso-fondo:rgba(245,158,11,.12); --critico-fondo:rgba(239,68,68,.14);
     }
-    * { box-sizing: border-box; }
-    body { margin:0; font-family: system-ui, sans-serif; background:var(--fondo); color:var(--texto); }
-    main { max-width: 1100px; margin: 0 auto; padding: 16px; }
-    h1 { margin: 8px 0 16px; font-size: 1.5rem; }
-    h2 { font-size: 1rem; margin: 0 0 12px; }
-    .rejilla { display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-    .tarjeta { background:var(--tarjeta); border:1px solid var(--borde); border-radius:12px; padding:16px; }
-    .metricas { display:grid; grid-template-columns: repeat(2, 1fr); gap:10px; }
-    .valor { font-size:1.4rem; font-weight:600; font-variant-numeric: tabular-nums; }
-    .etiqueta, .hora, td.suave { color:var(--suave); font-size:.8rem; }
-    .vacio { color:var(--suave); }
-    canvas { width:100% !important; height:240px !important; }
-    table { width:100%; border-collapse:collapse; font-size:.85rem; }
-    td, th { text-align:left; padding:6px 4px; border-bottom:1px solid var(--borde); }
-    .ok { color:var(--ok); } .mal { color:var(--mal); }
-    .desplazable { overflow-x:auto; }
+    [data-tema="claro"] {
+      --fondo:#eef1f5; --panel:#ffffff; --panel-2:#f5f7fa; --borde:#d9dee6;
+      --texto:#111827; --suave:#4b5563; --tenue:#9ca3af;
+      --ok:#15803d; --aviso:#b45309; --critico:#b91c1c; --info:#1d4ed8; --sin_datos:#6b7280;
+      --ok-fondo:rgba(21,128,61,.08); --aviso-fondo:rgba(180,83,9,.10); --critico-fondo:rgba(185,28,28,.10);
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; background:var(--fondo); color:var(--texto);
+      font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+    .num { font-variant-numeric: tabular-nums; }
+    main { padding:12px 16px 16px; max-width:1920px; margin:0 auto; display:grid; gap:12px; }
+
+    /* ---------- Barra superior ---------- */
+    .barra { display:grid; grid-template-columns: 1fr auto 1fr; align-items:center; gap:12px;
+      padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--borde);
+      position:sticky; top:0; z-index:5; }
+    .marca b { font-size:1.05rem; letter-spacing:.06em; }
+    .marca span { display:block; color:var(--suave); font-size:.8rem; }
+    .global { display:flex; align-items:center; gap:10px; padding:8px 18px; border-radius:999px;
+      font-weight:800; letter-spacing:.12em; font-size:1rem; border:2px solid currentColor; }
+    .reloj { justify-self:end; text-align:right; display:flex; align-items:center; gap:14px; }
+    .reloj .hora { font-size:1.8rem; font-weight:700; line-height:1; }
+    .reloj .fecha, .reloj .act { color:var(--suave); font-size:.78rem; }
+    .boton { background:var(--panel-2); color:var(--texto); border:1px solid var(--borde);
+      border-radius:8px; padding:6px 10px; cursor:pointer; font:inherit; font-size:.8rem; }
+
+    .aviso-conexion { display:none; background:var(--critico); color:#fff; font-weight:700;
+      text-align:center; padding:8px; letter-spacing:.05em; }
+    .aviso-conexion.visible { display:block; }
+
+    /* ---------- Colores por nivel ---------- */
+    .n-ok { --c:var(--ok); --cf:var(--ok-fondo); }
+    .n-aviso { --c:var(--aviso); --cf:var(--aviso-fondo); }
+    .n-critico { --c:var(--critico); --cf:var(--critico-fondo); }
+    .n-info { --c:var(--info); --cf:transparent; }
+    .n-sin_datos { --c:var(--sin_datos); --cf:transparent; }
+    .global { color:var(--c); background:var(--cf); }
+
+    .pastilla { display:inline-flex; align-items:center; gap:5px; font-size:.68rem; font-weight:800;
+      letter-spacing:.08em; padding:3px 7px; border-radius:5px; color:var(--c);
+      background:var(--cf); border:1px solid color-mix(in srgb, var(--c) 45%, transparent); white-space:nowrap; }
+    .n-info .pastilla, .pastilla.n-info { display:none; }
+
+    /* ---------- Fichas de indicadores ---------- */
+    .fichas { display:grid; gap:12px; grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .ficha { background:var(--panel); border:1px solid var(--borde); border-left:5px solid var(--c);
+      border-radius:10px; padding:12px 14px 10px; display:grid; gap:4px; min-height:168px;
+      grid-template-rows: auto auto auto 1fr auto; }
+    .ficha.n-critico { background:linear-gradient(var(--cf), var(--cf)), var(--panel); }
+    .ficha header { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .ficha .etq { color:var(--suave); font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+    .ficha .valor { font-size:2.6rem; font-weight:750; line-height:1.05; }
+    .ficha .valor small { font-size:.95rem; font-weight:600; color:var(--suave); margin-left:4px; }
+    .ficha .sub { font-size:.85rem; color:var(--c); font-weight:600; min-height:1.1em; }
+    .ficha .sub .gris { color:var(--suave); font-weight:500; }
+    .ficha svg { width:100%; height:34px; display:block; align-self:end; }
+    .ficha footer { display:flex; justify-content:space-between; flex-wrap:wrap; gap:2px 8px; font-size:.75rem; color:var(--suave); }
+    .ficha.antiguo .valor, .ficha.antiguo svg { opacity:.45; }
+    .etiqueta-antiguo { color:var(--aviso); font-weight:800; }
+
+    /* ---------- Paneles ---------- */
+    .fila { display:grid; gap:12px; grid-template-columns: minmax(0,2fr) minmax(0,1fr); }
+    .tarjeta { background:var(--panel); border:1px solid var(--borde); border-radius:10px; padding:14px; min-width:0; }
+    .tarjeta h2 { margin:0 0 10px; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; color:var(--suave);
+      display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .lienzo { position:relative; height:260px; }
+    .datos-luz { display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:8px; margin-bottom:10px; }
+    .dato { background:var(--panel-2); border:1px solid var(--borde); border-radius:8px; padding:8px 10px; }
+    .dato .t { font-size:.7rem; color:var(--suave); text-transform:uppercase; letter-spacing:.06em; }
+    .dato .v { font-size:1.15rem; font-weight:700; }
+    .dato .h { font-size:.75rem; color:var(--suave); }
+    .dato.destacado { border-color:var(--ok); }
+    .leyenda { display:flex; gap:14px; font-size:.75rem; color:var(--suave); flex-wrap:wrap; }
+    .leyenda i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+
+    .lista { list-style:none; margin:0; padding:0; display:grid; gap:6px; max-height:300px; overflow:auto; }
+    .lista li { display:grid; grid-template-columns: 6px 1fr auto; gap:10px; align-items:center;
+      background:var(--panel-2); border-radius:8px; padding:8px 10px; }
+    .lista li::before { content:""; width:6px; height:100%; min-height:28px; border-radius:3px; background:var(--c); }
+    .lista .tit { font-weight:650; font-size:.88rem; }
+    .lista .det { font-size:.75rem; color:var(--suave); }
+    .lista .der { text-align:right; font-size:.8rem; }
+    .vacio { color:var(--suave); font-size:.88rem; padding:10px 0; }
+
+    table { width:100%; border-collapse:collapse; font-size:.84rem; }
+    th { text-align:left; font-size:.7rem; color:var(--suave); text-transform:uppercase; letter-spacing:.06em; font-weight:700; }
+    td, th { padding:8px 6px; border-bottom:1px solid var(--borde); vertical-align:top; }
+    td .error { color:var(--aviso); font-size:.75rem; display:block; margin-top:2px; word-break:break-word; }
+
+    @keyframes latido { 50% { opacity:.35; } }
+    .n-critico .pastilla, .global.n-critico .punto { animation: latido 1.6s ease-in-out infinite; }
+    .punto { width:12px; height:12px; border-radius:50%; background:currentColor; }
+    @media (prefers-reduced-motion: reduce) { * { animation:none !important; } }
+
+    /* ---------- Pantallas más pequeñas ---------- */
+    @media (max-width: 1200px) { .fichas { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .fila { grid-template-columns: 1fr; } .datos-luz { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+    @media (max-width: 640px) {
+      .barra { grid-template-columns: 1fr auto; } .global { grid-column: 1 / -1; justify-self:stretch; justify-content:center; order:3; }
+      .reloj .hora { font-size:1.3rem; } .ficha .valor { font-size:2rem; }
+      .marca b { font-size:.9rem; } .marca span { display:none; }
+      .ficha footer { flex-direction:column; }
+      .datos-luz { grid-template-columns: repeat(2, minmax(0,1fr)); } .fichas { gap:8px; }
+      .ficha { min-height:150px; padding:10px; }
+    }
   </style>
 </head>
 <body>
+<div class="aviso-conexion" id="aviso-conexion">⚠ SIN CONEXIÓN CON EL SERVIDOR — los datos mostrados pueden estar desactualizados</div>
+<header class="barra">
+  <div class="marca"><b>MONITOR VITORIA-GASTEIZ</b><span>Panel de operaciones · datos públicos</span></div>
+  <div class="global n-sin_datos" id="global"><span class="punto"></span><span id="global-texto">CARGANDO…</span></div>
+  <div class="reloj">
+    <div><div class="hora num" id="reloj">--:--:--</div>
+      <div class="fecha" id="fecha"></div><div class="act" id="actualizado">Esperando datos…</div></div>
+    <button class="boton" id="tema" type="button" title="Cambiar tema claro/oscuro">◐ Tema</button>
+  </div>
+</header>
+
 <main>
-  <h1>Monitor Vitoria-Gasteiz</h1>
+  <section class="fichas" id="fichas" aria-label="Indicadores"></section>
 
-  <section class="rejilla">
-    {% for nombre, g in grupos.items() %}
-    <div class="tarjeta">
-      <h2>{{ g.descripcion }}</h2>
-      {% if g.lecturas %}
-        <div class="metricas">
-          {% for l in g.lecturas %}
-          <div>
-            <div class="etiqueta">{{ l.etiqueta }}</div>
-            <div class="valor">{{ '%g' % l.valor }} <small>{{ l.unidad }}</small></div>
-            <div class="hora" data-utc="{{ l.momento }}"></div>
-          </div>
-          {% endfor %}
-        </div>
-      {% else %}
-        <p class="vacio">Sin datos todavía. Ejecuta <code>python -m monitor_vitoria recoger {{ nombre }}</code>.</p>
-      {% endif %}
-    </div>
-    {% endfor %}
+  <section class="fila">
+    <article class="tarjeta">
+      <h2><span>Precio de la luz (PVPC) · hoy y mañana</span>
+        <span class="leyenda"><span><i style="background:var(--ok)"></i>Barato</span>
+          <span><i style="background:var(--aviso)"></i>Medio</span>
+          <span><i style="background:var(--critico)"></i>Caro</span>
+          <span>(comparado con su día)</span></span></h2>
+      <div class="datos-luz" id="datos-luz"></div>
+      <div class="lienzo"><canvas id="g-luz" aria-label="Gráfica de precio de la luz"></canvas></div>
+      <div class="vacio" id="luz-nota"></div>
+    </article>
+    <article class="tarjeta">
+      <h2><span>Alertas recientes</span><span id="alertas-num"></span></h2>
+      <ul class="lista" id="alertas"></ul>
+    </article>
   </section>
 
-  <section class="rejilla" style="margin-top:16px">
-    <div class="tarjeta"><h2>Temperatura (48 h)</h2><canvas id="g-temp"></canvas></div>
-    <div class="tarjeta"><h2>Precio PVPC hoy y mañana</h2><canvas id="g-pvpc"></canvas></div>
-    <div class="tarjeta"><h2>Calidad del aire (72 h)</h2><canvas id="g-aqi"></canvas></div>
-  </section>
-
-  <section class="tarjeta" style="margin-top:16px">
-    <h2>Últimas ejecuciones</h2>
-    <div class="desplazable">
-    <table>
-      <tr><th>Fuente</th><th>Inicio</th><th>Estado</th><th>Nuevas</th><th>Detalle</th></tr>
-      {% for e in ejecuciones %}
-      <tr>
-        <td>{{ e.fuente }}</td>
-        <td class="suave" data-utc="{{ e.inicio }}"></td>
-        <td class="{{ 'ok' if e.ok else 'mal' }}">{{ 'OK' if e.ok else 'Error' }}</td>
-        <td>{{ e.nuevas }}</td>
-        <td class="suave">{{ e.error or '' }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5" class="vacio">Aún no se ha ejecutado ningún recolector.</td></tr>
-      {% endfor %}
-    </table>
-    </div>
+  <section class="fila">
+    <article class="tarjeta">
+      <h2><span>Meteorología · últimas 48 h</span>
+        <span class="leyenda"><span><i style="background:var(--info)"></i>Temperatura (°C)</span>
+          <span><i style="background:var(--aviso)"></i>Racha (m/s)</span></span></h2>
+      <div class="lienzo"><canvas id="g-meteo" aria-label="Gráfica de temperatura y racha"></canvas></div>
+    </article>
+    <article class="tarjeta">
+      <h2><span>Estado de las fuentes</span></h2>
+      <table><thead><tr><th>Fuente</th><th>Estado</th><th>Última recogida OK</th></tr></thead>
+        <tbody id="fuentes"></tbody></table>
+    </article>
   </section>
 </main>
 
 <script>
-  // Convierte las horas UTC guardadas en la base de datos a hora local
-  const fmt = new Intl.DateTimeFormat("es-ES", { weekday:"short", day:"2-digit", hour:"2-digit", minute:"2-digit" });
-  document.querySelectorAll("[data-utc]").forEach(el => { el.textContent = fmt.format(new Date(el.dataset.utc)); });
+const REFRESCO_S = {{ refresco_s }};
+const ZONA = "Europe/Madrid";
+const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
+const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
 
-  const estilo = getComputedStyle(document.documentElement);
-  const acento = estilo.getPropertyValue("--acento").trim();
-  const suave = estilo.getPropertyValue("--suave").trim();
+// ---------- Utilidades ----------
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const num = (v, d=1) => v == null ? "—" : new Intl.NumberFormat("es-ES", {minimumFractionDigits:d, maximumFractionDigits:d}).format(v);
+const fHora = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, hour:"2-digit", minute:"2-digit"});
+const fDiaHora = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, weekday:"short", hour:"2-digit", minute:"2-digit"});
+const fDia = new Intl.DateTimeFormat("es-ES", {timeZone:ZONA, weekday:"short"});
+const hora = t => fHora.format(new Date(t));
+const dia = t => fDia.format(new Date(t)).replace(".", "");
+const diaHora = t => fDiaHora.format(new Date(t));
+function hace(t) {
+  if (!t) return "nunca";
+  const min = Math.round((Date.now() - new Date(t)) / 60000);
+  if (min < 1) return "ahora mismo";
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 48 ? `hace ${h} h ${min % 60 ? (min % 60) + " min" : ""}`.trim() : `hace ${Math.round(h/24)} días`;
+}
+const pastilla = n => n === "info" ? "" : `<span class="pastilla n-${n}">${ICONO[n]} ${TEXTO_NIVEL[n]}</span>`;
 
-  async function grafica(idCanvas, url, tipo = "line") {
-    const r = await fetch(url);
-    const datos = await r.json();
-    const lienzo = document.getElementById(idCanvas);
-    if (!datos.puntos.length) {
-      lienzo.replaceWith(Object.assign(document.createElement("p"), { className:"vacio", textContent:"Sin datos todavía." }));
-      return;
-    }
-    new Chart(lienzo, {
-      type: tipo,
-      data: {
-        labels: datos.puntos.map(p => fmt.format(new Date(p.t))),
-        datasets: [{ label: `${datos.etiqueta} (${datos.unidad})`, data: datos.puntos.map(p => p.v),
-                     borderColor: acento, backgroundColor: acento, pointRadius: 0, borderWidth: 2, tension: .3 }]
-      },
-      options: {
-        maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: suave } } },
-        scales: { x: { ticks: { color: suave, maxTicksLimit: 8 } }, y: { ticks: { color: suave } } }
-      }
-    });
+// ---------- Reloj ----------
+function reloj() {
+  const d = new Date();
+  $("reloj").textContent = d.toLocaleTimeString("es-ES", {timeZone:ZONA});
+  $("fecha").textContent = d.toLocaleDateString("es-ES", {timeZone:ZONA, weekday:"long", day:"numeric", month:"long"});
+}
+setInterval(reloj, 1000); reloj();
+
+// ---------- Minigráfica (sparkline) en SVG ----------
+function sparkline(serie, color) {
+  if (serie.length < 2) return `<svg viewBox="0 0 100 34"></svg>`;
+  const vs = serie.map(p => p[1]), min = Math.min(...vs), max = Math.max(...vs), r = (max - min) || 1;
+  const t0 = new Date(serie[0][0]), t1 = new Date(serie.at(-1)[0]), rt = (t1 - t0) || 1;
+  const pts = serie.map(([t, v]) => `${((new Date(t) - t0) / rt * 100).toFixed(1)},${(31 - (v - min) / r * 28).toFixed(1)}`);
+  return `<svg viewBox="0 0 100 34" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${pts.join(" ")}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/></svg>`;
+}
+
+// ---------- Fichas ----------
+function fichaIndicador(i) {
+  const color = css(`--${i.nivel}`) || css("--info");
+  const tend = i.tendencia == null ? "" :
+    `${i.tendencia > 0 ? "▲" : i.tendencia < 0 ? "▼" : "▬"} ${i.tendencia > 0 ? "+" : ""}${num(i.tendencia, i.decimales)} en 1 h`;
+  const sub = [i.texto, i.secundario && `<span class="gris">${esc(i.secundario)}</span>`].filter(Boolean).join(" · ");
+  return `<article class="ficha n-${i.nivel} ${i.antiguo ? "antiguo" : ""}">
+    <header><span class="etq">${esc(i.etiqueta)}</span>${pastilla(i.nivel)}</header>
+    <div class="valor num">${num(i.valor, i.decimales)}<small>${esc(i.unidad)}</small></div>
+    <div class="sub">${sub || "&nbsp;"}</div>
+    ${sparkline(i.serie, color)}
+    <footer><span class="num">${tend}</span>
+      <span>${i.antiguo ? '<span class="etiqueta-antiguo">DATO ANTIGUO · </span>' : ""}${i.valor == null ? "" : hace(i.momento)}</span></footer>
+  </article>`;
+}
+
+function fichaLuz(p) {
+  const a = p.actual, f = p.mejor_franja;
+  const tramo = a ? {barato:"Tramo barato", medio:"Tramo medio", caro:"Tramo caro"}[a.tramo] : "Sin datos";
+  const color = css(`--${p.nivel}`);
+  return `<article class="ficha n-${p.nivel}">
+    <header><span class="etq">Luz ahora</span>${pastilla(p.nivel).replace(/OK|AVISO|CRÍTICO/, m => ({OK:"BARATA",AVISO:"MEDIA","CRÍTICO":"CARA"}[m]))}</header>
+    <div class="valor num">${a ? num(a.v, 3) : "—"}<small>€/kWh</small></div>
+    <div class="sub">${tramo}${p.media_hoy ? ` <span class="gris">· media hoy ${num(p.media_hoy, 3)}</span>` : ""}</div>
+    ${sparkline((p.puntos || []).map(x => [x.t, x.v]), color)}
+    <footer><span>${f ? `Mejor ${f.horas} h: <b>${hora(f.inicio)}–${hora(f.fin)}</b>` : ""}</span>
+      <span>${a ? "hasta " + hora(new Date(new Date(a.t).getTime() + p.paso_min * 60000)) : ""}</span></footer>
+  </article>`;
+}
+
+// ---------- Panel de la luz ----------
+function datosLuz(p) {
+  const d = (t, v, h, extra = "") => `<div class="dato ${extra}"><div class="t">${t}</div><div class="v num">${v}</div><div class="h">${h}</div></div>`;
+  if (!p.puntos?.length) { $("datos-luz").innerHTML = ""; return; }
+  const f = p.mejor_franja;
+  $("datos-luz").innerHTML =
+    d("Ahora", p.actual ? num(p.actual.v, 3) : "—", "€/kWh") +
+    d("Mínimo hoy", p.minimo_hoy ? num(p.minimo_hoy.v, 3) : "—", p.minimo_hoy ? "a las " + hora(p.minimo_hoy.t) : "") +
+    d("Máximo hoy", p.maximo_hoy ? num(p.maximo_hoy.v, 3) : "—", p.maximo_hoy ? "a las " + hora(p.maximo_hoy.t) : "") +
+    d("Media hoy", num(p.media_hoy, 3), "€/kWh") +
+    d(`Mejor franja ${f ? f.horas + " h" : ""}`, f ? `${hora(f.inicio)}–${hora(f.fin)}` : "—",
+      f ? `${dia(f.inicio)} · media ${num(f.media, 3)}` : "", "destacado");
+}
+
+let gLuz, gMeteo;
+const ejes = () => ({ ticks:{ color:css("--suave"), font:{size:11} }, grid:{ color:css("--borde") }, border:{ display:false } });
+
+function graficaLuz(p) {
+  const pts = p.puntos || [];
+  $("luz-nota").textContent = !pts.length ? "Sin datos de precio todavía."
+    : p.hay_manana ? "" : "Los precios de mañana los publica REE hacia las 20:30.";
+  const ahora = Date.now(), paso = (p.paso_min || 60) * 60000;
+  const colores = pts.map(x => {
+    const base = css({barato:"--ok", medio:"--aviso", caro:"--critico"}[x.tramo]);
+    const t = new Date(x.t).getTime();
+    const pasado = t + paso <= ahora, actual = t <= ahora && ahora < t + paso;
+    return actual ? base : base + (pasado ? "40" : "b0");  // pasado = tenue, futuro = medio, actual = sólido
+  });
+  const bordes = pts.map(x => { const t = new Date(x.t).getTime(); return (t <= ahora && ahora < t + paso) ? css("--texto") : "transparent"; });
+  const datos = { labels: pts.map(x => x.t),
+    datasets: [{ data: pts.map(x => x.v), backgroundColor: colores, borderColor: bordes, borderWidth: 2, borderSkipped:false, barPercentage:.92, categoryPercentage:1 }] };
+  const opciones = { maintainAspectRatio:false, animation:false,
+    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ title: c => diaHora(c[0].label), label: c => `${num(c.raw, 4)} €/kWh` } } },
+    scales:{ x:{ ...ejes(), ticks:{ ...ejes().ticks, autoSkip:false, maxRotation:0,
+               callback(v, i) { const t = this.getLabelForValue(v), d = new Date(t);
+                 const h = Number(fHora.format(d).slice(0,2)), m = d.getUTCMinutes();
+                 const cada = this.chart.width < 600 ? 6 : 3;   // menos etiquetas en pantallas estrechas
+                 if (m !== 0 || h % cada) return "";
+                 return h === 0 ? dia(t).toUpperCase() : String(h).padStart(2,"0") + "h"; } } },
+             y:{ ...ejes(), beginAtZero:true, ticks:{ ...ejes().ticks, callback: v => num(v, 2) } } } };
+  if (gLuz) { gLuz.data = datos; gLuz.options = opciones; gLuz.update("none"); }
+  else gLuz = new Chart($("g-luz"), { type:"bar", data:datos, options:opciones });
+}
+
+function graficaMeteo(m) {
+  const racha = new Map(m.racha.map(([t, v]) => [t, v]));
+  const datos = { labels: m.temperatura.map(p => p[0]), datasets: [
+    { label:"Temperatura", data: m.temperatura.map(p => p[1]), borderColor: css("--info"), backgroundColor: css("--info") + "22",
+      fill:true, yAxisID:"y", pointRadius:0, borderWidth:2, tension:.3 },
+    { label:"Racha", data: m.temperatura.map(p => racha.get(p[0]) ?? null), borderColor: css("--aviso"),
+      borderDash:[5,4], yAxisID:"y2", pointRadius:0, borderWidth:1.6, tension:.3 } ] };
+  const opciones = { maintainAspectRatio:false, animation:false, interaction:{ mode:"index", intersect:false },
+    plugins:{ legend:{display:false}, tooltip:{ callbacks:{ title: c => diaHora(c[0].label),
+      label: c => c.datasetIndex ? `Racha ${num(c.raw)} m/s (${num(c.raw * 3.6, 0)} km/h)` : `Temp. ${num(c.raw)} °C` } } },
+    scales:{ x:{ ...ejes(), ticks:{ ...ejes().ticks, maxTicksLimit: innerWidth < 640 ? 4 : 9, maxRotation:0, callback(v) { return diaHora(this.getLabelForValue(v)); } } },
+             y:{ ...ejes(), ticks:{ ...ejes().ticks, callback: v => v + "°" } },
+             y2:{ ...ejes(), position:"right", grid:{ display:false }, beginAtZero:true, ticks:{ ...ejes().ticks, callback: v => v + " m/s" } } } };
+  if (gMeteo) { gMeteo.data = datos; gMeteo.options = opciones; gMeteo.update("none"); }
+  else gMeteo = new Chart($("g-meteo"), { type:"line", data:datos, options:opciones });
+}
+
+// ---------- Alertas y fuentes ----------
+function alertas(lista) {
+  $("alertas-num").textContent = lista.length ? `${lista.length} últimas` : "";
+  $("alertas").innerHTML = lista.length ? lista.map(a => `<li class="n-${a.nivel}">
+      <div><div class="tit">${esc(a.titulo)}</div><div class="det">Dato de ${diaHora(a.momento)}</div></div>
+      <div class="der"><div class="num"><b>${a.valor == null ? "" : num(a.valor, a.unidad === "€/kWh" ? 3 : 1) + " " + esc(a.unidad)}</b></div>
+        <div class="det">${hace(a.enviado_en)}</div></div></li>`).join("")
+    : `<li class="n-ok"><div><div class="tit">Sin alertas</div><div class="det">Ningún umbral superado</div></div><div></div></li>`;
+}
+
+function fuentes(lista) {
+  $("fuentes").innerHTML = lista.map(f => `<tr class="n-${f.nivel}">
+    <td><b>${esc(f.descripcion)}</b><span class="error" style="color:var(--suave)">cada ${f.intervalo_min} min</span></td>
+    <td><span class="pastilla">${ICONO[f.nivel]} ${esc(f.texto).toUpperCase()}</span>${f.error ? `<span class="error">${esc(f.error)}</span>` : ""}</td>
+    <td class="num">${f.ultima_ok ? hace(f.ultima_ok) : "nunca"}</td></tr>`).join("");
+}
+
+// ---------- Ciclo de actualización ----------
+let ultimo = null;
+function pintar(d) {
+  const g = d.estado_global;
+  $("global").className = `global n-${g.nivel}`;
+  $("global-texto").textContent = g.texto;
+  $("fichas").innerHTML = d.indicadores.map(fichaIndicador).join("") + fichaLuz(d.pvpc);
+  datosLuz(d.pvpc); graficaLuz(d.pvpc); graficaMeteo(d.meteo_48h);
+  alertas(d.alertas); fuentes(d.fuentes);
+}
+async function refrescar() {
+  try {
+    const r = await fetch("/api/panel", {cache:"no-store"});
+    if (!r.ok) throw new Error(r.status);
+    ultimo = await r.json();
+    pintar(ultimo);
+    $("aviso-conexion").classList.remove("visible");
+    $("actualizado").textContent = "Actualizado " + new Date().toLocaleTimeString("es-ES", {timeZone:ZONA});
+  } catch (e) {
+    $("aviso-conexion").classList.add("visible");
   }
+}
 
-  grafica("g-temp", "/api/serie/aemet/temperatura?horas=48");
-  grafica("g-pvpc", "/api/serie/pvpc/precio?horas=24&adelante=48", "bar");
-  grafica("g-aqi",  "/api/serie/waqi/aqi?horas=72");
+// ---------- Tema ----------
+try { const t = localStorage.getItem("tema"); if (t) document.documentElement.dataset.tema = t; } catch {}
+$("tema").addEventListener("click", () => {
+  const nuevo = document.documentElement.dataset.tema === "claro" ? "oscuro" : "claro";
+  document.documentElement.dataset.tema = nuevo;
+  try { localStorage.setItem("tema", nuevo); } catch {}
+  gLuz?.destroy(); gMeteo?.destroy(); gLuz = gMeteo = null;
+  if (ultimo) pintar(ultimo);
+});
+
+refrescar();
+setInterval(refrescar, REFRESCO_S * 1000);
 </script>
 </body>
 </html>

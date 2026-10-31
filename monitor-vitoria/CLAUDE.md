@@ -44,7 +44,10 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 | `planificador.py` | APScheduler (v3, `BlockingScheduler`), un job de intervalo por recolector. |
 | `alertas.py` | Reglas construidas desde umbrales del `.env`; dedupe en `alertas_enviadas`. |
 | `telegram.py` | `sendMessage`. Sin config → solo log. |
-| `web/app.py` | FastAPI: `/` (HTML Jinja2 + Chart.js), `/api/ultimas`, `/api/serie/{fuente}/{metrica}`, `/api/ejecuciones`, `/salud`, `/docs`. |
+| `panel.py` | Interpreta los datos para el panel: nivel ok/aviso/critico de cada indicador, dato antiguo, tendencia 1 h, tramos PVPC (terciles de cada día), mejor franja de 3 h, salud de fuentes y estado global. Pura lógica, testeable. |
+| `web/app.py` | FastAPI: `/` (esqueleto HTML), `/api/panel` (todo lo de `panel.py`), `/api/ultimas`, `/api/serie/{fuente}/{metrica}`, `/api/ejecuciones`, `/salud`, `/docs`. |
+| `web/templates/index.html` | Panel de operaciones: solo pinta. Pide `/api/panel` cada 60 s. Chart.js para barras PVPC y meteo 48 h; sparklines en SVG propio. |
+| `demo.py` | `python -m monitor_vitoria demo` → `datos/demo.db` con datos simulados. |
 | `__main__.py` | CLI: `init-db`, `recoger [fuente]`, `planificador`, `web`, `probar-telegram`, `estado`. |
 
 ## Base de datos (SQLite, `datos/monitor.db`)
@@ -53,6 +56,18 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
   `INSERT OR IGNORE`, así repetir una consulta es idempotente.
 - `ejecuciones` — una fila por ejecución de un recolector (ok, nuevas, error).
 - `alertas_enviadas` — PK `(regla, momento)` para no repetir alertas.
+
+## Panel de operaciones (criterios de diseño)
+
+- Pensado como pantalla fija de sala de control: tema oscuro por defecto (botón para claro),
+  números grandes con cifras tabulares, todo visible sin scroll en 1080p.
+- **Semáforo**: verde `ok`, ámbar `aviso`, rojo `critico`, azul `info` (sin umbral), gris `sin_datos`.
+  El color va SIEMPRE acompañado de texto e icono (✓ ▲ ✖) — no depender solo del color.
+- **Las reglas de color viven en `panel.py`**, nunca en el JS. El HTML no decide nada.
+- El precio de la luz no afecta al estado global (caro ≠ avería). Sí lo hacen las fuentes caídas
+  y los datos antiguos.
+- Fuente "Caída" = sin éxito en 4× su intervalo; "Retrasada" = 2×.
+- Se actualiza por `fetch` sin recargar; si el servidor no responde sale una franja roja.
 
 ## Convenciones
 
@@ -94,6 +109,7 @@ python -m monitor_vitoria estado
 python -m monitor_vitoria recoger pvpc
 python -m monitor_vitoria planificador
 python -m monitor_vitoria web --reload
+python -m monitor_vitoria demo && DB_PATH=datos/demo.db python -m monitor_vitoria web
 pytest
 ```
 

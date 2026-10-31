@@ -22,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 
 from .. import db
 from ..config import cargar_config
+from ..panel import construir_panel
 from ..recolectores import RECOLECTORES
 
 config = cargar_config()
@@ -46,22 +47,17 @@ def _etiqueta(fuente: str, metrica: str) -> str:
 
 
 @app.get("/", response_class=HTMLResponse)
-def inicio(request: Request, conn: sqlite3.Connection = Depends(obtener_conexion)):
-    # Agrupamos las últimas lecturas por fuente para pintar una tarjeta por fuente
-    grupos: dict[str, dict] = {
-        nombre: {"descripcion": clase.descripcion, "lecturas": []}
-        for nombre, clase in RECOLECTORES.items()
-    }
-    for fila in db.ultimas_lecturas(conn):
-        if fila["fuente"] in grupos:
-            grupos[fila["fuente"]]["lecturas"].append(
-                {**dict(fila), "etiqueta": _etiqueta(fila["fuente"], fila["metrica"])}
-            )
-    return plantillas.TemplateResponse(
-        request,
-        "index.html",
-        {"grupos": grupos, "ejecuciones": db.ultimas_ejecuciones(conn, 10)},
-    )
+def inicio(request: Request):
+    """La página es solo el 'esqueleto': los datos los pide con JavaScript
+    a /api/panel cada 60 s, así se actualiza sin recargar ni parpadear."""
+    return plantillas.TemplateResponse(request, "index.html", {"refresco_s": 60})
+
+
+@app.get("/api/panel")
+def api_panel(conn: sqlite3.Connection = Depends(obtener_conexion)):
+    """Todo lo que necesita el panel de operaciones, ya interpretado
+    (niveles verde/ámbar/rojo, frescura, tramos de la luz...)."""
+    return construir_panel(conn, config)
 
 
 @app.get("/api/ultimas")

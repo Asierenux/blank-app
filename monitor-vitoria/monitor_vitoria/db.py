@@ -133,13 +133,18 @@ def ultimas_lecturas(conn: sqlite3.Connection) -> list[sqlite3.Row]:
 def serie(conn: sqlite3.Connection, fuente: str, metrica: str,
           horas_atras: int = 48, horas_adelante: int = 0) -> list[sqlite3.Row]:
     ahora = datetime.now(timezone.utc)
-    desde = a_utc_iso(ahora - timedelta(hours=horas_atras))
-    hasta = a_utc_iso(ahora + timedelta(hours=horas_adelante))
+    return serie_rango(conn, fuente, metrica,
+                       ahora - timedelta(hours=horas_atras),
+                       ahora + timedelta(hours=horas_adelante))
+
+
+def serie_rango(conn: sqlite3.Connection, fuente: str, metrica: str,
+                desde: datetime, hasta: datetime) -> list[sqlite3.Row]:
     return conn.execute(
         "SELECT momento, valor FROM lecturas "
         "WHERE fuente = ? AND metrica = ? AND momento BETWEEN ? AND ? "
         "ORDER BY momento",
-        (fuente, metrica, desde, hasta),
+        (fuente, metrica, a_utc_iso(desde), a_utc_iso(hasta)),
     ).fetchall()
 
 
@@ -147,3 +152,27 @@ def ultimas_ejecuciones(conn: sqlite3.Connection, limite: int = 20) -> list[sqli
     return conn.execute(
         "SELECT * FROM ejecuciones ORDER BY id DESC LIMIT ?", (limite,)
     ).fetchall()
+
+
+def ultima_ejecucion(conn: sqlite3.Connection, fuente: str,
+                     solo_ok: bool = False) -> sqlite3.Row | None:
+    sql = "SELECT * FROM ejecuciones WHERE fuente = ?"
+    if solo_ok:
+        sql += " AND ok = 1"
+    return conn.execute(sql + " ORDER BY id DESC LIMIT 1", (fuente,)).fetchone()
+
+
+def alertas_recientes(conn: sqlite3.Connection, limite: int = 15) -> list[sqlite3.Row]:
+    return conn.execute(
+        "SELECT regla, momento, enviado_en FROM alertas_enviadas "
+        "ORDER BY enviado_en DESC, momento DESC LIMIT ?", (limite,)
+    ).fetchall()
+
+
+def valor_en(conn: sqlite3.Connection, fuente: str, metrica: str,
+             momento: str) -> float | None:
+    fila = conn.execute(
+        "SELECT valor FROM lecturas WHERE fuente = ? AND metrica = ? AND momento = ?",
+        (fuente, metrica, momento),
+    ).fetchone()
+    return fila["valor"] if fila else None
