@@ -155,3 +155,30 @@ def test_fuente_que_nunca_funciono_es_aviso(config):
     db.registrar_ejecucion(conn, "pvpc", datetime.now(timezone.utc), ok=False, error="x")
     pvpc = next(f for f in panel.construir_panel(conn, config)["fuentes"] if f["nombre"] == "pvpc")
     assert pvpc["nivel"] == "aviso" and pvpc["texto"] == "Sin datos todavía"
+
+
+def test_investigar_pagina_saih(tmp_path, monkeypatch):
+    import httpx
+
+    from monitor_vitoria import __main__ as cli
+    from monitor_vitoria import config as cfg
+    monkeypatch.setattr(cfg, "RAIZ", tmp_path)
+    html = ('<html><script src="/js/app.js"></script><body>Urrunaga cargando…'
+            '<div data-x="/api/estaciones/E028/senales"></div></body></html>')
+    js = 'fetch("/api/tiempo-real/E028.json").then(r=>r.json()); var logo="/img/logo.png";'
+    cliente = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, text=js)))
+    cli._investigar_pagina(cliente, "https://www.saihebro.com/tiempo-real/x", html, "E028", "urrunaga")
+    informe = (tmp_path / "datos" / "diagnostico_saih.txt").read_text(encoding="utf-8")
+    assert "/api/estaciones/E028/senales" in informe and "/api/tiempo-real/E028.json" in informe
+    assert "logo.png" not in informe
+
+
+def test_error_http_con_detalle_de_la_web():
+    import httpx
+
+    from monitor_vitoria.servicio import explicar_error
+    req = httpx.Request("GET", "https://apidatos.ree.es/x")
+    resp = httpx.Response(500, request=req, json={"errors": [{"code": 500, "title": "Error",
+                                                              "detail": "Fechas fuera de rango"}]})
+    msg = explicar_error(httpx.HTTPStatusError("x", request=req, response=resp))
+    assert "error 500" in msg and "Fechas fuera de rango" in msg

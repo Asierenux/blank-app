@@ -53,13 +53,8 @@ def explicar_error(e: Exception) -> str:
         return str(e)
     if isinstance(e, httpx.HTTPStatusError):
         codigo = e.response.status_code
-        if codigo in (401, 403):
-            return f"La web rechazó la clave (error {codigo}). ¿Está bien copiada y activada?"
-        if codigo == 429:
-            return "Demasiadas consultas seguidas (error 429). Se reintentará más tarde."
-        if codigo >= 500:
-            return f"La web de la fuente está fallando ahora mismo (error {codigo})."
-        return f"La web respondió con error {codigo}."
+        detalle = _detalle_respuesta(e.response)
+        return _mensaje_http(codigo) + (f" La web dice: {detalle}" if detalle else "")
     if isinstance(e, httpx.TimeoutException):
         return "La web tardó demasiado en responder. Se reintentará más tarde."
     if "CERTIFICATE_VERIFY_FAILED" in str(e):
@@ -69,6 +64,31 @@ def explicar_error(e: Exception) -> str:
         detalle = f" Detalle: {e}"[:200] if str(e) else ""
         return f"No se pudo conectar con la web ({type(e).__name__}). ¿Hay conexión a internet?{detalle}"
     return f"{type(e).__name__}: {e}"
+
+
+def _mensaje_http(codigo: int) -> str:
+    if codigo in (401, 403):
+        return f"La web rechazó la clave (error {codigo}). ¿Está bien copiada y activada?"
+    if codigo == 429:
+        return "Demasiadas consultas seguidas (error 429). Se reintentará más tarde."
+    if codigo >= 500:
+        return f"La web de la fuente está fallando ahora mismo (error {codigo})."
+    return f"La web respondió con error {codigo}."
+
+
+def _detalle_respuesta(respuesta: httpx.Response) -> str:
+    """Muchas APIs explican el error en el cuerpo (REData: {"errors":[{"detail":...}]})."""
+    try:
+        datos = respuesta.json()
+        if isinstance(datos, dict):
+            errores = datos.get("errors") or []
+            if errores and isinstance(errores[0], dict):
+                return str(errores[0].get("detail") or errores[0].get("title") or "")[:200]
+            return str(datos.get("message") or datos.get("detail") or datos.get("descripcion") or "")[:200]
+    except Exception:  # noqa: BLE001
+        pass
+    texto = " ".join(respuesta.text.split())
+    return texto[:150] if texto and not texto.lstrip().startswith("<") else ""
 
 
 def ejecutar_recolector(config: Config, nombre: str) -> bool:

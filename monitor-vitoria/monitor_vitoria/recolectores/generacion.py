@@ -46,16 +46,24 @@ class RecolectorGeneracion(Recolector):
         return self.config.intervalo_generacion_min
 
     def recoger(self) -> list[Lectura]:
+        # Solo días completos: de hace 30 días hasta AYER a las 23:59
+        # (pedir el día en curso o fechas futuras puede dar error en REData)
         hoy = datetime.now(MADRID).replace(hour=0, minute=0, second=0, microsecond=0)
-        desde, hasta = hoy - timedelta(days=30), hoy + timedelta(hours=23, minutes=59)
-        lecturas = []
+        desde, hasta = hoy - timedelta(days=30), hoy - timedelta(minutes=1)
+        lecturas, errores = [], []
         for zona, extra in ZONAS.items():
-            r = self.cliente.get(URL, params={
-                "start_date": desde.strftime("%Y-%m-%dT%H:%M"),
-                "end_date": hasta.strftime("%Y-%m-%dT%H:%M"),
-                "time_trunc": "day", **extra})
-            r.raise_for_status()
-            lecturas += self.parsear(r.json(), zona)
+            try:
+                r = self.cliente.get(URL, params={
+                    "start_date": desde.strftime("%Y-%m-%dT%H:%M"),
+                    "end_date": hasta.strftime("%Y-%m-%dT%H:%M"),
+                    "time_trunc": "day", **extra})
+                r.raise_for_status()
+                lecturas += self.parsear(r.json(), zona)
+            except Exception as e:  # noqa: BLE001 — una zona no debe tumbar la otra
+                from ..servicio import explicar_error
+                errores.append(f"{zona}: {explicar_error(e)}")
+        if errores and not lecturas:
+            raise ErrorRecolector("; ".join(errores))
         return lecturas
 
     def parsear(self, datos: dict, zona: str) -> list[Lectura]:

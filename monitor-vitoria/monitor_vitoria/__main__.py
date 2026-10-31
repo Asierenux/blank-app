@@ -205,10 +205,45 @@ def _probar_saih(config, codigo: str, estacion_id: str | None) -> int:
             for k, v in valores.items():
                 print(f"  ✔ {k:<11} {v}")
         else:
-            print("✘ No se encontró ningún valor. Fragmento de la página para ajustar los patrones:")
-            i = max(0, texto.find("nivel") - 200)
-            print("   " + texto[i:i + 800])
+            print("✘ No se encontró ningún valor en el texto de la página.")
+            print("  Probablemente la web carga los datos después, con JavaScript. Investigando…")
+            _investigar_pagina(cliente, url, r.text, codigo, texto)
         return 0 if valores and claves_ok else 1
+
+
+def _investigar_pagina(cliente, url: str, html: str, codigo: str, texto: str) -> None:
+    """Busca en la página y en sus JavaScript las direcciones de las que puede
+    cargar los datos, y lo deja todo en datos/ para revisarlo."""
+    import re
+    from urllib.parse import urljoin, urlparse
+
+    from .config import RAIZ
+    carpeta = RAIZ / "datos"
+    carpeta.mkdir(exist_ok=True)
+    (carpeta / f"saih_{codigo}.html").write_text(html, encoding="utf-8")
+
+    patron = re.compile(r"""["'`]((?:https?:)?//[^"'`\s<>]+|/[A-Za-z0-9_\-./]*(?:api|json|ajax|dato|tiempo|senal|estacion|php)[A-Za-z0-9_\-./?=&{}$]*)["'`]""", re.I)
+    candidatas = set(patron.findall(html))
+    host = urlparse(url).netloc
+    scripts = [urljoin(url, s) for s in re.findall(r"<script[^>]+src=[\"']([^\"']+)", html, re.I)]
+    for js in scripts:
+        if urlparse(js).netloc != host:
+            continue                       # solo los JavaScript de la propia web
+        try:
+            candidatas |= {f"[{js.rsplit('/', 1)[-1]}] {u}" for u in patron.findall(cliente.get(js).text)}
+        except Exception as e:  # noqa: BLE001
+            candidatas.add(f"[{js}] no se pudo descargar: {type(e).__name__}")
+
+    utiles = sorted(c for c in candidatas if not re.search(r"\.(png|jpe?g|svg|gif|css|woff2?|ico)(\?|$)", c, re.I))
+    lineas = [f"URL: {url}", f"Scripts: {len(scripts)}", "", "Direcciones candidatas:"] + \
+             [f"  {c}" for c in utiles[:120]] + ["", "Texto visible (inicio):", texto[:1500]]
+    informe = carpeta / "diagnostico_saih.txt"
+    informe.write_text("\n".join(lineas), encoding="utf-8")
+    print(f"  Scripts revisados: {len(scripts)} · direcciones candidatas: {len(utiles)}")
+    for c in utiles[:25]:
+        print("   ", c)
+    print(f"\n  Informe completo: {informe}")
+    print(f"  Página guardada:  {carpeta / f'saih_{codigo}.html'}")
 
 
 if __name__ == "__main__":
