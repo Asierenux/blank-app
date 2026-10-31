@@ -20,10 +20,30 @@ log = logging.getLogger(__name__)
 USER_AGENT = "monitor-vitoria/0.1 (+https://github.com/asierenux/blank-app)"
 
 
-def crear_cliente() -> httpx.Client:
+def contexto_ssl():
+    """Certificados de seguridad (HTTPS) que usará Python.
+
+    Por defecto Python trae su propia lista de certificados. Pero muchos
+    antivirus (Avast, Kaspersky, ESET...) y redes de empresa "revisan" las
+    conexiones seguras poniendo un certificado propio que Windows/Mac conocen
+    y Python no, y entonces falla con CERTIFICATE_VERIFY_FAILED.
+
+    `truststore` hace que Python use los certificados del SISTEMA, igual que
+    el navegador. Así funciona sin desactivar la seguridad.
+    """
+    try:
+        import ssl
+
+        import truststore
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:  # noqa: BLE001 — sin truststore, la lista propia de Python
+        return True
+
+
+def crear_cliente(timeout: float = 30) -> httpx.Client:
     # timeout: si una API no responde en 30 s, abortamos en vez de colgarnos.
-    return httpx.Client(timeout=30, headers={"User-Agent": USER_AGENT},
-                        follow_redirects=True)
+    return httpx.Client(timeout=timeout, headers={"User-Agent": USER_AGENT},
+                        follow_redirects=True, verify=contexto_ssl())
 
 
 def explicar_error(e: Exception) -> str:
@@ -42,8 +62,12 @@ def explicar_error(e: Exception) -> str:
         return f"La web respondió con error {codigo}."
     if isinstance(e, httpx.TimeoutException):
         return "La web tardó demasiado en responder. Se reintentará más tarde."
+    if "CERTIFICATE_VERIFY_FAILED" in str(e):
+        return ("Certificado de seguridad no reconocido. Suele deberse a un antivirus o a la red "
+                "de una empresa que revisa las conexiones seguras. Detalle: " + str(e)[:160])
     if isinstance(e, (httpx.ConnectError, httpx.ProxyError, httpx.NetworkError)):
-        return f"No se pudo conectar con la web ({type(e).__name__}). ¿Hay conexión a internet?"
+        detalle = f" Detalle: {e}"[:200] if str(e) else ""
+        return f"No se pudo conectar con la web ({type(e).__name__}). ¿Hay conexión a internet?{detalle}"
     return f"{type(e).__name__}: {e}"
 
 
@@ -66,12 +90,14 @@ def ejecutar_recolector(config: Config, nombre: str) -> bool:
             nuevas = db.guardar_lecturas(conn, lecturas)
             db.registrar_ejecucion(conn, nombre, inicio, ok=True,
                                    recibidas=len(lecturas), nuevas=len(nuevas))
-            log.info("[%s] %d lecturas recibidas, %d nuevas", nombre, len(lecturas), len(nuevas))
+            log.info("[%s] ✔ %d lecturas recibidas, %d nuevas", nombre, len(lecturas), len(nuevas))
 
             alertas.procesar(conn, config, nuevas)
             return True
     except Exception as e:  # noqa: BLE001 — queremos capturar cualquier fallo
-        log.exception("[%s] error al recoger", nombre)
+        # Una línea clara en la ventana; el detalle técnico solo con LOG_LEVEL=DEBUG
+        log.error("[%s] ✘ %s", nombre, explicar_error(e))
+        log.debug("Detalle técnico:", exc_info=True)
         db.registrar_ejecucion(conn, nombre, inicio, ok=False,
                                error=explicar_error(e)[:500])
         return False

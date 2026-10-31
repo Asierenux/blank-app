@@ -28,7 +28,9 @@ def enviar(config: Config, texto: str, cliente: httpx.Client | None = None) -> b
     datos = {"chat_id": config.telegram_chat_id, "text": texto}
     try:
         if cliente is None:
-            r = httpx.post(url, json=datos, timeout=15)
+            from .servicio import crear_cliente   # mismos certificados que el resto
+            with crear_cliente(timeout=15) as c:
+                r = c.post(url, json=datos)
         else:
             r = cliente.post(url, json=datos)
         r.raise_for_status()

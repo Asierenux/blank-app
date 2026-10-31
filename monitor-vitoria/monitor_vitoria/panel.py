@@ -271,7 +271,10 @@ def construir_fuentes(conn, c: Config, ahora: datetime) -> list[dict]:
             else:
                 edad_ok = ((ahora - _dt(ultima_ok["fin"])).total_seconds() / 60
                            if ultima_ok else None)
-                if edad_ok is None or edad_ok > 4 * intervalo:
+                if edad_ok is None:
+                    # Nunca ha funcionado: problema de conexión/configuración, no una avería
+                    nivel, texto = "aviso", "Sin datos todavía"
+                elif edad_ok > 4 * intervalo:
                     nivel, texto = "critico", "Caída"
                 elif not ultima["ok"]:
                     nivel, texto = "aviso", "Último intento falló"

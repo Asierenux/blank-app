@@ -5,6 +5,7 @@ fastapi>=0.110         # framework del panel web
 uvicorn[standard]>=0.29  # servidor que ejecuta FastAPI
 jinja2>=3.1            # plantillas HTML
 python-dotenv>=1.0     # lee el archivo .env
+truststore>=0.9        # usa los certificados del sistema (antivirus, redes de empresa)
 
 # Desarrollo
 pytest>=8.0

@@ -127,8 +127,9 @@ def _iniciar(args) -> int:
     if args.demo:
         os.environ["MONITOR_DEMO"] = "1"
     config = cargar_config()
-    logging.basicConfig(level=config.log_level,
-                        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s")
+    logging.basicConfig(level=config.log_level, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
+    # El planificador escribe "Job ... executed successfully" cada vez: ruido para el día a día
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
     puerto = args.puerto or config.web_port
     url = f"http://127.0.0.1:{puerto}"
 

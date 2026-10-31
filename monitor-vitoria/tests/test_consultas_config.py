@@ -131,3 +131,27 @@ def test_errores_explicados():
     assert "rechazó la clave" in explicar_error(e401)
     assert "conexión a internet" in explicar_error(httpx.ConnectError("x"))
     assert "tardó demasiado" in explicar_error(httpx.ReadTimeout("x"))
+
+
+def test_certificados_del_sistema_y_error_explicado():
+    import ssl
+
+    import httpx
+
+    from monitor_vitoria.servicio import contexto_ssl, crear_cliente, explicar_error
+    assert isinstance(contexto_ssl(), ssl.SSLContext)        # truststore instalado
+    with crear_cliente() as c:
+        assert c is not None
+    e = httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: "
+                           "self-signed certificate in certificate chain")
+    assert "antivirus" in explicar_error(e)
+
+
+def test_fuente_que_nunca_funciono_es_aviso(config):
+    from datetime import datetime, timezone
+
+    from monitor_vitoria import panel
+    conn = db.conectar(config.db_path)
+    db.registrar_ejecucion(conn, "pvpc", datetime.now(timezone.utc), ok=False, error="x")
+    pvpc = next(f for f in panel.construir_panel(conn, config)["fuentes"] if f["nombre"] == "pvpc")
+    assert pvpc["nivel"] == "aviso" and pvpc["texto"] == "Sin datos todavía"

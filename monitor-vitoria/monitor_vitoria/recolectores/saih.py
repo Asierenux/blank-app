@@ -199,7 +199,8 @@ class RecolectorSaih(Recolector):
                 r.raise_for_status()
                 lecturas += self.parsear(e, r.text)
             except Exception as ex:  # noqa: BLE001 — una estación no tumba a las demás
-                errores.append(f"{e.id}: {type(ex).__name__}: {ex}")
+                from ..servicio import explicar_error
+                errores.append(f"{e.id}: {explicar_error(ex)}")
         if errores and not lecturas:
             raise ErrorRecolector("; ".join(errores))
         for err in errores:
