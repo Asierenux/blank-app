@@ -73,8 +73,9 @@ class Estacion:
 CATALOGO: tuple[Estacion, ...] = (
     Estacion("ullibarri", "Embalse de Ullíbarri-Gamboa", "embalse", "Zadorra", None,
              ("ullivarri", "ullibarri"), capacidad_hm3=147.0),
+    # Urrunaga: 39,100 hm³ = 54,27 % en la web del SAIH → capacidad ≈ 72,05 hm³
     Estacion("urrunaga", "Embalse de Urrunaga", "embalse", "Santa Engracia", "E028",
-             ("urrunaga",), capacidad_hm3=72.0),
+             ("urrunaga",), capacidad_hm3=72.05),
     Estacion("zadorra_vitoria", "Zadorra en Vitoria", "rio", "Zadorra", None,
              ("zadorra",)),
     Estacion("zadorra_arce", "Zadorra en Arce", "rio", "Zadorra", None,
@@ -88,6 +89,7 @@ SENALES = {
         "porcentaje": ("Llenado", "%"),
         "entrada": ("Entrada", "m³/s"),
         "salida": ("Salida", "m³/s"),
+        "lluvia_24h": ("Lluvia 24 h en el embalse", "l/m²"),
     },
     "rio": {
         "nivel": ("Nivel", "m"),
@@ -119,6 +121,8 @@ PATRONES = {
         "porcentaje": rf"(?:porcentaje|llenado|capacidad|% ?vol){_HUECO}{_NUM}\s*%",
         "entrada": rf"entrada{_HUECO}{_NUM}\s*{_M3S}",
         "salida": rf"(?:salida|desembalse){_HUECO}{_NUM}\s*{_M3S}",
+        # "Precip. 24h. en Urrunaga 0,0 l/m²" (tras normalizar: "l/m2")
+        "lluvia_24h": rf"precip\.?\s*24\s*h{_HUECO}{_NUM}\s*l\s*/\s*m",
     },
     "rio": {
         "nivel": rf"nivel{_HUECO}{_NUM}\s*m\b",

@@ -198,16 +198,19 @@ function tarjetaEmbalse(e) {
       <div class="tarjeta-cab"><div><b>${esc(e.nombre)}</b><div class="gris" style="font-size:.78rem">Río ${esc(e.rio)} · ${e.codigo ? "SAIH " + esc(e.codigo) : "sin código SAIH"}</div></div>
         ${pastilla(e.nivel_estado, e.texto)}</div>
       <div class="grande num" style="margin-top:8px">${num(e.volumen, 1)}<small>hm³${e.capacidad_hm3 ? " de " + num(e.capacidad_hm3, 0) : ""}</small></div>
-      <div class="flujo">
+      ${e.entrada == null && e.salida == null
+        ? `<div class="flujo" style="grid-template-columns:1fr"><div class="t">Este embalse no publica caudales de entrada ni salida en el SAIH</div></div>`
+        : `<div class="flujo">
         <div><div class="t">Entrada</div><div class="v num">${num(e.entrada, 2)}</div><div class="t">m³/s</div></div>
         <div class="flecha" title="${m ? esc(m.texto) : ""}">${flecha}</div>
         <div><div class="t">Salida · desembalse</div><div class="v num">${num(e.salida, 2)}</div><div class="t">m³/s</div></div>
-      </div>
+      </div>`}
       <div class="mini-datos">
         <div>Maniobra<b>${m ? esc(m.texto) : "—"}</b></div>
         <div>Cota<b class="num">${num(e.nivel, 2)} m</b></div>
         <div>Cambio 24 h<b class="num">${e.var_24h_cm == null ? "—" : conSigno(e.var_24h_cm, 0) + " cm"}</b></div>
-        <div>Balance<b class="num">${m ? conSigno(m.balance_hm3_dia, 2) + " hm³/día" : "—"}</b></div>
+        ${m ? `<div>Balance<b class="num">${conSigno(m.balance_hm3_dia, 2)} hm³/día</b></div>`
+            : `<div>Lluvia 24 h<b class="num">${e.lluvia_24h == null ? "—" : num(e.lluvia_24h, 1) + " l/m²"}</b></div>`}
         <div>Llenado 24 h<b class="num">${e.var_24h_pct == null ? "—" : conSigno(e.var_24h_pct, 1) + " pts"}</b></div>
         <div>Dato<b>${e.antiguo ? '<span class="etiqueta-antiguo">ANTIGUO</span>' : hace(e.momento)}</b></div>
       </div>

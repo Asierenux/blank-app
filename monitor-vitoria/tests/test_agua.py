@@ -110,3 +110,16 @@ def test_historico_agua_alinea_lluvia_y_caudal(config):
     rio = next(r for r in h["rios"] if r["id"] == "zadorra_arce")
     assert len(h["cubos"]) == len(h["lluvia"]) == len(rio["caudal"])
     assert 8.0 in h["lluvia"] and rio["caudal"][-1] == 20
+
+
+def test_saih_formato_real_de_urrunaga(config, cliente_falso):
+    """Tabla 'Valores actuales' tal como la muestra la web del SAIH (31/10/2026)."""
+    urrunaga = next(e for e in CATALOGO if e.id == "urrunaga")
+    pagina = (DATOS / "saih_urrunaga_real.html").read_text(encoding="utf-8")
+    l = {x.metrica.split(".")[1]: x for x in RecolectorSaih(config, cliente_falso).parsear(urrunaga, pagina)}
+    assert l["nivel"].valor == 541.95          # la primera fila, no la "(Iber)"
+    assert l["volumen"].valor == 39.1
+    assert l["porcentaje"].valor == 54.27
+    assert l["lluvia_24h"].valor == 2.4
+    assert "entrada" not in l and "salida" not in l   # Urrunaga no publica caudales
+    assert l["nivel"].momento_utc == "2026-10-31T15:00:00Z"   # 16:00 en Madrid
