@@ -4,6 +4,14 @@ Vigila una aplicación (por ejemplo la HMI de los perfilómetros) y la vuelve a 
 si se cierra o se queda colgada. La configuración se guarda y se mantiene tras
 reiniciar el PC, así que siempre vigila la misma aplicación.
 
+## Apariencia
+
+Interfaz con la identidad visual de Michelin: cabecera azul (`#06196A`) con el logo,
+franja amarilla (`#FCE500`), tarjetas blancas y Bibendum en la tarjeta de estado.
+Bibendum cambia de color según el estado: **azul** si la HMI está en marcha,
+**naranja** mientras se reinicia, **rojo** si está cerrada o no responde y **gris**
+si la vigilancia está en pausa. El diseño cabe en pantallas de 1024×768.
+
 ## Funciones
 
 | Función | Detalle |
@@ -68,7 +76,10 @@ pythonw hmi_watchdog.py
 | `hmi_watchdog.py` | Interfaz gráfica (tkinter) y punto de entrada |
 | `watchdog_core.py` | Lógica: configuración, contador, detección, relanzado, anti-bucle |
 | `tests/test_core.py` | Pruebas automáticas (simulan una HMI que se cierra) |
-| `build.bat` | Genera `dist\HMIWatchdog.exe` con PyInstaller |
+| `build.bat` | Genera `dist\HMIWatchdog.exe` con PyInstaller (incluye imágenes e icono) |
+| `assets_src/` | Imágenes originales (logo y Bibendum) |
+| `assets/` | PNG e icono `.ico` que usa la interfaz, generados con `make_assets.py` |
+| `make_assets.py` | Regenera `assets/` si cambias las imágenes originales (requiere Pillow) |
 
 Datos en `%LOCALAPPDATA%\HMIWatchdog\`: `config.json`, `state.json` (contadores),
 `historial.csv` y `watchdog.log`. El botón *Carpeta de datos* abre esa carpeta.

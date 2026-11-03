@@ -1,5 +1,5 @@
 """
-HMI Watchdog - Supervisor de aplicaciones para Windows.
+HMI Watchdog - Supervisor de aplicaciones para Windows (estilo Michelin).
 
 Interfaz gráfica (tkinter). Ejecutar:
     pythonw hmi_watchdog.py            (o el .exe generado con build.bat)
@@ -18,100 +18,248 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 import watchdog_core as core
 from watchdog_core import Config, State, Status, fmt_duration
 
-STATUS_COLORS = {
-    Status.RUNNING: ("#1b8a3a", "white"),
-    Status.RESTARTING: ("#e08a00", "white"),
-    Status.STOPPED: ("#c62828", "white"),
-    Status.HUNG: ("#c62828", "white"),
-    Status.ERROR: ("#c62828", "white"),
-    Status.LOOP_BLOCK: ("#8e24aa", "white"),
-    Status.PAUSED: ("#607d8b", "white"),
-    Status.WAITING: ("#1565c0", "white"),
-    Status.NO_CONFIG: ("#9e9e9e", "white"),
+# ---------------------------------------------------------------------------
+# Identidad visual
+# ---------------------------------------------------------------------------
+NAVY = "#06196A"        # azul Michelin
+NAVY_HOVER = "#11288A"
+NAVY_SOFT = "#C9D2F0"
+YELLOW = "#FCE500"      # amarillo Michelin
+YELLOW_HOVER = "#FFEE47"
+BG = "#EEF1F6"
+CARD = "#FFFFFF"
+BORDER = "#DCE1EC"
+TEXT = "#141C3D"
+MUTED = "#6B7390"
+GREEN = "#14853B"
+RED = "#D0262D"
+ORANGE = "#E8840C"
+PURPLE = "#7B2FA6"
+GREY = "#7A8296"
+
+FONT = "Segoe UI" if core.IS_WINDOWS else "DejaVu Sans"
+MONO = "Consolas" if core.IS_WINDOWS else "DejaVu Sans Mono"
+
+# estado -> (color, variante de Bibendum, frase para el operario)
+STATUS_LOOK = {
+    Status.RUNNING: (GREEN, "ok", "La HMI está abierta y vigilada."),
+    Status.WAITING: (NAVY, "ok", "Esperando a que Windows termine de arrancar…"),
+    Status.RESTARTING: (ORANGE, "warn", "La HMI se ha cerrado. Volviendo a abrirla…"),
+    Status.STOPPED: (RED, "alert", "La HMI está cerrada."),
+    Status.HUNG: (RED, "alert", "La HMI no responde. Se reiniciará si no se recupera."),
+    Status.ERROR: (RED, "alert", "No se ha podido abrir la HMI. Revisa la configuración."),
+    Status.LOOP_BLOCK: (PURPLE, "alert", "Demasiados cierres seguidos. Reintento en espera."),
+    Status.PAUSED: (GREY, "pause", "Vigilancia en pausa por mantenimiento."),
+    Status.NO_CONFIG: (GREY, "pause", "Pulsa «Configuración» y elige la aplicación a vigilar."),
 }
 
 
-class ConfigDialog(tk.Toplevel):
-    """Ventana de configuración."""
+def asset_dir() -> str:
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, "assets")
 
+
+class Images:
+    """Carga las imágenes (versión @2x en pantallas con escalado >= 150 %)."""
+
+    def __init__(self, root: tk.Misc):
+        self.hidpi = root.winfo_fpixels("1i") >= 140
+        self._cache: dict[str, tk.PhotoImage | None] = {}
+        self.root = root
+
+    def get(self, name: str) -> tk.PhotoImage | None:
+        if name not in self._cache:
+            img = None
+            for candidate in ([f"{name}@2x.png"] if self.hidpi else []) + [f"{name}.png"]:
+                path = os.path.join(asset_dir(), candidate)
+                if os.path.exists(path):
+                    try:
+                        img = tk.PhotoImage(master=self.root, file=path)
+                        break
+                    except tk.TclError:
+                        pass
+            self._cache[name] = img
+        return self._cache[name]
+
+
+def setup_styles(root: tk.Misc) -> None:
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    style.configure(".", font=(FONT, 10), background=BG, foreground=TEXT)
+    style.configure("TEntry", fieldbackground="white", bordercolor=BORDER, lightcolor=BORDER,
+                    darkcolor=BORDER, padding=5)
+    style.map("TEntry", bordercolor=[("focus", NAVY)], lightcolor=[("focus", NAVY)])
+    style.configure("TSpinbox", fieldbackground="white", bordercolor=BORDER, lightcolor=BORDER,
+                    darkcolor=BORDER, arrowcolor=NAVY, padding=4)
+    style.configure("TCheckbutton", background=CARD, foreground=TEXT, font=(FONT, 10))
+    style.map("TCheckbutton", background=[("active", CARD)],
+              indicatorcolor=[("selected", NAVY), ("!selected", "white")])
+    style.configure("Vertical.TScrollbar", background=BG, troughcolor=CARD, bordercolor=CARD,
+                    arrowcolor=NAVY, lightcolor=BG, darkcolor=BG)
+    style.configure("Treeview", background=CARD, fieldbackground=CARD, foreground=TEXT,
+                    rowheight=26, font=(FONT, 10), bordercolor=BORDER)
+    style.configure("Treeview.Heading", background=NAVY, foreground="white",
+                    font=(FONT, 10, "bold"), relief="flat", padding=6)
+    style.map("Treeview.Heading", background=[("active", NAVY_HOVER)])
+    style.map("Treeview", background=[("selected", YELLOW)], foreground=[("selected", NAVY)])
+
+
+# ---------------------------------------------------------------------------
+# Widgets reutilizables
+# ---------------------------------------------------------------------------
+class FlatButton(tk.Label):
+    """Botón plano con efecto hover (tk.Button ignora los colores en algunos sistemas)."""
+
+    KINDS = {
+        "primary": (NAVY, "white", NAVY_HOVER),
+        "accent": (YELLOW, NAVY, YELLOW_HOVER),
+        "ghost": (CARD, NAVY, "#E6EAF5"),
+    }
+
+    def __init__(self, parent, text, command, kind="ghost", **kw):
+        bg, fg, hover = self.KINDS[kind]
+        super().__init__(parent, text=text, bg=bg, fg=fg, font=(FONT, 10, "bold"),
+                         padx=16, pady=9, cursor="hand2",
+                         highlightthickness=1 if kind == "ghost" else 0,
+                         highlightbackground=NAVY, highlightcolor=NAVY, **kw)
+        self._bg, self._hover, self._cmd = bg, hover, command
+        self.bind("<Enter>", lambda e: self.configure(bg=self._hover))
+        self.bind("<Leave>", lambda e: self.configure(bg=self._bg))
+        self.bind("<ButtonRelease-1>", lambda e: self._cmd())
+
+
+def card(parent, accent: str | None = None, **kw) -> tuple[tk.Frame, tk.Frame]:
+    """Tarjeta blanca con borde suave y (opcional) franja superior de color.
+
+    Devuelve (marco_exterior, contenido)."""
+    outer = tk.Frame(parent, bg=CARD, highlightthickness=1, highlightbackground=BORDER, **kw)
+    if accent:
+        tk.Frame(outer, bg=accent, height=4).pack(fill="x", side="top")
+    inner = tk.Frame(outer, bg=CARD, padx=16, pady=12)
+    inner.pack(fill="both", expand=True)
+    return outer, inner
+
+
+def header(parent, images: Images, title: str, subtitle: str) -> None:
+    bar = tk.Frame(parent, bg=NAVY, padx=20, pady=12)
+    bar.pack(fill="x", side="top")
+    logo = images.get("logo_white")
+    if logo:
+        tk.Label(bar, image=logo, bg=NAVY).pack(side="left")
+    else:
+        tk.Label(bar, text="MICHELIN", bg=NAVY, fg="white",
+                 font=(FONT, 22, "bold italic")).pack(side="left")
+    txt = tk.Frame(bar, bg=NAVY)
+    txt.pack(side="right")
+    tk.Label(txt, text=title, bg=NAVY, fg="white", font=(FONT, 16, "bold")).pack(anchor="e")
+    tk.Label(txt, text=subtitle, bg=NAVY, fg=NAVY_SOFT, font=(FONT, 10)).pack(anchor="e")
+    tk.Frame(parent, bg=YELLOW, height=5).pack(fill="x", side="top")
+
+
+# ---------------------------------------------------------------------------
+# Ventana de configuración
+# ---------------------------------------------------------------------------
+class ConfigDialog(tk.Toplevel):
     def __init__(self, app: "App"):
-        super().__init__(app)
+        super().__init__(app, bg=BG)
         self.app = app
-        self.title("Configuración")
+        self.title("Configuración - HMI Watchdog")
         self.resizable(True, False)
         self.transient(app)
         self.f: dict[str, tk.Variable] = {}
+        header(self, app.images, "Configuración", "Aplicación vigilada y opciones")
         self._build()
         for key, var in self.f.items():
             var.set(getattr(app.cfg, key))
-        self.grab_set()
+        self.after(50, self._grab)
+
+    def _grab(self) -> None:
+        try:
+            self.grab_set()
+        except tk.TclError:
+            pass
 
     def _build(self) -> None:
-        cf = ttk.Frame(self, padding=10)
-        cf.pack(fill="both", expand=True)
-        pad = dict(padx=6, pady=3)
-        row = 0
+        body = tk.Frame(self, bg=BG, padx=18, pady=14)
+        body.pack(fill="both", expand=True)
+        body.columnconfigure(0, weight=1, uniform="c")
+        body.columnconfigure(1, weight=1, uniform="c")
 
-        def section(title):
-            nonlocal row
-            ttk.Label(cf, text=title, font=("Segoe UI", 10, "bold")).grid(
-                row=row, column=0, columnspan=3, sticky="w", padx=6, pady=(10, 2))
-            row += 1
+        def section(r, c, title, colspan=1, parent=None):
+            outer, inner = card(parent or body, accent=YELLOW)
+            if parent is None:
+                outer.grid(row=r, column=c, columnspan=colspan, sticky="nsew", padx=6, pady=5)
+            else:
+                outer.pack(fill="both", expand=True, pady=(0 if r == 0 else 10, 0))
+            tk.Label(inner, text=title.upper(), bg=CARD, fg=NAVY,
+                     font=(FONT, 10, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
+            inner.columnconfigure(1, weight=1)
+            return inner
 
-        def entry(label, key, width=60, browse=None):
-            nonlocal row
-            ttk.Label(cf, text=label).grid(row=row, column=0, sticky="w", **pad)
+        def label(parent, row, text):
+            tk.Label(parent, text=text, bg=CARD, fg=TEXT, font=(FONT, 10)).grid(
+                row=row, column=0, sticky="w", pady=3, padx=(0, 10))
+
+        def entry(parent, row, text, key, width=50, browse=None):
+            label(parent, row, text)
             var = tk.StringVar()
-            ttk.Entry(cf, textvariable=var, width=width).grid(
-                row=row, column=1, sticky="we" if width >= 40 else "w", **pad)
+            ttk.Entry(parent, textvariable=var, width=width).grid(
+                row=row, column=1, sticky="we" if width >= 30 else "w", pady=4)
             if browse:
-                ttk.Button(cf, text="Examinar…", command=lambda: browse(var)).grid(row=row, column=2, **pad)
+                FlatButton(parent, "Examinar…", lambda: browse(var), kind="ghost").grid(
+                    row=row, column=2, padx=(8, 0), pady=4)
             self.f[key] = var
-            row += 1
 
-        def spin(label, key, lo, hi):
-            nonlocal row
-            ttk.Label(cf, text=label).grid(row=row, column=0, sticky="w", **pad)
+        def spin(parent, row, text, key, lo, hi, unit=""):
+            label(parent, row, text)
+            fr = tk.Frame(parent, bg=CARD)
+            fr.grid(row=row, column=1, sticky="w", pady=4)
             var = tk.StringVar()
-            ttk.Spinbox(cf, from_=lo, to=hi, textvariable=var, width=8).grid(
-                row=row, column=1, sticky="w", **pad)
+            ttk.Spinbox(fr, from_=lo, to=hi, textvariable=var, width=6).pack(side="left")
+            if unit:
+                tk.Label(fr, text=unit, bg=CARD, fg=MUTED).pack(side="left", padx=6)
             self.f[key] = var
-            row += 1
 
-        def check(label, key):
-            nonlocal row
+        def check(parent, row, text, key):
             var = tk.BooleanVar()
-            ttk.Checkbutton(cf, text=label, variable=var).grid(
-                row=row, column=0, columnspan=3, sticky="w", **pad)
+            ttk.Checkbutton(parent, text=text, variable=var).grid(
+                row=row, column=0, columnspan=3, sticky="w", pady=4)
             self.f[key] = var
-            row += 1
 
-        section("Aplicación a vigilar")
-        entry("Ejecutable (.exe):", "exe_path", browse=self.browse_exe)
-        entry("Argumentos (opcional):", "args")
-        entry("Carpeta de trabajo (opcional):", "work_dir", browse=self.browse_dir)
-        section("Vigilancia")
-        spin("Comprobar cada (s):", "check_interval_s", 1, 300)
-        spin("Espera antes de relanzar (s):", "restart_delay_s", 0, 300)
-        spin("Espera tras encender el PC (s):", "startup_delay_s", 0, 600)
-        check("Reiniciar la aplicación si se queda en 'No responde'", "detect_hang")
-        spin("   … tras estar colgada (s):", "hang_timeout_s", 10, 3600)
-        check("Traer la aplicación al frente tras relanzarla", "bring_to_front")
-        section("Protección anti-bucle (si la app se cierra nada más abrirse)")
-        spin("Máximo de reinicios…", "loop_max_restarts", 1, 100)
-        spin("   … en (min):", "loop_window_min", 1, 600)
-        spin("   … entonces esperar (min):", "loop_cooldown_min", 1, 600)
-        section("Supervisor")
-        check("Iniciar el supervisor automáticamente con Windows", "autostart")
-        check("Iniciar el supervisor minimizado", "start_minimized")
-        spin("Una pausa manual se reanuda sola tras (min):", "pause_auto_resume_min", 1, 1440)
-        entry("PIN de protección (vacío = sin PIN):", "pin", width=12)
-        cf.columnconfigure(1, weight=1)
+        s = section(0, 0, "Aplicación a vigilar", colspan=2)
+        entry(s, 1, "Ejecutable (.exe)", "exe_path", browse=self.browse_exe)
+        entry(s, 2, "Argumentos (opcional)", "args")
+        entry(s, 3, "Carpeta de trabajo (opcional)", "work_dir", browse=self.browse_dir)
 
-        bar = ttk.Frame(cf)
-        bar.grid(row=row, column=0, columnspan=3, pady=(14, 0))
-        ttk.Button(bar, text="Guardar", command=self.on_save).pack(side="left", padx=6)
-        ttk.Button(bar, text="Cancelar", command=self.destroy).pack(side="left", padx=6)
+        s = section(1, 0, "Vigilancia")
+        spin(s, 1, "Comprobar cada", "check_interval_s", 1, 300, "s")
+        spin(s, 2, "Espera antes de relanzar", "restart_delay_s", 0, 300, "s")
+        spin(s, 3, "Espera tras encender el PC", "startup_delay_s", 0, 600, "s")
+        check(s, 4, "Reiniciar si queda en «No responde»", "detect_hang")
+        spin(s, 5, "   … tras estar colgada", "hang_timeout_s", 10, 3600, "s")
+        check(s, 6, "Traer la HMI al frente tras relanzarla", "bring_to_front")
+
+        right = tk.Frame(body, bg=BG)
+        right.grid(row=1, column=1, sticky="nsew", padx=6, pady=5)
+        s = section(0, 1, "Protección anti-bucle", parent=right)
+        tk.Label(s, text="Si la HMI se cierra nada más abrirse, espera\n"
+                         "un tiempo antes de volver a intentarlo.",
+                 bg=CARD, fg=MUTED, justify="left", font=(FONT, 9)).grid(
+            row=1, column=0, columnspan=3, sticky="w", pady=(0, 4))
+        spin(s, 2, "Máximo de reinicios", "loop_max_restarts", 1, 100)
+        spin(s, 3, "   … en", "loop_window_min", 1, 600, "min")
+        spin(s, 4, "   … entonces esperar", "loop_cooldown_min", 1, 600, "min")
+
+        s = section(1, 1, "Supervisor", parent=right)
+        check(s, 1, "Iniciar automáticamente con Windows", "autostart")
+        check(s, 2, "Iniciar minimizado", "start_minimized")
+        spin(s, 3, "Pausa manual: reanudar tras", "pause_auto_resume_min", 1, 1440, "min")
+        entry(s, 4, "PIN (vacío = sin PIN)", "pin", width=10)
+
+        bar = tk.Frame(body, bg=BG)
+        bar.grid(row=2, column=0, columnspan=2, sticky="e", pady=(10, 0), padx=6)
+        FlatButton(bar, "Cancelar", self.destroy, kind="ghost").pack(side="right", padx=(8, 0))
+        FlatButton(bar, "Guardar", self.on_save, kind="accent").pack(side="right")
 
     def browse_exe(self, var: tk.StringVar) -> None:
         path = filedialog.askopenfilename(
@@ -162,81 +310,129 @@ class ConfigDialog(tk.Toplevel):
         self.destroy()
 
 
+# ---------------------------------------------------------------------------
+# Ventana principal
+# ---------------------------------------------------------------------------
 class App(tk.Tk):
     def __init__(self, cfg: Config, wd: core.Watchdog):
         super().__init__()
         self.cfg = cfg
         self.wd = wd
         self.title(core.APP_TITLE)
-        self.geometry("820x640")
-        self.minsize(700, 520)
+        self.configure(bg=BG)
+        self.geometry("1000x760")
+        self.minsize(900, 680)
         self.protocol("WM_DELETE_WINDOW", self.on_close)
+        self.images = Images(self)
+        self._set_icon()
+        setup_styles(self)
         self._build()
+        self._events_shown = None
+        self._bib_variant = None
         self.after(200, self.refresh)
 
-    # ------------------------------------------------------------------ UI
-    def _build(self) -> None:
-        style = ttk.Style(self)
+    def _set_icon(self) -> None:
+        ico = os.path.join(asset_dir(), "icon.ico")
         try:
-            style.theme_use("vista" if core.IS_WINDOWS else "clam")
+            if core.IS_WINDOWS and os.path.exists(ico):
+                self.iconbitmap(default=ico)
+            elif self.images.get("icon"):
+                self.iconphoto(True, self.images.get("icon"))
         except tk.TclError:
             pass
 
-        top = ttk.Frame(self, padding=8)
-        top.pack(fill="x")
-        self.lbl_status = tk.Label(top, text="", font=("Segoe UI", 20, "bold"), pady=10)
-        self.lbl_status.pack(fill="x")
+    # ------------------------------------------------------------------ UI
+    def _build(self) -> None:
+        header(self, self.images, "Supervisor HMI", "Perfilómetros · vigilancia continua")
 
-        # Contador grande
-        cnt = ttk.Frame(top)
-        cnt.pack(fill="x", pady=(8, 4))
+        footer = tk.Frame(self, bg=BG, padx=20)
+        footer.pack(fill="x", side="bottom", pady=(0, 8))
+        self.lbl_footer = tk.Label(footer, text="", bg=BG, fg=MUTED, font=(FONT, 9))
+        self.lbl_footer.pack(side="left")
+
+        body = tk.Frame(self, bg=BG, padx=20, pady=16)
+        body.pack(fill="both", expand=True)
         self.vars = {k: tk.StringVar(value="-") for k in (
-            "app", "pid", "uptime", "count", "last", "since", "boot", "hangs", "sup", "extra")}
-        ttk.Label(cnt, text="Reinicios efectuados:", font=("Segoe UI", 12)).pack(side="left", padx=6)
-        ttk.Label(cnt, textvariable=self.vars["count"], font=("Segoe UI", 22, "bold")).pack(side="left")
-        ttk.Label(cnt, text="   Último:", font=("Segoe UI", 12)).pack(side="left", padx=(16, 6))
-        ttk.Label(cnt, textvariable=self.vars["last"], font=("Segoe UI", 12, "bold")).pack(side="left")
+            "status", "message", "app", "path", "count", "since", "last", "reason",
+            "uptime", "pid", "extra")}
 
-        info = ttk.Frame(top)
-        info.pack(fill="x")
-        rows = [
-            ("Aplicación:", "app"),
-            ("PID / tiempo en marcha:", "uptime"),
-            ("Contando reinicios desde:", "since"),
-            ("Arranques al iniciar el PC:", "boot"),
-            ("Cierres forzados por 'No responde':", "hangs"),
-            ("Supervisor activo desde hace:", "sup"),
-        ]
-        for r, (label, key) in enumerate(rows):
-            ttk.Label(info, text=label).grid(row=r, column=0, sticky="w", padx=6, pady=1)
-            ttk.Label(info, textvariable=self.vars[key]).grid(row=r, column=1, sticky="w", padx=6, pady=1)
-        info.columnconfigure(1, weight=1)
-        ttk.Label(top, textvariable=self.vars["extra"], foreground="#c62828").pack(fill="x", padx=6)
+        # ---- Tarjeta de estado con Bibendum ----
+        hero = tk.Frame(body, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+        hero.pack(fill="x")
+        self.hero_bar = tk.Frame(hero, bg=GREEN, width=8)
+        self.hero_bar.pack(side="left", fill="y")
+        self.lbl_bib = tk.Label(hero, bg=CARD, padx=18, pady=10)
+        self.lbl_bib.pack(side="left")
+        side = tk.Frame(hero, bg=CARD, padx=18, pady=14)
+        side.pack(side="right", fill="y")
+        info = tk.Frame(hero, bg=CARD, pady=14)
+        info.pack(side="left", fill="both", expand=True)
+        tk.Label(info, text="ESTADO DE LA APLICACIÓN", bg=CARD, fg=MUTED,
+                 font=(FONT, 9, "bold")).pack(anchor="w")
+        self.lbl_status = tk.Label(info, textvariable=self.vars["status"], bg=CARD, fg=GREEN,
+                                   font=(FONT, 30, "bold"))
+        self.lbl_status.pack(anchor="w")
+        tk.Label(info, textvariable=self.vars["message"], bg=CARD, fg=TEXT,
+                 font=(FONT, 12)).pack(anchor="w", pady=(0, 10))
+        tk.Label(info, textvariable=self.vars["app"], bg=CARD, fg=NAVY,
+                 font=(FONT, 13, "bold")).pack(anchor="w")
+        tk.Label(info, textvariable=self.vars["path"], bg=CARD, fg=MUTED, anchor="w",
+                 font=(FONT, 9)).pack(anchor="w", fill="x")
+        tk.Label(info, textvariable=self.vars["extra"], bg=CARD, fg=RED,
+                 font=(FONT, 10, "bold")).pack(anchor="w", pady=(6, 0))
+        self.btn_pause = FlatButton(side, "Pausar vigilancia", self.on_pause, kind="ghost")
+        self.btn_pause.pack(fill="x", pady=3)
+        FlatButton(side, "Reiniciar HMI ahora", self.on_restart_now, kind="ghost").pack(fill="x", pady=3)
+        FlatButton(side, "Configuración", self.on_config, kind="accent").pack(fill="x", pady=3)
 
-        btns = ttk.Frame(top)
-        btns.pack(fill="x", pady=6)
-        self.btn_pause = ttk.Button(btns, text="Pausar vigilancia", command=self.on_pause)
-        self.btn_pause.pack(side="left", padx=3)
-        ttk.Button(btns, text="Reiniciar app ahora", command=self.on_restart_now).pack(side="left", padx=3)
-        ttk.Button(btns, text="Contador a cero", command=self.on_reset).pack(side="left", padx=3)
-        ttk.Button(btns, text="Historial", command=self.on_history).pack(side="left", padx=3)
-        ttk.Button(btns, text="Carpeta de datos", command=self.on_open_folder).pack(side="left", padx=3)
-        ttk.Button(btns, text="⚙ Configuración…", command=self.on_config).pack(side="right", padx=3)
+        # ---- KPIs ----
+        kpis = tk.Frame(body, bg=BG)
+        kpis.pack(fill="x", pady=14)
+        for i in range(3):
+            kpis.columnconfigure(i, weight=1, uniform="k")
 
-        ev = ttk.LabelFrame(self, text="Eventos", padding=4)
-        ev.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self.txt = tk.Text(ev, height=8, state="disabled", font=("Consolas", 9), wrap="none")
-        sb = ttk.Scrollbar(ev, command=self.txt.yview)
+        def kpi(col, title, big_key, big_font, small_key):
+            outer, inner = card(kpis, accent=YELLOW)
+            outer.grid(row=0, column=col, sticky="nsew",
+                       padx=(0 if col == 0 else 7, 0 if col == 2 else 7))
+            tk.Label(inner, text=title, bg=CARD, fg=MUTED, font=(FONT, 9, "bold")).pack(anchor="w")
+            tk.Label(inner, textvariable=self.vars[big_key], bg=CARD, fg=NAVY,
+                     font=(FONT, big_font, "bold")).pack(anchor="w")
+            tk.Label(inner, textvariable=self.vars[small_key], bg=CARD, fg=MUTED,
+                     font=(FONT, 9)).pack(anchor="w")
+
+        kpi(0, "REINICIOS EFECTUADOS", "count", 34, "since")
+        kpi(1, "ÚLTIMO REINICIO", "last", 17, "reason")
+        kpi(2, "TIEMPO EN MARCHA DE LA HMI", "uptime", 22, "pid")
+
+        # ---- Eventos ----
+        outer, inner = card(body)
+        outer.pack(fill="both", expand=True)
+        top = tk.Frame(inner, bg=CARD)
+        top.pack(fill="x", pady=(0, 8))
+        tk.Label(top, text="Registro de eventos", bg=CARD, fg=NAVY,
+                 font=(FONT, 12, "bold")).pack(side="left")
+        FlatButton(top, "Carpeta de datos", self.on_open_folder, kind="ghost").pack(side="right")
+        FlatButton(top, "Contador a cero", self.on_reset, kind="ghost").pack(side="right", padx=6)
+        FlatButton(top, "Historial completo", self.on_history, kind="primary").pack(side="right")
+        box = tk.Frame(inner, bg=CARD)
+        box.pack(fill="both", expand=True)
+        self.txt = tk.Text(box, height=6, state="disabled", font=(MONO, 9), wrap="none",
+                           bg="#F7F8FB", fg=TEXT, relief="flat", padx=10, pady=8,
+                           highlightthickness=0, borderwidth=0)
+        sb = ttk.Scrollbar(box, command=self.txt.yview)
         self.txt.configure(yscrollcommand=sb.set)
         self.txt.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        self._events_shown = None
+        self.txt.tag_configure("bad", foreground=RED)
+        self.txt.tag_configure("restart", foreground=ORANGE, font=(MONO, 9, "bold"))
+        self.txt.tag_configure("ok", foreground=GREEN)
 
+    # ------------------------------------------------------------- acciones
     def on_config(self) -> None:
         if self.check_pin("modificar la configuración"):
             ConfigDialog(self)
 
-    # ------------------------------------------------------------- acciones
     def check_pin(self, action: str) -> bool:
         if not self.cfg.pin:
             return True
@@ -284,19 +480,31 @@ class App(tk.Tk):
             subprocess.Popen(["xdg-open", path])
 
     def on_history(self) -> None:
-        win = tk.Toplevel(self)
-        win.title("Historial de eventos")
-        win.geometry("760x450")
-        tree = ttk.Treeview(win, columns=("fecha", "evento", "pid"), show="headings")
-        for col, w in (("fecha", 150), ("evento", 500), ("pid", 70)):
-            tree.heading(col, text=col.capitalize())
+        win = tk.Toplevel(self, bg=BG)
+        win.title("Historial de eventos - HMI Watchdog")
+        win.geometry("860x520")
+        header(win, self.images, "Historial", "Todos los eventos registrados")
+        body = tk.Frame(win, bg=BG, padx=16, pady=14)
+        body.pack(fill="both", expand=True)
+        tree = ttk.Treeview(body, columns=("fecha", "evento", "pid"), show="headings")
+        for col, title, w in (("fecha", "Fecha", 160), ("evento", "Evento", 560), ("pid", "PID", 80)):
+            tree.heading(col, text=title, anchor="w")
             tree.column(col, width=w, anchor="w")
-        sb = ttk.Scrollbar(win, command=tree.yview)
+        sb = ttk.Scrollbar(body, command=tree.yview)
         tree.configure(yscrollcommand=sb.set)
         tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
-        for row in reversed(core.read_history(1000)):
-            tree.insert("", "end", values=row)
+        tree.tag_configure("odd", background="#F5F7FB")
+        tree.tag_configure("restart", foreground=ORANGE)
+        tree.tag_configure("bad", foreground=RED)
+        for i, row in enumerate(reversed(core.read_history(1000))):
+            tags = ["odd"] if i % 2 else []
+            ev = row[1] if len(row) > 1 else ""
+            if "REINICIO" in ev:
+                tags.append("restart")
+            elif any(w in ev for w in ("CERRADO", "NO RESPONDE", "ERROR")):
+                tags.append("bad")
+            tree.insert("", "end", values=row, tags=tags)
 
     def on_close(self) -> None:
         if not self.check_pin("cerrar el supervisor"):
@@ -311,36 +519,62 @@ class App(tk.Tk):
     # -------------------------------------------------------------- refresco
     def refresh(self) -> None:
         s = self.wd.snapshot()
-        bg, fg = STATUS_COLORS.get(s["status"], ("#9e9e9e", "white"))
-        text = s["status"]
+        color, variant, message = STATUS_LOOK.get(s["status"], (GREY, "pause", ""))
+        status = s["status"]
         if s["paused_left"]:
-            text += f"  ({fmt_duration(s['paused_left'])})"
+            message += f"  Se reanuda en {fmt_duration(s['paused_left'])}."
         elif s["loop_block_left"]:
-            text += f"  (reintento en {fmt_duration(s['loop_block_left'])})"
+            message = f"Demasiados cierres seguidos. Reintento en {fmt_duration(s['loop_block_left'])}."
         elif s["hung_for"]:
-            text += f"  ({int(s['hung_for'])} s)"
-        self.lbl_status.configure(text=text, bg=bg, fg=fg)
+            status += f"  ({int(s['hung_for'])} s)"
 
         v = self.vars
-        v["app"].set(self.cfg.exe_path or "(ninguna)  →  pulsa '⚙ Configuración…'")
-        v["uptime"].set(f"{s['pid'] or '-'}  /  {fmt_duration(s['uptime'])}")
-        v["sup"].set(fmt_duration(s["supervisor_uptime"]))
-        v["count"].set(str(s["restart_count"]))
-        v["last"].set(f"{s['last_restart']}  ({s['last_reason']})" if s["last_restart"] else "nunca")
-        v["since"].set(s["counting_since"])
-        v["boot"].set(f"{s['boot_launches']}" + (f"  (último: {s['last_boot_launch']})"
-                                                   if s["last_boot_launch"] else ""))
-        v["hangs"].set(str(s["hang_kills"]))
+        v["status"].set(status)
+        v["message"].set(message)
+        self.lbl_status.configure(fg=color)
+        self.hero_bar.configure(bg=color)
+        if variant != self._bib_variant:
+            img = self.images.get(f"bibendum_{variant}")
+            if img:
+                self.lbl_bib.configure(image=img)
+            self._bib_variant = variant
+
+        exe = self.cfg.exe_path
+        v["app"].set(os.path.basename(exe) if exe else "Ninguna aplicación configurada")
+        v["path"].set(exe if len(exe) <= 75 else "…" + exe[-74:])
         v["extra"].set(f"Último error: {s['last_error']}" if s["last_error"] else "")
-        self.btn_pause.configure(text="Reanudar vigilancia" if s["paused_left"] else "Pausar vigilancia")
-        self.title(f"{core.APP_TITLE}  -  {s['status']}  -  Reinicios: {s['restart_count']}")
+        v["count"].set(str(s["restart_count"]))
+        v["since"].set(f"desde {s['counting_since']}")
+        if s["last_restart"]:
+            v["last"].set(s["last_restart"])
+            v["reason"].set(f"Motivo: {s['last_reason']}")
+        else:
+            v["last"].set("Nunca")
+            v["reason"].set("Sin reinicios registrados")
+        v["uptime"].set(fmt_duration(s["uptime"]))
+        v["pid"].set(f"PID {s['pid']}" if s["pid"] else "Sin proceso")
+        self.btn_pause.configure(
+            text="Reanudar vigilancia" if s["paused_left"] else "Pausar vigilancia")
+        self.lbl_footer.configure(
+            text=f"Arranques al iniciar el PC: {s['boot_launches']}"
+                 f"   ·   Cierres forzados por «No responde»: {s['hang_kills']}"
+                 f"   ·   Supervisor activo desde hace {fmt_duration(s['supervisor_uptime'])}")
+        self.title(f"Supervisor HMI  -  {s['status']}  -  Reinicios: {s['restart_count']}")
 
         events = s["events"]
         key = (len(events), events[-1] if events else None)
         if key != self._events_shown:
             self.txt.configure(state="normal")
             self.txt.delete("1.0", "end")
-            self.txt.insert("end", "\n".join(reversed(events)))
+            for line in reversed(events):
+                tag = ()
+                if "REINICIO" in line:
+                    tag = ("restart",)
+                elif any(w in line for w in ("CERRADO", "NO RESPONDE", "ERROR")):
+                    tag = ("bad",)
+                elif "lanzada" in line or "vuelve a responder" in line:
+                    tag = ("ok",)
+                self.txt.insert("end", line + "\n", tag)
             self.txt.configure(state="disabled")
             self._events_shown = key
         self.after(1000, self.refresh)
@@ -348,6 +582,12 @@ class App(tk.Tk):
 
 def main() -> None:
     core.setup_logging()
+    if core.IS_WINDOWS:
+        try:  # texto nítido en pantallas con escalado
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except (AttributeError, OSError):
+            pass
     mutex = core.acquire_single_instance()
     if mutex is None:
         root = tk.Tk()
@@ -371,8 +611,8 @@ def main() -> None:
         app.iconify()
     elif not cfg.is_valid:
         messagebox.showinfo(core.APP_TITLE,
-                            "Bienvenido. Pulsa '⚙ Configuración…', selecciona el "
-                            "ejecutable de la HMI y pulsa 'Guardar'.")
+                            "Bienvenido. Pulsa «Configuración», selecciona el "
+                            "ejecutable de la HMI y pulsa «Guardar».")
     app.mainloop()
     wd.stop()
 

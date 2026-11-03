@@ -640,7 +640,11 @@ class Watchdog(threading.Thread):
     def _booted_recently(self) -> bool:
         return time.time() - psutil.boot_time() < 300
 
-    def _track(self, proc: psutil.Process) -> None:
+    def _track(self, proc: psutil.Process | None) -> None:
+        if proc is None:
+            self.pid = None
+            self.proc_started = None
+            return
         if self.pid != proc.pid:
             self.pid = proc.pid
             try:

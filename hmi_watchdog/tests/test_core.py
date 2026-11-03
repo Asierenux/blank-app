@@ -98,6 +98,8 @@ def test_pause_does_not_restart(env):
         time.sleep(2.5)
         assert core.find_process(cfg.exe_path) is None
         assert wd.snapshot()["status"] == core.Status.PAUSED
+        assert wd.snapshot()["last_error"] == ""
+        assert wd.snapshot()["pid"] is None
         wd.resume()
         assert wait_for(lambda: wd.state.restart_count == 1)
     finally:
