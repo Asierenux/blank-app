@@ -1,14 +1,15 @@
 # HMI Watchdog: supervisor de aplicaciones para Windows
 
-Vigila una aplicación (por ejemplo la HMI de los perfilómetros) y la vuelve a abrir
-si se cierra o se queda colgada. La configuración se guarda y se mantiene tras
-reiniciar el PC, así que siempre vigila la misma aplicación.
+Vigila una o varias aplicaciones (normalmente las **dos HMI de los perfilómetros**)
+y las vuelve a abrir si se cierran o se quedan colgadas. Cada aplicación tiene su
+**nombre**, su estado y su propio contador de reinicios. La configuración se guarda
+y se mantiene tras reiniciar el PC.
 
 ## Apariencia
 
 Interfaz con la identidad visual de Michelin: cabecera azul (`#06196A`) con el logo,
-franja amarilla (`#FCE500`), tarjetas blancas y Bibendum en la tarjeta de estado.
-Bibendum cambia de color según el estado: **azul** si la HMI está en marcha,
+franja amarilla (`#FCE500`), tarjetas blancas y una tarjeta por aplicación con Bibendum.
+Bibendum cambia de color según el estado: **azul** si la aplicación está en marcha,
 **naranja** mientras se reinicia, **rojo** si está cerrada o no responde y **gris**
 si la vigilancia está en pausa. El diseño cabe en pantallas de 1024×768.
 
@@ -16,18 +17,19 @@ si la vigilancia está en pausa. El diseño cabe en pantallas de 1024×768.
 
 | Función | Detalle |
 |---|---|
-| **Elegir la app a vigilar** | Botón *⚙ Configuración… → Examinar…*. Se puede indicar argumentos y carpeta de trabajo. |
+| **Varias aplicaciones con nombre** | *Configuración → + Añadir*: nombre (p.ej. «Perfilómetro Línea 1»), ejecutable, argumentos y carpeta de trabajo. Cada una aparece en su propia tarjeta. Se pueden activar/desactivar y ordenar (se arrancan en ese orden, separadas unos segundos). |
+| **Mismo .exe en carpetas distintas** | La detección es por **ruta completa**: `C:\Linea1\HMI.exe` y `C:\Linea2\HMI.exe` son aplicaciones distintas y se vigilan por separado. Solo se impide configurar dos veces exactamente la misma ruta. |
 | **Configuración persistente** | Se guarda en `%LOCALAPPDATA%\HMIWatchdog\config.json`. Se escribe de forma atómica para que un corte de luz no la corrompa. |
 | **Arranque con Windows** | Se registra solo en `HKCU\...\CurrentVersion\Run`. Tras encender el PC espera unos segundos configurables y abre la HMI. |
-| **Contador de reinicios** | Número de reinicios y fecha, hora y motivo del último (*Cerrada* / *No responde*). Se conserva tras reiniciar el PC. |
+| **Contador de reinicios** | Por aplicación: número de reinicios y fecha, hora y motivo del último (*Cerrada* / *No responde*). Se conserva tras reiniciar el PC. |
 | **Detección de "No responde"** | Si la ventana de la HMI está colgada más de N segundos, se cierra a la fuerza y se relanza. |
 | **Protección anti-bucle** | Si la app se cierra N veces en M minutos (falta un fichero, falla la licencia…), espera un tiempo antes de reintentar en lugar de relanzarla sin parar. |
 | **Pausa de mantenimiento** | Se puede pausar la vigilancia para cerrar la HMI a propósito. La vigilancia **se reanuda sola** pasado el tiempo indicado, para que nadie se olvide de reactivarla. |
 | **PIN de protección** | Opcional. Se pide para cerrar el supervisor, pausar, reiniciar, poner el contador a cero o cambiar la configuración. |
 | **Historial** | Todos los eventos quedan en `historial.csv` (se abre con Excel) y en `watchdog.log` (rotativo, 5 × 1 MB). |
 | **Instancia única** | No se pueden abrir dos supervisores a la vez. |
-| **Traer al frente** | Tras relanzar la HMI, pone su ventana en primer plano. |
-| **Reinicio manual** | Botón para cerrar y volver a abrir la HMI. |
+| **Traer al frente** | Tras relanzar una aplicación, pone su ventana en primer plano. |
+| **Reinicio manual / pausa / contador a cero** | Botones en la tarjeta de cada aplicación. |
 
 Si la HMI ya estaba abierta cuando arranca el supervisor, simplemente la vigila:
 no la duplica ni lo cuenta como reinicio. Los lanzamientos al encender el PC se
@@ -41,7 +43,8 @@ cuentan aparte (*Arranques al iniciar el PC*) y no suman en el contador de reini
    - desde GitHub: *Actions → HMI Watchdog (Windows build) → último run → Artifacts*, o
    - genéralo tú en un PC con Python ejecutando `build.bat`. Queda en `dist\HMIWatchdog.exe`.
 2. Cópialo a una carpeta fija, por ejemplo `C:\HMIWatchdog\HMIWatchdog.exe`.
-3. Ábrelo, pulsa **⚙ Configuración…**, elige el `.exe` de la HMI y pulsa **Guardar**.
+3. Ábrelo, pulsa **Configuración → + Añadir**, ponle un nombre a la primera HMI,
+   elige su `.exe` y acepta. Repite con la segunda y pulsa **Guardar**.
 4. Listo. A partir de ahora arranca solo con Windows.
 
 ### Opción B: con Python
@@ -81,8 +84,10 @@ pythonw hmi_watchdog.py
 | `assets/` | PNG e icono `.ico` que usa la interfaz, generados con `make_assets.py` |
 | `make_assets.py` | Regenera `assets/` si cambias las imágenes originales (requiere Pillow) |
 
-Datos en `%LOCALAPPDATA%\HMIWatchdog\`: `config.json`, `state.json` (contadores),
-`historial.csv` y `watchdog.log`. El botón *Carpeta de datos* abre esa carpeta.
+Datos en `%LOCALAPPDATA%\HMIWatchdog\`: `config.json`, `state_<id>.json` (contadores,
+uno por aplicación), `historial.csv` (con columna de aplicación) y `watchdog.log`.
+Si venías de la versión de una sola aplicación, la configuración y el contador se
+migran solos. El botón *Carpeta de datos* abre esa carpeta.
 
 ## Pruebas
 

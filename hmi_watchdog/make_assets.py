@@ -54,9 +54,10 @@ def main() -> None:
         fit_h(logo_w, 38 * scale).save(OUT / f"logo_white{suffix}.png", optimize=True)
         fit_h(logo_b, 46 * scale).save(OUT / f"logo_blue{suffix}.png", optimize=True)
         fit_h(bib_white, 90 * scale).save(OUT / f"bibendum_white{suffix}.png", optimize=True)
-        base = fit_h(bib, 190 * scale)
-        for name, color in TINTS.items():
-            tint(base, color).save(OUT / f"bibendum_{name}{suffix}.png", optimize=True)
+        for size, tag in ((190, ""), (140, "_sm")):
+            base = fit_h(bib, size * scale)
+            for name, color in TINTS.items():
+                tint(base, color).save(OUT / f"bibendum_{name}{tag}{suffix}.png", optimize=True)
 
     # Icono: cabeza de Bibendum sobre círculo amarillo
     head = bib.crop((0, 0, bib.width, int(bib.height * 0.36)))
