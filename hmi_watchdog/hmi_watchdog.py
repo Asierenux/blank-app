@@ -26,15 +26,15 @@ from watchdog_core import AppConfig, Config, Status, fmt_duration
 # ---------------------------------------------------------------------------
 # Identidad visual
 # ---------------------------------------------------------------------------
-NAVY = "#06196A"        # azul Michelin
-NAVY_HOVER = "#11288A"
+NAVY = "#061866"        # azul Michelin (plantillas corporativas)
+NAVY_HOVER = "#13287F"
 NAVY_SOFT = "#C9D2F0"
 YELLOW = "#FCE500"      # amarillo Michelin
 YELLOW_HOVER = "#FFEE47"
-BG = "#EEF1F6"
+BG = "#F4F3F1"           # blanco roto del fondo corporativo
 CARD = "#FFFFFF"
-TILE = "#F5F7FB"
-BORDER = "#DCE1EC"
+TILE = "#F4F3F1"
+BORDER = "#E1E1E1"
 TEXT = "#141C3D"
 MUTED = "#6B7390"
 GREEN = "#14853B"
@@ -45,6 +45,18 @@ GREY = "#7A8296"
 
 FONT = "Segoe UI" if core.IS_WINDOWS else "DejaVu Sans"
 MONO = "Consolas" if core.IS_WINDOWS else "DejaVu Sans Mono"
+FONT_H = FONT  # títulos y cifras: tipografía corporativa BIB si está instalada
+
+
+def pick_brand_font(root: tk.Misc) -> None:
+    """Usa la tipografía corporativa «BIB» para títulos si está instalada en el PC."""
+    global FONT_H
+    from tkinter import font as tkfont
+    families = set(tkfont.families(root))
+    for name in ("BIB Bold", "BIB", "BIB Regular"):
+        if name in families:
+            FONT_H = name
+            return
 
 # estado -> (color, variante de Bibendum, frase para el operario)
 STATUS_LOOK = {
@@ -159,9 +171,58 @@ def header(parent, images: Images, title: str, subtitle: str) -> None:
                  font=(FONT, 22, "bold italic")).pack(side="left")
     txt = tk.Frame(bar, bg=NAVY)
     txt.pack(side="right")
-    tk.Label(txt, text=title, bg=NAVY, fg="white", font=(FONT, 16, "bold")).pack(anchor="e")
+    tk.Label(txt, text=title, bg=NAVY, fg="white", font=(FONT_H, 16, "bold")).pack(anchor="e")
     tk.Label(txt, text=subtitle, bg=NAVY, fg=NAVY_SOFT, font=(FONT, 10)).pack(anchor="e")
     tk.Frame(parent, bg=YELLOW, height=5).pack(fill="x", side="top")
+
+
+class Structure(tk.Canvas):
+    """Elemento gráfico «structure» de Michelin: línea azul con muesca en V.
+
+    Se dibuja como borde superior de una tarjeta; los laterales los pone el
+    marco azul de la tarjeta y la parte inferior queda abierta, como en la marca.
+    """
+
+    DEPTH = 11
+
+    def __init__(self, parent, notch_at: float = 0.77):
+        super().__init__(parent, height=self.DEPTH + 2, bg=BG, highlightthickness=0, borderwidth=0)
+        self.notch_at = notch_at
+        self.bind("<Configure>", self._draw)
+
+    def _draw(self, _e=None) -> None:
+        self.delete("all")
+        w, d = self.winfo_width(), self.DEPTH
+        nx = int(w * self.notch_at)
+        top = 1
+        # interior blanco bajo la línea; encima de la muesca queda el fondo
+        self.create_rectangle(1, top, w - 1, d + 3, fill=CARD, outline="")
+        self.create_polygon([nx - 22, top - 1, nx - 9, top + 1, nx, top + d, nx + 9, top + 1,
+                             nx + 22, top - 1, nx, top - 1],
+                            fill=BG, outline="", smooth=True, splinesteps=24)
+        # tramos rectos con esquinas en ángulo recto + muesca curva
+        self.create_line(1, d + 3, 1, top, nx - 22, top, fill=NAVY, width=2)
+        self.create_line(nx + 22, top, w - 1, top, w - 1, d + 3, fill=NAVY, width=2)
+        self.create_line(nx - 23, top, nx - 9, top + 1, nx, top + d, nx + 9, top + 1, nx + 23, top,
+                         fill=NAVY, width=2, smooth=True, splinesteps=24, capstyle="round")
+
+
+class TreadStrip(tk.Canvas):
+    """Franja lateral con el dibujo de la banda de rodadura (fondo corporativo)."""
+
+    def __init__(self, parent, images: "Images"):
+        self.tile = images.get("tread_tile")
+        w = self.tile.width() if self.tile else 0
+        super().__init__(parent, width=w, bg=BG, highlightthickness=0, borderwidth=0)
+        self.bind("<Configure>", self._draw)
+
+    def _draw(self, e) -> None:
+        self.delete("all")
+        if not self.tile:
+            return
+        th = self.tile.height()
+        for y in range(0, e.height + th, th):
+            self.create_image(0, y, anchor="nw", image=self.tile)
 
 
 class ScrollFrame(tk.Frame):
@@ -202,7 +263,12 @@ class ScrollFrame(tk.Frame):
 # ---------------------------------------------------------------------------
 class AppCard(tk.Frame):
     def __init__(self, parent, app: "App", app_id: str):
-        super().__init__(parent, bg=CARD, highlightthickness=1, highlightbackground=BORDER)
+        super().__init__(parent, bg=BG)
+        Structure(self).pack(fill="x")
+        frame = tk.Frame(self, bg=NAVY)          # laterales de la «structure»
+        frame.pack(fill="both", expand=True)
+        body = tk.Frame(frame, bg=CARD)
+        body.pack(fill="both", expand=True, padx=2)
         self.main = app
         self.app_id = app_id
         self._variant = None
@@ -210,24 +276,24 @@ class AppCard(tk.Frame):
             "name", "path", "status", "message", "count", "since", "last", "reason",
             "uptime", "pid", "extra")}
 
-        self.bar = tk.Frame(self, bg=GREEN, width=8)
+        self.bar = tk.Frame(body, bg=GREEN, width=8)
         self.bar.pack(side="left", fill="y")
-        self.lbl_bib = tk.Label(self, bg=CARD, padx=12, pady=8)
+        self.lbl_bib = tk.Label(body, bg=CARD, padx=12, pady=4)
         self.lbl_bib.pack(side="left")
 
-        side = tk.Frame(self, bg=CARD, padx=14, pady=12)
+        side = tk.Frame(body, bg=CARD, padx=14, pady=8)
         side.pack(side="right", fill="y")
         self.btn_pause = FlatButton(side, "Pausar vigilancia", self.on_pause, small=True)
         self.btn_pause.pack(fill="x", pady=3)
         FlatButton(side, "Reiniciar ahora", self.on_restart, small=True).pack(fill="x", pady=3)
         FlatButton(side, "Contador a cero", self.on_reset, small=True).pack(fill="x", pady=3)
 
-        info = tk.Frame(self, bg=CARD, pady=8)
+        info = tk.Frame(body, bg=CARD, pady=4)
         info.pack(side="left", fill="both", expand=True)
         top = tk.Frame(info, bg=CARD)
         top.pack(fill="x")
         tk.Label(top, textvariable=self.v["name"], bg=CARD, fg=NAVY,
-                 font=(FONT, 15, "bold")).pack(side="left")
+                 font=(FONT_H, 15, "bold")).pack(side="left")
         self.lbl_status = tk.Label(top, textvariable=self.v["status"], bg=GREEN, fg="white",
                                    font=(FONT, 10, "bold"), padx=10, pady=2)
         self.lbl_status.pack(side="left", padx=12)
@@ -248,7 +314,7 @@ class AppCard(tk.Frame):
             tk.Frame(t, bg=YELLOW, height=3).pack(fill="x", pady=(0, 4))
             tk.Label(t, text=title, bg=TILE, fg=MUTED, font=(FONT, 8, "bold")).pack(anchor="w")
             tk.Label(t, textvariable=self.v[big], bg=TILE, fg=NAVY,
-                     font=(FONT, big_font, "bold")).pack(anchor="w")
+                     font=(FONT_H, big_font, "bold")).pack(anchor="w")
             tk.Label(t, textvariable=self.v[small], bg=TILE, fg=MUTED,
                      font=(FONT, 8)).pack(anchor="w")
 
@@ -473,7 +539,7 @@ class ConfigDialog(tk.Toplevel):
             else:
                 outer.pack(fill="both", expand=True, pady=(0 if r == 0 else 10, 0))
             tk.Label(inner, text=title.upper(), bg=CARD, fg=NAVY,
-                     font=(FONT, 10, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
+                     font=(FONT_H, 10, "bold")).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 6))
             inner.columnconfigure(1, weight=1)
             return inner
 
@@ -665,6 +731,7 @@ class App(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self.on_close)
         self.images = Images(self)
         self._set_icon()
+        pick_brand_font(self)
         setup_styles(self)
         self.cards: dict[str, AppCard] = {}
         self._events_shown = None
@@ -685,6 +752,7 @@ class App(tk.Tk):
     # ------------------------------------------------------------------ UI
     def _build(self) -> None:
         header(self, self.images, "Supervisor HMI", "Perfilómetros · vigilancia continua")
+        TreadStrip(self, self.images).pack(side="left", fill="y")
 
         footer = tk.Frame(self, bg=BG, padx=20)
         footer.pack(fill="x", side="bottom", pady=(0, 8))
@@ -697,7 +765,7 @@ class App(tk.Tk):
         # barra resumen + acciones globales
         tool = tk.Frame(body, bg=BG)
         tool.pack(fill="x", pady=(0, 10))
-        self.lbl_summary = tk.Label(tool, text="", bg=BG, fg=GREEN, font=(FONT, 13, "bold"))
+        self.lbl_summary = tk.Label(tool, text="", bg=BG, fg=GREEN, font=(FONT_H, 13, "bold"))
         self.lbl_summary.pack(side="left")
         FlatButton(tool, "Configuración", self.on_config, kind="accent").pack(side="right")
         FlatButton(tool, "Carpeta de datos", self.on_open_folder).pack(side="right", padx=6)
@@ -707,10 +775,10 @@ class App(tk.Tk):
         outer, inner = card(body)
         outer.pack(fill="x", side="bottom", pady=(10, 0))
         tk.Label(inner, text="Registro de eventos", bg=CARD, fg=NAVY,
-                 font=(FONT, 11, "bold")).pack(anchor="w", pady=(0, 6))
+                 font=(FONT_H, 11, "bold")).pack(anchor="w", pady=(0, 6))
         box = tk.Frame(inner, bg=CARD)
         box.pack(fill="both", expand=True)
-        self.txt = tk.Text(box, height=4, state="disabled", font=(MONO, 9), wrap="none",
+        self.txt = tk.Text(box, height=3, state="disabled", font=(MONO, 9), wrap="none",
                            bg=TILE, fg=TEXT, relief="flat", padx=10, pady=6,
                            highlightthickness=0, borderwidth=0)
         sb = ttk.Scrollbar(box, command=self.txt.yview)
@@ -738,7 +806,7 @@ class App(tk.Tk):
             self.empty.pack(pady=60)
         for app in active:
             c = AppCard(self.scroll.inner, self, app.id)
-            c.pack(fill="x", pady=(0, 10))
+            c.pack(fill="x", pady=(0, 12))
             self.cards[app.id] = c
 
     def apply_config(self, cfg: Config) -> None:

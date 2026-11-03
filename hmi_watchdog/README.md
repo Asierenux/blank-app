@@ -7,11 +7,20 @@ y se mantiene tras reiniciar el PC.
 
 ## Apariencia
 
-Interfaz con la identidad visual de Michelin: cabecera azul (`#06196A`) con el logo,
-franja amarilla (`#FCE500`), tarjetas blancas y una tarjeta por aplicación con Bibendum.
-Bibendum cambia de color según el estado: **azul** si la aplicación está en marcha,
-**naranja** mientras se reinicia, **rojo** si está cerrada o no responde y **gris**
-si la vigilancia está en pausa. El diseño cabe en pantallas de 1024×768.
+Interfaz con la identidad visual de Michelin, a partir del material corporativo:
+
+- **Colores**: azul oficial `#061866` (el de las plantillas corporativas), blanco roto
+  `#F4F3F1` del fondo corporativo y amarillo `#FCE500` como acento.
+- **Cabecera** azul con el logo y franja amarilla.
+- **Franja lateral** con el dibujo de la banda de rodadura del fondo corporativo.
+- **Tarjetas de aplicación** enmarcadas con la *structure* de Michelin: línea azul con
+  muesca en V y la parte inferior abierta.
+- **Bibendum** en cada tarjeta, del color del estado: **azul** si la aplicación está
+  en marcha, **naranja** mientras se reinicia, **rojo** si está cerrada o no responde
+  y **gris** si la vigilancia está en pausa.
+- **Tipografía**: si el PC tiene instalada la fuente corporativa **BIB**, se usa en
+  títulos y cifras. Si no, se usa Segoe UI.
+- Cabe en pantallas de 1024×768.
 
 ## Funciones
 
@@ -80,7 +89,7 @@ pythonw hmi_watchdog.py
 | `watchdog_core.py` | Lógica: configuración, contador, detección, relanzado, anti-bucle |
 | `tests/test_core.py` | Pruebas automáticas (simulan una HMI que se cierra) |
 | `build.bat` | Genera `dist\HMIWatchdog.exe` con PyInstaller (incluye imágenes e icono) |
-| `assets_src/` | Imágenes originales (logo y Bibendum) |
+| `assets_src/` | Material original: logo, Bibendum, fondo con banda de rodadura y *structure* (`.ai`) |
 | `assets/` | PNG e icono `.ico` que usa la interfaz, generados con `make_assets.py` |
 | `make_assets.py` | Regenera `assets/` si cambias las imágenes originales (requiere Pillow) |
 

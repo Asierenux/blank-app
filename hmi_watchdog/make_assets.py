@@ -10,7 +10,7 @@ from PIL import Image
 
 HERE = Path(__file__).resolve().parent
 SRC, OUT = HERE / "assets_src", HERE / "assets"
-NAVY = (6, 25, 106)
+NAVY = (6, 24, 102)  # #061866, azul oficial (plantillas corporativas)
 
 # color de Bibendum según el estado de la HMI
 TINTS = {
@@ -58,6 +58,15 @@ def main() -> None:
             base = fit_h(bib, size * scale)
             for name, color in TINTS.items():
                 tint(base, color).save(OUT / f"bibendum_{name}{tag}{suffix}.png", optimize=True)
+
+    # Dibujo de la banda de rodadura (fondo corporativo): un periodo de una
+    # columna, para repetirlo en vertical sin cortes. El patrón se repite cada 264 px.
+    bg = Image.open(SRC / "tread_background.jpg").convert("RGB")
+    period = bg.crop((40, 252, 460, 252 + 264))
+    for scale, suffix in ((1, ""), (2, "@2x")):
+        h = 60 * scale
+        period.resize((round(period.width * h / period.height), h), Image.LANCZOS).save(
+            OUT / f"tread_tile{suffix}.png", optimize=True)
 
     # Icono: cabeza de Bibendum sobre círculo amarillo
     head = bib.crop((0, 0, bib.width, int(bib.height * 0.36)))
