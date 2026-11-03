@@ -120,9 +120,19 @@ INDICADORES = [
 ]
 
 
+# Kapildui (Euskalmet, 1.173 m): la montaña. No cuenta para el estado global:
+# allí arriba el viento fuerte es lo normal y no es una emergencia en Vitoria.
+INDICADORES_KAPILDUI = [
+    Indicador("euskalmet", "temperatura", nivel_temperatura, 120, cuenta_global=False),
+    Indicador("euskalmet", "racha", nivel_racha, 120, cuenta_global=False),
+    Indicador("euskalmet", "viento", nivel_neutro, 120, cuenta_global=False),
+    Indicador("euskalmet", "precipitacion", nivel_precipitacion, 120, cuenta_global=False),
+]
+
+
 def _secundario(ind: Indicador, valor: float) -> str | None:
     """Un dato extra práctico debajo del valor principal."""
-    if ind.metrica == "racha":
+    if ind.metrica in ("racha", "viento"):
         return f"≈ {valor * 3.6:.0f} km/h"
     return None
 
@@ -379,6 +389,7 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
         "pvpc": pvpc,
         "fuentes": fuentes,
         "pestanas": pestanas,
+        "kapildui": [construir_indicador(conn, c, ind, ahora) for ind in INDICADORES_KAPILDUI],
         "agua": agua,
         "energia": construir_energia(conn, ahora),
         "alertas": construir_alertas(conn, c),

@@ -11,6 +11,9 @@ from __future__ import annotations
 
 import re
 
+from pathlib import Path
+
+from . import config as _config
 from .config import Config, guardar_en_env
 
 CAMPOS = [
@@ -34,6 +37,15 @@ CAMPOS = [
      "ayuda": "Formato estacion=CODIGO separados por comas. Estaciones: ullibarri, urrunaga, "
               "zadorra_vitoria, zadorra_arce. Ullíbarri (E027) y Urrunaga (E028) ya vienen puestos; "
               "añade los ríos así: zadorra_arce=A0xx"},
+    {"clave": "EUSKALMET_EMAIL", "fuente": None, "etiqueta": "Email de tu alta en Euskalmet (Kapildui)",
+     "secreto": False, "obligatorio": False,
+     "enlace": "https://opendata.euskadi.eus/api-euskalmet/-/api-de-euskalmet/",
+     "ayuda": "Gratis. Date de alta en la API de Euskalmet con tu email: te darán una clave privada. "
+              "Pon aquí el mismo email y la clave en el campo de abajo."},
+    {"clave": "EUSKALMET_CLAVE_PRIVADA", "fuente": "euskalmet", "etiqueta": "Clave privada de Euskalmet",
+     "secreto": True, "obligatorio": False, "multilinea": True, "enlace": None,
+     "ayuda": "Abre el archivo .pem que te dio Euskalmet con el Bloc de notas, copia TODO "
+              "(desde -----BEGIN hasta END-----) y pégalo aquí. Se guarda en datos/euskalmet_privateKey.pem."},
     {"clave": "TELEGRAM_BOT_TOKEN", "fuente": None, "etiqueta": "Token del bot de Telegram",
      "secreto": True, "obligatorio": False,
      "enlace": "https://t.me/BotFather",
@@ -52,11 +64,16 @@ def _valor(config: Config, clave: str) -> str | None:
         "ESIOS_TOKEN": config.esios_token,
         "SAIH_CODIGOS": ",".join(f"{k}={v}" for k, v in config.saih_codigos.items()) or None,
         "TELEGRAM_BOT_TOKEN": config.telegram_bot_token, "TELEGRAM_CHAT_ID": config.telegram_chat_id,
+        "EUSKALMET_EMAIL": config.euskalmet_email,
+        "EUSKALMET_CLAVE_PRIVADA": config.euskalmet_clave if config.euskalmet_clave
+        and Path(config.euskalmet_clave).exists() else None,
     }
     return mapa.get(clave)
 
 
 def enmascarar(valor: str) -> str:
+    if valor.endswith(".pem"):
+        return "archivo " + Path(valor).name
     return valor if len(valor) <= 8 else f"{valor[:4]}…{valor[-3:]}"
 
 
@@ -76,11 +93,32 @@ def validar(cambios: dict[str, str]) -> dict[str, str]:
         if clave not in PERMITIDAS:
             raise ValueError(f"No se puede cambiar {clave} desde el panel")
         valor = str(valor).strip().strip('"').strip("'")
+        if clave == "EUSKALMET_CLAVE_PRIVADA":
+            limpio[clave] = valor            # se valida y guarda aparte (es multilínea)
+            continue
         if re.search(r"[\r\n]", valor):
             raise ValueError("El valor no puede tener saltos de línea")
         limpio[clave] = valor
     return limpio
 
 
+def guardar_clave_pem(texto: str) -> str:
+    """Guarda la clave privada pegada en el panel en datos/ y devuelve su ruta para .env."""
+    texto = texto.replace("\r\n", "\n").strip()
+    if "-----BEGIN" not in texto or "PRIVATE KEY-----" not in texto:
+        raise ValueError("Eso no parece una clave privada: debe empezar por -----BEGIN … PRIVATE KEY-----")
+    destino = _config.RAIZ / "datos" / "euskalmet_privateKey.pem"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    destino.write_text(texto + "\n", encoding="utf-8")
+    try:
+        destino.chmod(0o600)                 # que solo la lea tu usuario
+    except OSError:
+        pass
+    return "datos/euskalmet_privateKey.pem"
+
+
 def aplicar(cambios: dict[str, str]) -> None:
-    guardar_en_env(validar(cambios))
+    limpio = validar(cambios)
+    if "EUSKALMET_CLAVE_PRIVADA" in limpio:
+        limpio["EUSKALMET_CLAVE_PRIVADA"] = guardar_clave_pem(limpio["EUSKALMET_CLAVE_PRIVADA"])
+    guardar_en_env(limpio)

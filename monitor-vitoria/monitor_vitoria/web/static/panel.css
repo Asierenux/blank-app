@@ -263,3 +263,10 @@ a.enlace-config { color:var(--info); font-size:.75rem; font-weight:700; display:
 .margenes div[class^="n-"] { border-color:var(--c); }
 .margenes b { display:block; color:var(--texto); font-size:.92rem; }
 .margenes div[class^="n-"] b { color:var(--c); }
+
+/* Clave privada (varias líneas) en Configuración */
+.config-campo textarea { flex:1; background:var(--panel-2); color:var(--texto); border:1px solid var(--borde); border-radius:8px;
+  padding:6px 8px; font: .78rem ui-monospace, Menlo, Consolas, monospace; resize:vertical; min-width:0; }
+.config-campo form:has(textarea) { flex-direction:column; }
+.titulo-seccion { margin:4px 0 -2px; font-size:.82rem; text-transform:uppercase; letter-spacing:.08em; color:var(--suave); }
+.titulo-seccion .gris { text-transform:none; letter-spacing:0; font-weight:500; margin-left:6px; }

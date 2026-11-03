@@ -321,7 +321,8 @@ async function getJSON(url, opciones) {
   return r.json();
 }
 const SERIES_AIRE = ["waqi:aqi", "waqi:pm25", "waqi:pm10", "waqi:no2", "waqi:o3"];
-const SERIES_METEO = ["aemet:temperatura", "aemet:racha", "aemet:precipitacion", "aemet:humedad", "aemet:presion"];
+const SERIES_METEO = ["aemet:temperatura", "aemet:racha", "aemet:precipitacion", "aemet:humedad", "aemet:presion",
+                      "euskalmet:temperatura", "euskalmet:racha"];
 let expSel = leer("exp.sel", ["aemet:temperatura", "aemet:precipitacion"]);
 let expFuncion = leer("exp.fun", "auto"), expBarras = leer("exp.barras", false);
 
@@ -513,9 +514,12 @@ function pintarConfig() {
       <div class="ayuda">${esc(f.ayuda)}${enlace}</div>
       ${f.configurado ? `<div class="ayuda">Valor actual: <code>${esc(f.valor)}</code></div>` : ""}
       <form data-clave="${esc(f.clave)}" data-fuente="${esc(f.fuente || "")}">
-        <input type="${f.secreto ? "password" : "text"}" name="valor" autocomplete="off" spellcheck="false"
+        ${f.multilinea
+          ? `<textarea name="valor" rows="4" autocomplete="off" spellcheck="false" ${c.editable ? "" : "disabled"}
+              placeholder="-----BEGIN PRIVATE KEY-----&#10;…&#10;-----END PRIVATE KEY-----" aria-label="${esc(f.etiqueta)}"></textarea>`
+          : `<input type="${f.secreto ? "password" : "text"}" name="valor" autocomplete="off" spellcheck="false"
           placeholder="${f.configurado ? "Pega un valor nuevo para cambiarlo" : "Pega aquí…"}" ${c.editable ? "" : "disabled"}
-          aria-label="${esc(f.etiqueta)}">
+          aria-label="${esc(f.etiqueta)}">`}
         <button class="boton primario" ${c.editable ? "" : "disabled"}>${boton}</button>
       </form>
       <div class="resultado ${resultadosConfig[f.clave]?.clase || ""}" aria-live="polite">${esc(resultadosConfig[f.clave]?.texto || "")}</div></div>`;
@@ -594,12 +598,18 @@ const PINTORES = {
   meteo(d) {
     $("meteo-fichas").innerHTML = indicadores(d, ["aemet.temperatura", "aemet.racha", "aemet.precipitacion", "aemet.humedad"])
       .map(fichaIndicador).join("");
+    const kap = d.kapildui || [];
+    $("meteo-kapildui").innerHTML = kap.some(i => i.valor != null) ? kap.map(fichaIndicador).join("")
+      : `<p class="vacio">Sin datos de Kapildui todavía. Configura Euskalmet en <a href="#sistema" data-ir-config>Sistema › Configuración</a>.</p>`;
     const r = cache.meteo; if (!r || r.error) return;
     $("meteo-resolucion").textContent = textoRango(r);
     const s = id => r.series.find(x => x.id === id);
-    graficaSeries("g-meteo-temp", "ley-meteo-temp", r, [s("aemet:temperatura"), s("aemet:racha")], {colores:[css("--info"), css("--aviso")]});
+    // Valle (Vitoria, AEMET) y montaña (Kapildui, Euskalmet) en la misma gráfica
+    const temp = [s("aemet:temperatura"), s("aemet:racha"), s("euskalmet:temperatura"), s("euskalmet:racha")]
+      .filter(x => x && (x.id.startsWith("aemet") || x.resumen.n));
+    graficaSeries("g-meteo-temp", "ley-meteo-temp", r, temp, {colores:[css("--info"), css("--aviso"), css("--agua-2"), css("--critico")]});
     graficaSeries("g-meteo-lluvia", "ley-meteo-lluvia", r, [s("aemet:precipitacion"), s("aemet:humedad")], {colores:[css("--lluvia"), css("--agua-2")]});
-    tablaResumen("meteo-tabla", r.series);
+    tablaResumen("meteo-tabla", r.series.filter(x => x.id.startsWith("aemet") || x.resumen.n));
   },
   explorar() { pintarExplorar(); },
   sistema(d) {

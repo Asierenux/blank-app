@@ -8,6 +8,7 @@ Para añadir una fuente nueva:
 
 from .aemet import RecolectorAemet
 from .base import Recolector
+from .euskalmet import RecolectorEuskalmet
 from .generacion import RecolectorGeneracion
 from .pvpc import RecolectorPvpc
 from .saih import RecolectorSaih
@@ -15,7 +16,7 @@ from .waqi import RecolectorWaqi
 
 RECOLECTORES: dict[str, type[Recolector]] = {
     r.nombre: r for r in (RecolectorAemet, RecolectorPvpc, RecolectorWaqi,
-                          RecolectorSaih, RecolectorGeneracion)
+                          RecolectorSaih, RecolectorGeneracion, RecolectorEuskalmet)
 }
 
 __all__ = ["RECOLECTORES", "Recolector"]

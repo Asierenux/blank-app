@@ -10,6 +10,7 @@
     estado                  muestra qué claves están configuradas
     demo                    crea datos/demo.db con datos simulados para ver el panel
     probar-saih CODIGO      descarga la ficha SAIH Ebro de una estación y enseña qué se extrae
+    probar-euskalmet        comprueba la clave de Euskalmet y qué mide Kapildui
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("probar-telegram", help="mensaje de prueba")
     sub.add_parser("estado", help="resumen de configuración")
     sub.add_parser("demo", help="datos simulados en datos/demo.db")
+    sub.add_parser("probar-euskalmet", help="comprueba la API de Euskalmet (Kapildui)")
     p_saih = sub.add_parser("probar-saih", help="comprueba una estación del SAIH Ebro")
     p_saih.add_argument("codigo", help="p. ej. E028")
     p_saih.add_argument("--estacion", help="id del catálogo (urrunaga, ullibarri, zadorra_arce...)")
@@ -106,6 +108,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Datos de demostración en {ruta}")
         print("Abre el panel con ellos:")
         print("  python -m monitor_vitoria web --demo")
+
+    elif args.orden == "probar-euskalmet":
+        return _probar_euskalmet(config)
 
     elif args.orden == "probar-saih":
         return _probar_saih(config, args.codigo.upper(), args.estacion)
@@ -170,6 +175,40 @@ def _iniciar(args) -> int:
         if sched:
             sched.shutdown(wait=False)
     return 0
+
+
+def _probar_euskalmet(config) -> int:
+    """Diagnóstico: firma el token, lista lo que mide la estación y lee la última hora."""
+    from .recolectores.euskalmet import MEDIDAS, RecolectorEuskalmet
+    from .servicio import crear_cliente, explicar_error
+    with crear_cliente() as cliente:
+        rec = RecolectorEuskalmet(config, cliente)
+        if (falta := rec.falta_configuracion()):
+            print("✘", falta)
+            return 1
+        try:
+            rec.token()
+            print("✔ Token firmado con tu clave privada")
+            medidas = rec.medidas_disponibles(usar_cache=False)
+        except Exception as e:  # noqa: BLE001
+            print("✘", explicar_error(e))
+            return 1
+        print(f"✔ La estación {config.euskalmet_estacion} mide:")
+        for m in medidas:
+            uso = "→ se guarda" if m["medida"] in MEDIDAS else "(no se usa)"
+            print(f"    {m['sensor']:<10} {m['tipo']:<22} {m['medida']:<18} {uso}")
+        try:
+            lecturas = rec.recoger()
+        except Exception as e:  # noqa: BLE001
+            print("✘ Al leer valores:", explicar_error(e))
+            return 1
+        ultimas = {}
+        for l in lecturas:
+            ultimas[l.metrica] = l
+        print("✔ Últimos valores:")
+        for l in ultimas.values():
+            print(f"    {l.metrica:<14} {l.valor:>8} {l.unidad:<5}  ({l.momento.astimezone().strftime('%d/%m %H:%M')})")
+        return 0
 
 
 def _probar_saih(config, codigo: str, estacion_id: str | None) -> int:

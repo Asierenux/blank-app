@@ -109,6 +109,12 @@ def generar(ruta: Path, semilla: int = 7) -> None:
         L("aemet", "racha", t, racha, "m/s")
         L("aemet", "viento", t, racha * .45, "m/s")
         L("aemet", "precipitacion", t, lluvia_en(h), "mm")
+        # Kapildui (1.173 m): ~6,5 °C más frío por altitud y bastante más viento
+        L("euskalmet", "temperatura", t, 9 + 6 * diurno - 6.5 + rnd.uniform(-.5, .5), "°C")
+        L("euskalmet", "racha", t, racha * 1.45 + 3, "m/s")
+        L("euskalmet", "viento", t, racha * .8, "m/s")
+        L("euskalmet", "humedad", t, 88 - 10 * diurno, "%")
+        L("euskalmet", "precipitacion", t, round(lluvia_en(h) * 1.3, 1), "mm")
 
     # WAQI: 72 h, AQI moderado subiendo
     for h in range(72, -1, -1):
@@ -146,6 +152,7 @@ def generar(ruta: Path, semilla: int = 7) -> None:
     db.registrar_ejecucion(conn, "waqi", inicio - timedelta(minutes=35), ok=True, recibidas=6, nuevas=6)
     db.registrar_ejecucion(conn, "waqi", inicio, ok=False, error="ReadTimeout: timed out")
     db.registrar_ejecucion(conn, "saih", inicio - timedelta(minutes=10), ok=True, recibidas=14, nuevas=14)
+    db.registrar_ejecucion(conn, "euskalmet", inicio - timedelta(minutes=8), ok=True, recibidas=60, nuevas=30)
     db.registrar_ejecucion(conn, "generacion", inicio - timedelta(hours=2), ok=True, recibidas=124, nuevas=4)
 
     with conn:
