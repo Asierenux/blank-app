@@ -1,0 +1,27 @@
+name: HMI Watchdog (Windows build)
+
+on:
+  push:
+    paths: ["hmi_watchdog/**", ".github/workflows/hmi-watchdog.yml"]
+  pull_request:
+    paths: ["hmi_watchdog/**", ".github/workflows/hmi-watchdog.yml"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: hmi_watchdog
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m pytest tests -v
+      - run: python -m PyInstaller --noconfirm --onefile --windowed --name HMIWatchdog hmi_watchdog.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HMIWatchdog-exe
+          path: hmi_watchdog/dist/HMIWatchdog.exe

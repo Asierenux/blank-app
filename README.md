@@ -17,3 +17,9 @@ A simple Streamlit app template for you to modify!
    ```
    $ streamlit run streamlit_app.py
    ```
+
+---
+
+## 🛡️ HMI Watchdog
+
+Supervisor para Windows que mantiene siempre abierta una aplicación (HMI de perfilómetros). Ver [`hmi_watchdog/README.md`](hmi_watchdog/README.md).
