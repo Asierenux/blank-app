@@ -8,8 +8,8 @@
 "use strict";
 
 const ZONA = "Europe/Madrid";
-const VISTAS = ["resumen", "agua", "energia", "aire", "meteo", "explorar", "sistema"];
-const VISTAS_CON_PERIODO = ["agua", "aire", "meteo", "explorar"];
+const VISTAS = ["resumen", "agua", "trafico", "energia", "aire", "meteo", "explorar", "sistema"];
+const VISTAS_CON_PERIODO = ["agua", "trafico", "aire", "meteo", "explorar"];
 const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
 const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
 
@@ -328,6 +328,7 @@ let expFuncion = leer("exp.fun", "auto"), expBarras = leer("exp.barras", false);
 
 const CARGADORES = {
   agua: () => getJSON(`/api/agua/historico?${paramsPeriodo()}`),
+  trafico: () => getJSON(`/api/datos?${paramsPeriodo({series: "trafico:incidencias_activas,trafico:accidentes_activos,trafico:obras_activas", funcion: "max"})}`),
   aire: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_AIRE.join(",")})}`),
   meteo: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_METEO.join(",")})}`),
   async explorar() {
@@ -359,13 +360,17 @@ function graficaSeries(idGraf, idLey, r, series, {colores, barras = false} = {})
     const deBarras = series.some(s => s.unidad === u && esBarra(s, barras));
     // display "auto": el eje desaparece si ocultas (en la leyenda) todas sus series
     ejes["y" + i] = eje({ position: i % 2 ? "right" : "left", display: i < 2 ? "auto" : false, beginAtZero: deBarras,
-      grid: { display: i === 0 }, ticks: { callback: v => `${num(v, Number.isInteger(v) ? 0 : decimales(u) > 1 ? 2 : 1)} ${u}` } });
+      // "nº" (recuentos): solo números enteros en el eje
+      grid: { display: i === 0 }, ticks: { ...(u === "nº" ? { precision: 0 } : {}),
+        callback: v => `${num(v, Number.isInteger(v) ? 0 : decimales(u) > 1 ? 2 : 1)} ${u}` } });
   });
   const datasets = series.map((s, i) => {
     const color = pal[i % pal.length], barra = esBarra(s, barras);
     return { type: barra ? "bar" : "line", label: s.etiqueta, data: s.valores, yAxisID: "y" + unidades.indexOf(s.unidad),
       borderColor: color, backgroundColor: barra ? color + "aa" : color, pointRadius: r.agrupar === "dia" ? 2 : 0,
-      borderWidth: 2, tension: .25, spanGaps: true, order: barra ? 2 : 1, unidad: s.unidad };
+      borderWidth: 2, spanGaps: true, order: barra ? 2 : 1, unidad: s.unidad,
+      // Los recuentos van en escalones (no existen "4,5 incidencias"); el resto, curva suave
+      ...(s.unidad === "nº" ? { stepped: "before", tension: 0 } : { tension: .25 }) };
   });
   leyendaInteractiva(idLey, idGraf, datasets.map(d => ({label: d.label, color: d.borderColor, barra: d.type === "bar", extra: d.unidad})));
   grafica(idGraf, "bar", { labels: r.cubos, datasets },
@@ -564,6 +569,87 @@ document.addEventListener("click", ev => {
 });
 
 // =====================================================================
+// TRÁFICO: mapa (Leaflet), incidencias y cámaras
+// =====================================================================
+const ICONO_TRAFICO = { accidente:"💥", corte:"⛔", obras:"🚧", retencion:"🚗", meteo:"❄️",
+                        averia:"🔧", peligro:"⚠️", evento:"🎪", otro:"ℹ️" };
+const NOMBRE_TRAFICO = { accidente:"Accidentes", corte:"Cortes", obras:"Obras", retencion:"Retenciones",
+                         meteo:"Meteorología", averia:"Averías", peligro:"Peligros", evento:"Eventos", otro:"Otras" };
+let mapa = null, capaMapa = null;
+
+function ubicacion(i) {
+  return [i.carretera, i.pk_inicio != null ? `km ${num(i.pk_inicio, 1)}` : null, i.sentido ? `sentido ${i.sentido}` : null]
+    .filter(Boolean).join(" · ");
+}
+
+function pintarMapa(t) {
+  if (!window.L) { $("mapa-trafico").innerHTML = `<p class="vacio">No se pudo cargar el mapa (¿sin conexión a internet?).</p>`; return; }
+  if (!mapa) {
+    mapa = L.map("mapa-trafico", { scrollWheelZoom: false }).setView(t.centro, 11);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapa);
+    capaMapa = L.layerGroup().addTo(mapa);
+  }
+  setTimeout(() => mapa.invalidateSize(), 50);     // el contenedor estaba oculto: recalcular tamaño
+  capaMapa.clearLayers();
+  L.circle(t.centro, { radius: t.radio_km * 1000, color: css("--suave"), weight: 1, fill: false, dashArray: "4 6" }).addTo(capaMapa);
+  for (const i of t.activas) {
+    if (i.lat == null || i.lon == null || Math.abs(i.lat) < 1) continue;
+    L.circleMarker([i.lat, i.lon], { radius: 9, color: "#000", weight: 1, fillOpacity: .9,
+        fillColor: css(`--${i.nivel_estado}`) || css("--info") })
+      .bindPopup(`<b>${ICONO_TRAFICO[i.tipo] || ""} ${esc(i.nombre)}</b><br>${esc(ubicacion(i))}<br>
+        ${esc(i.municipio || "")}${i.causa ? "<br>Causa: " + esc(i.causa) : ""}${i.nivel ? "<br>" + esc(i.nivel) : ""}
+        <br><small>Desde ${diaHora(i.inicio)} · hasta ${i.fin_estimado ? "≈ " : ""}${hora(i.estimado_hasta)}</small>`)
+      .addTo(capaMapa);
+  }
+  for (const c of t.camaras) {
+    L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "marca-camara", html: "■", iconSize: [14, 14] }) })
+      .bindPopup(`<b>${esc(c.nombre)}</b><br><img src="${esc(conRefresco(c.imagen))}" alt="Cámara ${esc(c.nombre)}" width="280">`)
+      .addTo(capaMapa);
+  }
+}
+
+// Añade ?t=<minuto> para que el navegador no muestre una imagen antigua guardada
+const conRefresco = url => url.startsWith("data:") ? url       // imágenes incrustadas (demo): tal cual
+  : url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 60000);
+
+function pintarTrafico(d) {
+  const t = d.trafico; if (!t) return;
+  const n = tipo => t.por_tipo[tipo] || 0;
+  $("trafico-resumen").innerHTML =
+    dato("Incidencias activas", String(t.activas.length), `a menos de ${num(t.radio_km, 0)} km de Vitoria`, t.activas.length ? "" : "destacado") +
+    dato("💥 Accidentes", String(n("accidente")), n("accidente") ? "activos ahora" : "ninguno") +
+    dato("⛔ Cortes · 🚗 retenciones", `${n("corte")} · ${n("retencion")}`, "carreteras cortadas · tráfico lento") +
+    dato("🚧 Obras · ❄️ meteo", `${n("obras")} · ${n("meteo")}`, "obras · puertos y vialidad invernal");
+  $("trafico-mapa-titulo").textContent = `Mapa · ${num(t.radio_km, 0)} km alrededor de Vitoria`;
+
+  const filtro = $("trafico-filtro").value;
+  const lista = t.activas.filter(i => !filtro || (filtro === "otros" ? !["accidente", "corte", "obras", "retencion", "meteo"].includes(i.tipo) : i.tipo === filtro));
+  $("trafico-lista").innerHTML = lista.length ? lista.map(i => `<li class="n-${i.nivel_estado === "info" ? "sin_datos" : i.nivel_estado}">
+      <div><div class="tit">${ICONO_TRAFICO[i.tipo] || ""} ${esc(i.nombre)}</div>
+        <div class="det">${esc(ubicacion(i))}${i.municipio ? " · " + esc(i.municipio) : ""}</div>
+        ${i.causa || i.nivel ? `<div class="det">${esc([i.causa, i.nivel].filter(Boolean).join(" · "))}</div>` : ""}</div>
+      <div class="der"><div class="det">desde ${hora(i.inicio)}</div>
+        <div class="det">hasta ${i.fin_estimado ? "≈ " : ""}${hora(i.estimado_hasta)}</div></div></li>`).join("")
+    : `<li class="n-ok"><div><div class="tit">Sin incidencias${filtro ? " de este tipo" : ""}</div>
+        <div class="det">Nada activo cerca de Vitoria ahora mismo</div></div><div></div></li>`;
+
+  $("trafico-camaras").innerHTML = t.camaras.length ? t.camaras.slice(0, 12).map(c => `<figure class="camara">
+      <img src="${esc(conRefresco(c.imagen))}" alt="Cámara ${esc(c.nombre)}" loading="lazy"
+        onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'sin-imagen',textContent:'Imagen no disponible'}))">
+      <figcaption><b>${esc(c.nombre)}</b> <span class="gris">${num(c.distancia_km, 1)} km</span></figcaption></figure>`).join("")
+    : `<p class="vacio">Aún no hay cámaras. Se descargan con la primera recogida de tráfico (una vez al día).</p>`;
+
+  pintarMapa(t);
+  const r = cache.trafico;
+  if (r && !r.error) {
+    $("trafico-resolucion").textContent = textoRango(r);
+    graficaSeries("g-trafico", "ley-trafico", r, r.series, {colores: [css("--aviso"), css("--critico"), css("--info")]});
+  }
+}
+$("trafico-filtro").addEventListener("change", () => pintar());
+
+// =====================================================================
 // PINTAR CADA VISTA
 // =====================================================================
 let ultimo = null, vista = "resumen";
@@ -581,6 +667,7 @@ const PINTORES = {
     $("agua-rios").innerHTML = d.agua.rios.map(tarjetaRio).join("");
     graficasAgua();
   },
+  trafico(d) { pintarTrafico(d); },
   energia(d) {
     datosLuz("energia-luz-datos", d.pvpc); graficaLuz("g-energia-luz", d.pvpc);
     $("energia-luz-nota").textContent = !d.pvpc.puntos?.length ? "Sin datos de precio todavía."
@@ -661,7 +748,7 @@ document.querySelectorAll('[role="tab"]').forEach(tab => {
 window.addEventListener("hashchange", () => { if (location.hash.slice(1) !== vista) mostrar(location.hash.slice(1)); });
 
 // Modo pared: rota por las pestañas de consulta (no por Explorar ni Sistema)
-const VISTAS_ROTAR = ["resumen", "agua", "energia", "aire", "meteo"];
+const VISTAS_ROTAR = ["resumen", "agua", "trafico", "energia", "aire", "meteo"];
 let temporizadorRotar = null;
 function rotar(segundos) {
   pararRotacion();

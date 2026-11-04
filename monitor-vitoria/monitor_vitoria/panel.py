@@ -374,8 +374,10 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
     def nivel_de(ids):
         return peor("ok", *[i["nivel"] for i in indicadores
                             if i["id"] in ids and i["nivel"] not in ("sin_datos", "info")])
+    trafico = construir_trafico(conn, c, ahora)
     pestanas = {
         "agua": peor("ok", *estados_agua),
+        "trafico": trafico["nivel"],
         "energia": "ok",
         "aire": nivel_de({"waqi.aqi", "waqi.pm25", "waqi.no2"}),
         "meteo": nivel_de({"aemet.temperatura", "aemet.racha", "aemet.precipitacion"}),
@@ -389,6 +391,7 @@ def construir_panel(conn: sqlite3.Connection, c: Config,
         "pvpc": pvpc,
         "fuentes": fuentes,
         "pestanas": pestanas,
+        "trafico": trafico,
         "kapildui": [construir_indicador(conn, c, ind, ahora) for ind in INDICADORES_KAPILDUI],
         "agua": agua,
         "energia": construir_energia(conn, ahora),
@@ -609,6 +612,51 @@ def historico_agua(conn, c: Config, inicio: datetime, fin: datetime,
 # ==========================================================================
 # ENERGÍA: generación hidráulica (REE)
 # ==========================================================================
+
+def construir_trafico(conn, c: Config, ahora: datetime) -> dict:
+    """Incidencias activas cerca de Vitoria (según su ventana estimada) y cámaras."""
+    import json
+
+    from .recolectores.trafico import activa, ventana
+
+    activas = []
+    for fila in db.incidencias_desde(conn, ahora - timedelta(hours=36)):
+        i = dict(fila)
+        if not activa(i, ahora):
+            continue
+        inicio = _dt(i["inicio"])
+        fin = _dt(i["fin"]) if i["fin"] else inicio + ventana(i["tipo"])
+        nivel_i = ("critico" if i["tipo"] in ("corte",) or "cerrad" in (i["nivel"] or "").lower()
+                   else "aviso" if i["tipo"] in ("accidente", "retencion", "meteo") else "info")
+        activas.append({**i, "nivel_estado": nivel_i, "estimado_hasta": a_utc_iso(fin),
+                        "fin_estimado": not i["fin"]})
+    orden = {"critico": 0, "aviso": 1, "info": 2}
+    activas.sort(key=lambda x: (orden[x["nivel_estado"]], x["inicio"]), reverse=False)
+
+    por_tipo: dict[str, int] = {}
+    for i in activas:
+        por_tipo[i["tipo"]] = por_tipo.get(i["tipo"], 0) + 1
+
+    # Un corte o carretera cerrada cerca de Vitoria = aviso para la pestaña (no crítico global:
+    # el tráfico no es una avería del sistema, pero sí algo a mirar)
+    nivel = ("aviso" if any(i["nivel_estado"] in ("critico", "aviso") for i in activas) else "ok")
+
+    camaras = []
+    from .recolectores.trafico import archivo_camaras
+    archivo = archivo_camaras(c.db_path)
+    if archivo.exists():
+        try:
+            camaras = json.loads(archivo.read_text(encoding="utf-8"))
+        except ValueError:
+            camaras = []
+    for cam in camaras:
+        from .recolectores.trafico import distancia_km
+        cam["distancia_km"] = round(distancia_km(c.latitud, c.longitud, cam["lat"], cam["lon"]), 1)
+    camaras.sort(key=lambda x: x["distancia_km"])
+
+    return {"nivel": nivel, "radio_km": c.trafico_radio_km, "centro": [c.latitud, c.longitud],
+            "activas": activas, "por_tipo": por_tipo, "camaras": camaras[:40]}
+
 
 def construir_energia(conn, ahora: datetime) -> dict:
     salida = {}

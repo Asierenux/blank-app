@@ -49,7 +49,51 @@ CREATE TABLE IF NOT EXISTS alertas_enviadas (
     enviado_en  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
     PRIMARY KEY (regla, momento)
 );
+
+-- Incidencias de tráfico (accidentes, obras, cortes...). No son números sino
+-- "sucesos", así que van en su propia tabla. Se actualizan si cambian.
+CREATE TABLE IF NOT EXISTS incidencias (
+    id          TEXT PRIMARY KEY,       -- "euskadi-12345"
+    tipo        TEXT NOT NULL,          -- categoría nuestra: accidente, obras, corte...
+    nombre      TEXT,                   -- texto original del tipo
+    causa       TEXT,
+    nivel       TEXT,                   -- "Circulación lenta", "Cerrado"...
+    carretera   TEXT,
+    pk_inicio   REAL,
+    pk_fin      REAL,
+    sentido     TEXT,
+    municipio   TEXT,
+    provincia   TEXT,
+    lat         REAL,
+    lon         REAL,
+    inicio      TEXT NOT NULL,          -- ISO UTC
+    fin         TEXT,                   -- ISO UTC (casi nunca viene)
+    visto_en    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+CREATE INDEX IF NOT EXISTS idx_incidencias_inicio ON incidencias (inicio);
 """
+
+
+def guardar_incidencias(conn: sqlite3.Connection, incidencias: list[dict]) -> int:
+    """Inserta o actualiza (por id). Devuelve cuántas eran nuevas."""
+    nuevas = 0
+    columnas = ("id", "tipo", "nombre", "causa", "nivel", "carretera", "pk_inicio", "pk_fin",
+                "sentido", "municipio", "provincia", "lat", "lon", "inicio", "fin")
+    with conn:
+        for i in incidencias:
+            existia = conn.execute("SELECT 1 FROM incidencias WHERE id = ?", (i["id"],)).fetchone()
+            nuevas += 0 if existia else 1
+            conn.execute(
+                f"INSERT INTO incidencias ({', '.join(columnas)}) VALUES ({', '.join('?' * len(columnas))}) "
+                "ON CONFLICT(id) DO UPDATE SET " + ", ".join(f"{c}=excluded.{c}" for c in columnas[1:])
+                + ", visto_en=strftime('%Y-%m-%dT%H:%M:%SZ', 'now')",
+                tuple(i.get(c) for c in columnas))
+    return nuevas
+
+
+def incidencias_desde(conn: sqlite3.Connection, desde: datetime) -> list[sqlite3.Row]:
+    return conn.execute("SELECT * FROM incidencias WHERE inicio >= ? ORDER BY inicio DESC",
+                        (a_utc_iso(desde),)).fetchall()
 
 
 def conectar(ruta: Path) -> sqlite3.Connection:

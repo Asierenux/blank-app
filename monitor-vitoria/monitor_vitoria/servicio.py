@@ -108,6 +108,9 @@ def ejecutar_recolector(config: Config, nombre: str) -> bool:
 
             lecturas = recolector.recoger()
             nuevas = db.guardar_lecturas(conn, lecturas)
+            # Algunas fuentes guardan además datos que no son números (p. ej. incidencias de tráfico)
+            if hasattr(recolector, "guardar_extra"):
+                recolector.guardar_extra(conn)
             db.registrar_ejecucion(conn, nombre, inicio, ok=True,
                                    recibidas=len(lecturas), nuevas=len(nuevas))
             log.info("[%s] ✔ %d lecturas recibidas, %d nuevas", nombre, len(lecturas), len(nuevas))

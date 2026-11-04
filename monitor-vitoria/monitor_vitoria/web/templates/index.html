@@ -6,6 +6,9 @@
   <title>Monitor Vitoria · Operaciones</title>
   <link rel="stylesheet" href="/static/panel.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <!-- Leaflet: mapas (pestaña Tráfico) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
 <body>
 <div class="aviso-conexion" id="aviso-conexion">⚠ SIN CONEXIÓN CON EL SERVIDOR — los datos mostrados pueden estar desactualizados</div>
@@ -24,6 +27,7 @@
   <nav class="pestanas" role="tablist" aria-label="Secciones">
     <button role="tab" id="tab-resumen" data-vista="resumen" class="n-ok"><span class="marca-nivel"></span>Resumen</button>
     <button role="tab" id="tab-agua" data-vista="agua" class="n-ok"><span class="marca-nivel"></span>Agua</button>
+    <button role="tab" id="tab-trafico" data-vista="trafico" class="n-ok"><span class="marca-nivel"></span>Tráfico</button>
     <button role="tab" id="tab-energia" data-vista="energia" class="n-ok"><span class="marca-nivel"></span>Energía</button>
     <button role="tab" id="tab-aire" data-vista="aire" class="n-ok"><span class="marca-nivel"></span>Aire</button>
     <button role="tab" id="tab-meteo" data-vista="meteo" class="n-ok"><span class="marca-nivel"></span>Meteo</button>
@@ -109,6 +113,40 @@
       <p class="nota"><b>Sobre las compuertas:</b> su posición no es un dato público. El panel lo estima comparando
         el <b>caudal de entrada</b> con el de <b>salida</b>: si sale bastante más de lo que entra, la presa está
         desembalsando (compuertas abiertas o turbinando); si el embalse está al máximo, puede estar vertiendo.</p>
+    </article>
+  </section>
+
+  <!-- ============================= TRÁFICO ============================ -->
+  <section class="vista" id="vista-trafico" role="tabpanel" aria-labelledby="tab-trafico" hidden>
+    <div class="datos d4" id="trafico-resumen"></div>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span id="trafico-mapa-titulo">Mapa</span>
+          <span class="leyenda"><span>● incidencia</span><span>■ cámara (pulsa para ver la imagen)</span></span></h2>
+        <div class="mapa" id="mapa-trafico" role="region" aria-label="Mapa de incidencias y cámaras"></div>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Incidencias activas</span>
+          <select id="trafico-filtro" aria-label="Tipo de incidencia">
+            <option value="">Todas</option><option value="accidente">💥 Accidentes</option>
+            <option value="corte">⛔ Cortes</option><option value="obras">🚧 Obras</option>
+            <option value="retencion">🚗 Retenciones</option><option value="meteo">❄️ Meteorología</option>
+            <option value="otros">Otras</option>
+          </select></h2>
+        <ul class="lista larga lista-trafico" id="trafico-lista"></ul>
+      </article>
+    </div>
+    <article class="tarjeta">
+      <h2><span>Cámaras de tráfico cercanas</span><span class="gris">la imagen se refresca cada minuto</span></h2>
+      <div class="camaras" id="trafico-camaras"></div>
+    </article>
+    <article class="tarjeta">
+      <h2><span>Evolución de las incidencias</span><span class="gris" id="trafico-resolucion"></span></h2>
+      <div class="leyenda-int" id="ley-trafico"></div>
+      <div class="lienzo"><canvas id="g-trafico"></canvas></div>
+      <p class="nota">Fuente: API de tráfico del Gobierno Vasco. Esa API publica cuándo <b>empieza</b> cada incidencia pero
+        casi nunca cuándo termina, así que se considera activa durante un tiempo estimado (accidentes y otras 4 h; obras y
+        meteorología 12 h). La hora «hasta» es esa estimación.</p>
     </article>
   </section>
 

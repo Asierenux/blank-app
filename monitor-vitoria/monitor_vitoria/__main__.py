@@ -11,6 +11,7 @@
     demo                    crea datos/demo.db con datos simulados para ver el panel
     probar-saih CODIGO      descarga la ficha SAIH Ebro de una estación y enseña qué se extrae
     probar-euskalmet        comprueba la clave de Euskalmet y qué mide Kapildui
+    probar-trafico          comprueba la API de tráfico (incidencias y cámaras cerca de Vitoria)
 """
 
 from __future__ import annotations
@@ -46,6 +47,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("estado", help="resumen de configuración")
     sub.add_parser("demo", help="datos simulados en datos/demo.db")
     sub.add_parser("probar-euskalmet", help="comprueba la API de Euskalmet (Kapildui)")
+    sub.add_parser("probar-trafico", help="comprueba la API de tráfico del Gobierno Vasco")
     p_saih = sub.add_parser("probar-saih", help="comprueba una estación del SAIH Ebro")
     p_saih.add_argument("codigo", help="p. ej. E028")
     p_saih.add_argument("--estacion", help="id del catálogo (urrunaga, ullibarri, zadorra_arce...)")
@@ -112,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.orden == "probar-euskalmet":
         return _probar_euskalmet(config)
 
+    elif args.orden == "probar-trafico":
+        return _probar_trafico(config)
+
     elif args.orden == "probar-saih":
         return _probar_saih(config, args.codigo.upper(), args.estacion)
 
@@ -175,6 +180,61 @@ def _iniciar(args) -> int:
         if sched:
             sched.shutdown(wait=False)
     return 0
+
+
+def _probar_trafico(config) -> int:
+    """Diagnóstico de la API de tráfico: no guarda nada, enseña lo que llega."""
+    import json
+    from datetime import datetime
+
+    from .recolectores.trafico import MADRID, URL, RecolectorTrafico, activa, convertir_camara
+    from .servicio import crear_cliente, explicar_error
+    with crear_cliente() as cliente:
+        rec = RecolectorTrafico(config, cliente)
+        hoy = datetime.now(MADRID)
+        url = f"{URL}/incidences/byDate/{hoy:%Y/%m/%d}"
+        print(f"Incidencias de hoy: {url}")
+        try:
+            r = cliente.get(url, headers={"Accept": "application/json"})
+            r.raise_for_status()
+            datos = r.json()
+        except Exception as e:  # noqa: BLE001
+            print("✘", explicar_error(e))
+            return 1
+        lista = datos.get("incidences") or []
+        print(f"✔ Respuesta OK · páginas: {datos.get('totalPages')} · total: {datos.get('totalItems')} · en esta página: {len(lista)}")
+        if lista:
+            print("  Ejemplo (primera incidencia, tal cual llega):")
+            print("   ", json.dumps(lista[0], ensure_ascii=False)[:600])
+        try:
+            rec.recoger()
+        except Exception as e:  # noqa: BLE001
+            print("✘ Al recoger todas las páginas:", explicar_error(e))
+            return 1
+        ahora = datetime.now().astimezone()
+        cerca = rec.incidencias
+        print(f"\n✔ Cerca de Vitoria (≤ {config.trafico_radio_km:g} km o en Álava): {len(cerca)} "
+              f"(activas ahora: {sum(activa(i, ahora) for i in cerca)})")
+        for i in cerca[:15]:
+            marca = "●" if activa(i, ahora) else "○"
+            print(f"   {marca} {i['tipo']:<10} {i['carretera'] or '':<10} {i['municipio'] or '':<22} "
+                  f"{i['nombre']} ({i['inicio']})")
+
+        print(f"\nCámaras: {URL}/cameras")
+        try:
+            r = cliente.get(f"{URL}/cameras", headers={"Accept": "application/json"})
+            r.raise_for_status()
+            datos = r.json()
+            lista = datos.get("cameras") or datos.get("items") or (datos if isinstance(datos, list) else [])
+            print(f"✔ Respuesta OK · claves: {list(datos)[:8] if isinstance(datos, dict) else 'lista'} · en esta página: {len(lista)}")
+            if lista:
+                print("  Ejemplo (primera cámara, tal cual llega):")
+                print("   ", json.dumps(lista[0], ensure_ascii=False)[:600])
+                leidas = [c for c in (convertir_camara(x) for x in lista) if c]
+                print(f"  Cámaras que el programa entiende en esta página: {len(leidas)} de {len(lista)}")
+        except Exception as e:  # noqa: BLE001
+            print("✘", explicar_error(e))
+        return 0
 
 
 def _probar_euskalmet(config) -> int:

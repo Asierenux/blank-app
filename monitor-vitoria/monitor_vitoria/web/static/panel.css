@@ -1,3 +1,15 @@
+/* ---------- Tráfico: mapa y cámaras (al principio del archivo por orden de lectura) ---------- */
+.mapa { height:420px; border-radius:8px; overflow:hidden; background:var(--panel-2); z-index:0; }
+.marca-camara { color:#38bdf8; font-size:14px; line-height:14px; text-align:center; text-shadow:0 0 2px #000; }
+.camaras { display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.camara { margin:0; background:var(--panel-2); border:1px solid var(--borde); border-radius:8px; overflow:hidden; }
+.camara img, .camara .sin-imagen { width:100%; aspect-ratio: 4 / 3; object-fit:cover; display:block; background:#000; }
+.camara .sin-imagen { display:grid; place-items:center; color:var(--suave); font-size:.8rem; }
+.camara figcaption { padding:6px 8px; font-size:.78rem; display:flex; justify-content:space-between; gap:6px; }
+.lista-trafico { max-height:420px; }
+.leaflet-popup-content { font: .82rem/1.4 Inter, "Segoe UI", system-ui, sans-serif; }
+@media (max-width: 640px) { .mapa { height:300px; } }
+
 /* =====================================================================
    Panel de operaciones · monitor-vitoria
    Oscuro por defecto (sala de control). Botón "Tema" para el modo claro.

@@ -86,6 +86,64 @@ def generar_agua(ahora: datetime, L) -> list[float]:
     return lluvias
 
 
+def generar_trafico(conn, ruta: Path, ahora: datetime, L, rnd) -> None:
+    """Incidencias y cámaras de ejemplo alrededor de Vitoria."""
+    import json
+
+    ejemplos = [  # (id, tipo, nombre, carretera, pk, sentido, municipio, lat, lon, hace_min, causa, nivel)
+        ("d1", "accidente", "Accidente", "A-1", 352.4, "Burgos", "Vitoria-Gasteiz", 42.8318, -2.7380, 35,
+         "Alcance entre dos turismos", "Circulación lenta"),
+        ("d2", "obras", "Obras", "N-622", 4.2, "Altube", "Zigoitia", 42.8890, -2.7050, 240,
+         "Mantenimiento de firme", "Corte de carril derecho"),
+        ("d3", "corte", "Corte de carretera", "A-2124", 10.5, "Ambos sentidos", "Arrazua-Ubarrundia",
+         42.9045, -2.6332, 90, "Inundación de calzada", "Cerrado"),
+        ("d4", "retencion", "Retención", "N-104 (circunvalación)", 357.0, "Altsasu", "Vitoria-Gasteiz",
+         42.8640, -2.6450, 20, "Tráfico denso", "Retención de 2 km"),
+        ("d5", "meteo", "Puertos de montaña", "A-3608 (puerto de Vitoria)", 6.0, None, "Vitoria-Gasteiz",
+         42.7880, -2.6860, 300, "Niebla", "Precaución"),
+        ("d6", "accidente", "Accidente", "AP-1", 5.0, "Eibar", "Arratzua", 42.9140, -2.5600, 400,
+         None, None),   # de hace casi 7 h: ya no se considera activo
+    ]
+    incidencias = [{
+        "id": f"demo-{i}", "tipo": tipo, "nombre": nombre, "causa": causa, "nivel": nivel,
+        "carretera": carretera, "pk_inicio": pk, "pk_fin": None, "sentido": sentido, "municipio": municipio,
+        "provincia": "Araba/Álava", "lat": lat, "lon": lon,
+        "inicio": a_utc_iso(ahora - timedelta(minutes=hace)), "fin": None,
+    } for i, tipo, nombre, carretera, pk, sentido, municipio, lat, lon, hace, causa, nivel in ejemplos]
+    db.guardar_incidencias(conn, incidencias)
+
+    # Evolución: incidencias activas en las últimas 48 h (picos en las horas punta)
+    for h in range(48, -1, -1):
+        t = ahora - timedelta(hours=h)
+        hora_local = t.astimezone(MADRID).hour
+        punta = 1 if hora_local in (8, 9, 14, 18, 19) else 0
+        total = 2 + punta * 2 + rnd.choice([0, 0, 1])
+        L("trafico", "incidencias_activas", t, total if h else 5, "nº")   # ahora: las 5 activas de arriba
+        L("trafico", "accidentes_activos", t, (punta and rnd.random() < .6) + (h == 0), "nº")
+        L("trafico", "obras_activas", t, 1, "nº")
+
+    # Cámaras de ejemplo: la "imagen" es un dibujo SVG (en real, una foto de la cámara)
+    def imagen(texto: str, color: str) -> str:
+        from urllib.parse import quote
+        svg = (f"<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 320 240'><rect width='320' height='240' fill='{color}'/>"
+               "<path d='M0 240 L130 120 L190 120 L320 240 Z' fill='#3a3f47'/>"
+               "<path d='M160 125 L160 240' stroke='#e5e5e5' stroke-width='4' stroke-dasharray='14 12'/>"
+               f"<text x='12' y='24' fill='#fff' font-family='sans-serif' font-size='15'>{texto} · DEMO</text></svg>")
+        return "data:image/svg+xml," + quote(svg)
+    camaras = [
+        {"id": "c1", "nombre": "A-1 Vitoria oeste (Armentia)", "carretera": "A-1", "pk": 352.0,
+         "lat": 42.8330, "lon": -2.7300, "imagen": imagen("A-1 pk 352", "#5b7a99")},
+        {"id": "c2", "nombre": "N-104 Circunvalación (Arriaga)", "carretera": "N-104", "pk": 357.0,
+         "lat": 42.8650, "lon": -2.6800, "imagen": imagen("N-104 pk 357", "#6b7f8f")},
+        {"id": "c3", "nombre": "N-622 Gamarra", "carretera": "N-622", "pk": 1.5,
+         "lat": 42.8720, "lon": -2.6900, "imagen": imagen("N-622 pk 1,5", "#7a8e9c")},
+        {"id": "c4", "nombre": "A-1 Vitoria este (Arkaute)", "carretera": "A-1", "pk": 362.0,
+         "lat": 42.8520, "lon": -2.6080, "imagen": imagen("A-1 pk 362", "#4f6d86")},
+    ]
+    from .recolectores.trafico import archivo_camaras
+    archivo_camaras(ruta).write_text(json.dumps(camaras, ensure_ascii=False), encoding="utf-8")
+
+
 def generar(ruta: Path, semilla: int = 7) -> None:
     rnd = random.Random(semilla)
     if ruta.exists():
@@ -134,6 +192,7 @@ def generar(ruta: Path, semilla: int = 7) -> None:
             L("pvpc", "precio", t, base * (1 + d * .08) + rnd.uniform(-.01, .01), "€/kWh")
 
     generar_agua(ahora, L)
+    generar_trafico(conn, ruta, ahora, L, rnd)
 
     # Generación hidráulica diaria (REE): sube después de los días de lluvia
     for d in range(30, -1, -1):

@@ -85,6 +85,8 @@ class Config:
     intervalo_saih_min: int
     intervalo_generacion_min: int
     intervalo_euskalmet_min: int
+    intervalo_trafico_min: int
+    trafico_radio_km: float
 
     alerta_temp_max: float | None
     alerta_temp_min: float | None
@@ -134,6 +136,8 @@ def cargar_config() -> Config:
         intervalo_saih_min=_entero("INTERVALO_SAIH_MIN", 30),
         intervalo_generacion_min=_entero("INTERVALO_GENERACION_MIN", 360),
         intervalo_euskalmet_min=_entero("INTERVALO_EUSKALMET_MIN", 30),
+        intervalo_trafico_min=_entero("INTERVALO_TRAFICO_MIN", 10),
+        trafico_radio_km=_decimal("TRAFICO_RADIO_KM", 25) or 25,
         alerta_temp_max=_decimal("ALERTA_TEMP_MAX", 35),
         alerta_temp_min=_decimal("ALERTA_TEMP_MIN", -3),
         alerta_viento_racha_ms=_decimal("ALERTA_VIENTO_RACHA_MS", 20),

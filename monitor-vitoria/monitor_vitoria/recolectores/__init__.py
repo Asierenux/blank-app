@@ -12,11 +12,13 @@ from .euskalmet import RecolectorEuskalmet
 from .generacion import RecolectorGeneracion
 from .pvpc import RecolectorPvpc
 from .saih import RecolectorSaih
+from .trafico import RecolectorTrafico
 from .waqi import RecolectorWaqi
 
 RECOLECTORES: dict[str, type[Recolector]] = {
     r.nombre: r for r in (RecolectorAemet, RecolectorPvpc, RecolectorWaqi,
-                          RecolectorSaih, RecolectorGeneracion, RecolectorEuskalmet)
+                          RecolectorSaih, RecolectorGeneracion, RecolectorEuskalmet,
+                          RecolectorTrafico)
 }
 
 __all__ = ["RECOLECTORES", "Recolector"]
