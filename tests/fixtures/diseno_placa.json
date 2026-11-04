@@ -1,0 +1,319 @@
+{
+  "nombre": "Soporte en L con agujeros",
+  "descripcion": "Escuadra con dos agujeros avellanados y nervio",
+  "supuestos": [
+    "Grosor estimado"
+  ],
+  "parametros": [
+    {
+      "nombre": "largo",
+      "valor": 60,
+      "etiqueta": "Largo base",
+      "unidad": "mm",
+      "medida_numero": 1
+    },
+    {
+      "nombre": "ancho",
+      "valor": 30,
+      "etiqueta": "Ancho",
+      "unidad": "mm",
+      "medida_numero": null
+    },
+    {
+      "nombre": "alto",
+      "valor": 40,
+      "etiqueta": "Alto pared",
+      "unidad": "mm",
+      "medida_numero": 2
+    },
+    {
+      "nombre": "grosor",
+      "valor": 4,
+      "etiqueta": "Grosor",
+      "unidad": "mm",
+      "medida_numero": null
+    },
+    {
+      "nombre": "d_agujero",
+      "valor": 4,
+      "etiqueta": "Ø tornillo",
+      "unidad": "mm",
+      "medida_numero": 3
+    },
+    {
+      "nombre": "holgura",
+      "valor": 0.3,
+      "etiqueta": "Holgura tornillo",
+      "unidad": "mm",
+      "medida_numero": null
+    }
+  ],
+  "nodos": [
+    {
+      "id": "base",
+      "op": "caja",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "largo"
+        },
+        {
+          "nombre": "y",
+          "valor": "ancho"
+        },
+        {
+          "nombre": "z",
+          "valor": "grosor"
+        }
+      ],
+      "entradas": [],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "pared0",
+      "op": "caja",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "grosor"
+        },
+        {
+          "nombre": "y",
+          "valor": "ancho"
+        },
+        {
+          "nombre": "z",
+          "valor": "alto"
+        }
+      ],
+      "entradas": [],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "pared",
+      "op": "mover",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "-largo/2 + grosor/2"
+        }
+      ],
+      "entradas": [
+        "pared0"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "nervio0",
+      "op": "extruir_poligono",
+      "args": [
+        {
+          "nombre": "h",
+          "valor": "grosor"
+        }
+      ],
+      "entradas": [],
+      "puntos": [
+        {
+          "x": "0",
+          "y": "0"
+        },
+        {
+          "x": "0",
+          "y": "alto*0.6"
+        },
+        {
+          "x": "largo*0.6",
+          "y": "0"
+        }
+      ],
+      "comentario": "triángulo en XY, luego se pone vertical"
+    },
+    {
+      "id": "nervio1",
+      "op": "rotar",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "90"
+        }
+      ],
+      "entradas": [
+        "nervio0"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "nervio",
+      "op": "mover",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "-largo/2 + grosor"
+        },
+        {
+          "nombre": "y",
+          "valor": "grosor/2"
+        },
+        {
+          "nombre": "z",
+          "valor": "grosor"
+        }
+      ],
+      "entradas": [
+        "nervio1"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "cuerpo",
+      "op": "unir",
+      "args": [],
+      "entradas": [
+        "base",
+        "pared",
+        "nervio"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "agujero",
+      "op": "cilindro",
+      "args": [
+        {
+          "nombre": "h",
+          "valor": "grosor + 2"
+        },
+        {
+          "nombre": "d",
+          "valor": "d_agujero + holgura"
+        }
+      ],
+      "entradas": [],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "agujero_pos",
+      "op": "mover",
+      "args": [
+        {
+          "nombre": "x",
+          "valor": "largo/2 - 10"
+        },
+        {
+          "nombre": "y",
+          "valor": "-ancho/2 + 7"
+        },
+        {
+          "nombre": "z",
+          "valor": "-1"
+        }
+      ],
+      "entradas": [
+        "agujero"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "agujeros",
+      "op": "array_lineal",
+      "args": [
+        {
+          "nombre": "n",
+          "valor": "2"
+        },
+        {
+          "nombre": "dy",
+          "valor": "ancho - 14"
+        }
+      ],
+      "entradas": [
+        "agujero_pos"
+      ],
+      "puntos": [],
+      "comentario": ""
+    },
+    {
+      "id": "pieza",
+      "op": "restar",
+      "args": [],
+      "entradas": [
+        "cuerpo",
+        "agujeros"
+      ],
+      "puntos": [],
+      "comentario": ""
+    }
+  ],
+  "partes": [
+    {
+      "nombre": "escuadra",
+      "nodo": "pieza"
+    }
+  ],
+  "comprobaciones": [
+    {
+      "descripcion": "Largo total",
+      "parte": "escuadra",
+      "magnitud": "ancho_x",
+      "esperado": "largo",
+      "tolerancia": 0.01,
+      "punto_x": "",
+      "punto_y": "",
+      "punto_z": ""
+    },
+    {
+      "descripcion": "Alto total",
+      "parte": "escuadra",
+      "magnitud": "alto_z",
+      "esperado": "alto",
+      "tolerancia": 0.01,
+      "punto_x": "",
+      "punto_y": "",
+      "punto_z": ""
+    },
+    {
+      "descripcion": "Una sola pieza",
+      "parte": "escuadra",
+      "magnitud": "num_cuerpos",
+      "esperado": "1",
+      "tolerancia": 0,
+      "punto_x": "",
+      "punto_y": "",
+      "punto_z": ""
+    },
+    {
+      "descripcion": "Centro del agujero 1 vacío",
+      "parte": "escuadra",
+      "magnitud": "vacio_en",
+      "esperado": "",
+      "tolerancia": 0,
+      "punto_x": "largo/2 - 10",
+      "punto_y": "-ancho/2 + 7",
+      "punto_z": "grosor/2"
+    },
+    {
+      "descripcion": "Material entre agujeros",
+      "parte": "escuadra",
+      "magnitud": "solido_en",
+      "esperado": "",
+      "tolerancia": 0,
+      "punto_x": "largo/2 - 10",
+      "punto_y": "0",
+      "punto_z": "grosor/2"
+    }
+  ],
+  "orientacion_impresion": "Base apoyada en la cama",
+  "necesita_soportes": false,
+  "notas_impresion": [],
+  "aprobado": false,
+  "cambios_realizados": []
+}

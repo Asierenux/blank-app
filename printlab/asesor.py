@@ -96,18 +96,25 @@ def analizar(images: list[Image.Image], objetivo: str, api_key: str | None = Non
     if client is None:
         import anthropic
 
-        client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
-    response = client.beta.messages.parse(
-        model=MODEL,
-        max_tokens=16000,
-        system=SYSTEM,
-        output_config={"effort": "high"},
-        # si un filtro de seguridad rechazara la petición, la API reintenta con otro modelo
-        betas=["server-side-fallback-2026-07-01"],
-        fallbacks="default",
-        messages=[{"role": "user", "content": build_content(images, objetivo)}],
-        output_format=Analisis,
-    )
+        client = anthropic.Anthropic(api_key=api_key, timeout=900) if api_key else anthropic.Anthropic(timeout=900)
+    # streaming: con razonamiento la respuesta puede ser larga y así no hay riesgo de timeout
+    try:
+        with client.beta.messages.stream(
+            model=MODEL,
+            max_tokens=32000,
+            system=SYSTEM,
+            output_config={"effort": "high"},
+            # si un filtro de seguridad rechazara la petición, la API reintenta con otro modelo
+            betas=["server-side-fallback-2026-07-01"],
+            fallbacks="default",
+            messages=[{"role": "user", "content": build_content(images, objetivo)}],
+            output_format=Analisis,
+        ) as stream:
+            response = stream.get_final_message()
+    except Exception as exc:  # noqa: BLE001
+        from .generador import explicar_error
+
+        raise RuntimeError(explicar_error(exc)) from exc
     if response.stop_reason == "refusal":
         raise RuntimeError("Claude no ha podido analizar estas fotos. Prueba con otras imágenes o describe mejor la pieza.")
     if response.stop_reason == "max_tokens" or response.parsed_output is None:

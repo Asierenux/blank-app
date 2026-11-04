@@ -1,0 +1,28 @@
+{"nombre":"Pomo moleteado M6","descripcion":"Pomo con tuerca M6 embutida","supuestos":[],
+ "parametros":[
+  {"nombre":"d_pomo","valor":35,"etiqueta":"Ø pomo","unidad":"mm","medida_numero":1},
+  {"nombre":"alto","valor":18,"etiqueta":"Alto","unidad":"mm","medida_numero":2},
+  {"nombre":"d_cuello","valor":16,"etiqueta":"Ø cuello","unidad":"mm","medida_numero":null},
+  {"nombre":"alto_cuello","valor":6,"etiqueta":"Alto cuello","unidad":"mm","medida_numero":null},
+  {"nombre":"tuerca_ec","valor":10,"etiqueta":"Tuerca entre caras","unidad":"mm","medida_numero":3},
+  {"nombre":"tuerca_h","valor":5,"etiqueta":"Alto tuerca","unidad":"mm","medida_numero":null},
+  {"nombre":"n_estrias","valor":18,"etiqueta":"Nº estrías","unidad":"unidades","medida_numero":null}],
+ "nodos":[
+  {"id":"perfil","op":"revolucion","args":[],"entradas":[],"puntos":[
+     {"x":"0","y":"0"},{"x":"d_cuello/2","y":"0"},{"x":"d_cuello/2","y":"alto_cuello"},{"x":"d_pomo/2","y":"alto_cuello+2"},
+     {"x":"d_pomo/2","y":"alto-2"},{"x":"d_pomo/2-2","y":"alto"},{"x":"0","y":"alto"}],"comentario":""},
+  {"id":"estria","op":"cilindro","args":[{"nombre":"h","valor":"alto"},{"nombre":"d","valor":"3"}],"entradas":[],"puntos":[],"comentario":""},
+  {"id":"estria_m","op":"mover","args":[{"nombre":"x","valor":"d_pomo/2+0.6"},{"nombre":"z","valor":"alto_cuello+1"}],"entradas":["estria"],"puntos":[],"comentario":""},
+  {"id":"estrias","op":"array_polar","args":[{"nombre":"n","valor":"n_estrias"}],"entradas":["estria_m"],"puntos":[],"comentario":""},
+  {"id":"tuerca","op":"cilindro","args":[{"nombre":"h","valor":"tuerca_h+1"},{"nombre":"d","valor":"(tuerca_ec+0.3)/cos(30)"},{"nombre":"lados","valor":"6"}],"entradas":[],"puntos":[],"comentario":""},
+  {"id":"tuerca_m","op":"mover","args":[{"nombre":"z","valor":"-1"}],"entradas":["tuerca"],"puntos":[],"comentario":""},
+  {"id":"eje","op":"cilindro","args":[{"nombre":"h","valor":"alto+2"},{"nombre":"d","valor":"6.5"}],"entradas":[],"puntos":[],"comentario":""},
+  {"id":"eje_m","op":"mover","args":[{"nombre":"z","valor":"-1"}],"entradas":["eje"],"puntos":[],"comentario":""},
+  {"id":"pomo","op":"restar","args":[],"entradas":["perfil","estrias","tuerca_m","eje_m"],"puntos":[],"comentario":""}],
+ "partes":[{"nombre":"pomo","nodo":"pomo"}],
+ "comprobaciones":[
+  {"descripcion":"Alto","parte":"pomo","magnitud":"alto_z","esperado":"alto","tolerancia":0.05,"punto_x":"","punto_y":"","punto_z":""},
+  {"descripcion":"Hueco tuerca","parte":"pomo","magnitud":"vacio_en","esperado":"","tolerancia":0,"punto_x":"tuerca_ec/2-0.5","punto_y":"0","punto_z":"tuerca_h/2"},
+  {"descripcion":"Eje pasante arriba","parte":"pomo","magnitud":"vacio_en","esperado":"","tolerancia":0,"punto_x":"0","punto_y":"0","punto_z":"alto-0.2"},
+  {"descripcion":"Pared del cuello","parte":"pomo","magnitud":"solido_en","esperado":"","tolerancia":0,"punto_x":"d_cuello/2-1","punto_y":"0","punto_z":"2"}],
+ "orientacion_impresion":"Cuello abajo","necesita_soportes":false,"notas_impresion":[],"aprobado":false,"cambios_realizados":[]}

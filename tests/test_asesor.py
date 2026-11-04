@@ -30,9 +30,17 @@ class FakeMessages:
     def __init__(self):
         self.kwargs = None
 
-    def parse(self, **kwargs):
+    def stream(self, **kwargs):
         self.kwargs = kwargs
-        return SimpleNamespace(stop_reason="end_turn", parsed_output=fake_analisis())
+        resp = SimpleNamespace(stop_reason="end_turn", parsed_output=fake_analisis())
+
+        class _S:
+            def __enter__(self_inner):
+                return SimpleNamespace(get_final_message=lambda: resp)
+
+            def __exit__(self_inner, *a):
+                return False
+        return _S()
 
 
 def test_analizar_sends_images_and_schema():

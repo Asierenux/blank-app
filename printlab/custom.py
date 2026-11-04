@@ -1,5 +1,6 @@
 """Carga de modelos a medida de la carpeta `modelos/`.
 
+Los `modelos/*.json` son diseños generados por el asistente (formato printlab.diseno.Diseno).
 Cada archivo `modelos/*.py` (que no empiece por `_`) define:
     NOMBRE = "Texto visible"
     DESCRIPCION = "..."
@@ -17,6 +18,16 @@ MODELS_DIR = Path(__file__).resolve().parent.parent / "modelos"
 
 def discover() -> dict[str, ModuleType]:
     found: dict[str, ModuleType] = {}
+    for path in sorted(MODELS_DIR.glob("*.json")):  # diseños generados por el asistente
+        try:
+            from .diseno import Diseno, como_modelo
+
+            mod = como_modelo(Diseno.model_validate_json(path.read_text(encoding="utf-8")))
+        except Exception as exc:  # noqa: BLE001
+            mod = ModuleType(path.stem)
+            mod.NOMBRE = f"⚠️ {path.stem} (error)"
+            mod.ERROR = repr(exc)
+        found[mod.NOMBRE] = mod
     for path in sorted(MODELS_DIR.glob("*.py")):
         if path.name.startswith("_"):
             continue

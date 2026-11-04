@@ -8,7 +8,7 @@ import numpy as np
 import streamlit as st
 import trimesh
 
-from printlab import asesor, custom, geometry, image2d, parametric, preview, printer
+from printlab import asesor, custom, diseno, generador, geometry, image2d, parametric, preview, printer
 from printlab.export import to_3mf, to_stl
 
 st.set_page_config(page_title="Taller 3D · Bambu Lab P2S", page_icon="🧊", layout="wide")
@@ -87,6 +87,69 @@ def show_result(parts: dict[str, trimesh.Trimesh], name: str, key: str) -> None:
                                    mime="model/stl", width="stretch", key=f"{key}_stl_{k}")
 
 
+def mostrar_generado(s: "generador.Sesion") -> None:
+    d = s.diseno
+    if s.verificado:
+        st.success(f"✅ **{d.nombre}** — verificado: Claude revisó las vistas renderizadas y todas las comprobaciones pasan.")
+    else:
+        st.warning(f"⚠️ **{d.nombre}** — sin verificación completa. Revisa el modelo y, si algo no cuadra, pide una corrección.")
+    st.write(d.descripcion)
+    with st.expander(f"Proceso ({s.llamadas} rondas con Claude)"):
+        for linea in s.log:
+            st.markdown(f"- {linea}")
+        if s.render_png:
+            st.image(s.render_png, caption="Vistas que revisó Claude", width="stretch")
+    if d.supuestos:
+        st.info("**Supuestos (medidas estimadas o decisiones sin dato):**\n" + "\n".join(f"- {x}" for x in d.supuestos))
+
+    st.markdown("**Medidas del modelo** (puedes retocarlas; se recalcula al instante sin volver a llamar a Claude)")
+    mod = diseno.como_modelo(d, s.medidas)
+    spec = {k: v[1:] for k, v in mod.PARAMS.items()}
+    defaults = {k: v[0] for k, v in mod.PARAMS.items()}
+    vals = param_inputs(spec, defaults, key=f"gen_{s.llamadas}")
+    try:
+        r = diseno.evaluar_diseno(d, overrides=vals)
+    except diseno.DisenoError as exc:
+        st.error("Con estos valores la pieza no se puede construir:\n- " + "\n- ".join(exc.errores))
+        return
+    if r.comprobaciones:
+        def _txt(c, v):
+            if v is None:
+                return "?"
+            if c.magnitud in ("solido_en", "vacio_en"):
+                return "material" if v > 0.5 else "hueco"
+            return f"{v:.2f}"
+        filas = [{"Comprobación": c.descripcion, "Esperado": _txt(c, c.esperado), "Modelo": _txt(c, c.real),
+                  "": "✅" if c.ok else "❌"} for c in r.comprobaciones]
+        st.dataframe(filas, hide_index=True, width="stretch")
+    for aviso in r.avisos:
+        if "ajustado a la medida real" not in aviso:
+            st.warning(aviso)
+    show_result(r.meshes, d.nombre, key="gen")
+    st.markdown(f"**Orientación de impresión:** {d.orientacion_impresion}  \n"
+                f"**Soportes:** {'sí' if d.necesita_soportes else 'no'}")
+    for n in d.notas_impresion:
+        st.markdown(f"- {n}")
+
+    d_json = d.model_copy(update={"parametros": [p.model_copy(update={"valor": vals.get(p.nombre, p.valor), "medida_numero": None})
+                                                  for p in d.parametros]}).model_dump_json(indent=1)
+    st.download_button("💾 Guardar diseño (.json)", d_json, file_name=f"{slug(d.nombre)}.json", mime="application/json",
+                       help="Súbelo luego en «Modelos a medida» o guárdalo en la carpeta modelos/ del proyecto.")
+
+    st.markdown("**¿Algo no coincide con la pieza real?** Descríbelo y Claude lo corregirá.")
+    comentario = st.text_area("Corrección", key=f"gen_fix_{s.llamadas}", label_visibility="collapsed",
+                              placeholder="Ej.: los agujeros están demasiado cerca del borde; la pestaña debería ser más gruesa…")
+    if st.button("🔧 Corregir el modelo", disabled=not comentario.strip() or not get_api_key(), key=f"gen_fix_btn_{s.llamadas}"):
+        with st.status("Aplicando la corrección…", expanded=True) as status:
+            try:
+                st.session_state["gen"] = generador.corregir(s, comentario, get_api_key(), progreso=status.write)
+                status.update(label="Corrección aplicada", state="complete", expanded=False)
+                st.rerun()
+            except Exception as exc:  # noqa: BLE001
+                status.update(label="No se pudo corregir", state="error")
+                st.error(str(exc))
+
+
 def as_parts(result) -> dict[str, trimesh.Trimesh]:
     if isinstance(result, dict):
         return {k: geometry.to_trimesh(v) for k, v in result.items()}
@@ -144,6 +207,7 @@ with tabs[0]:
         with st.spinner("Claude está estudiando la pieza… (puede tardar un minuto)"):
             try:
                 st.session_state["as_result"] = (asesor.analizar(imgs, objetivo, get_api_key()), imgs, objetivo)
+                st.session_state.pop("gen", None)
             except Exception as exc:  # noqa: BLE001
                 st.error(f"No se pudo completar el análisis: {exc}")
 
@@ -188,12 +252,32 @@ with tabs[0]:
         if faltan:
             st.caption(f"Faltan por rellenar: {', '.join(map(str, faltan))}")
         else:
-            st.success("✅ Todas las medidas listas. Descarga la ficha y pásasela a Claude con las fotos para crear el modelo.")
+            st.success("✅ Todas las medidas listas. Ya puedes generar el modelo 3D más abajo.")
         d1, d2 = st.columns(2)
         d1.download_button("⬇️ Ficha de medidas (.md)", asesor.ficha_markdown(a, valores, obj),
                            file_name="ficha_medidas.md", mime="text/markdown", width="stretch")
         d2.download_button("⬇️ Ficha de medidas (.json)", asesor.ficha_json(a, valores, obj),
                            file_name="ficha_medidas.json", mime="application/json", width="stretch")
+
+        # ---------------------------------------------- generación automática del modelo
+        st.divider()
+        st.subheader("🧠 Generar el modelo 3D")
+        st.write("Claude diseña la pieza con tus medidas, la app la construye y comprueba, y Claude revisa "
+                 "las vistas renderizadas contra tus fotos hasta darla por buena. Tarda varios minutos.")
+        criticas = [m.numero for m in a.medidas if m.critica and valores.get(m.numero) is None]
+        if criticas:
+            st.warning(f"Faltan medidas críticas ({', '.join(map(str, criticas))}). Se puede generar con las "
+                       "estimaciones de la foto, pero el encaje puede no ser exacto.")
+        if st.button("🧠 Generar modelo 3D", type="primary", disabled=not get_api_key(), key="gen_btn"):
+            with st.status("Generando el modelo…", expanded=True) as status:
+                try:
+                    st.session_state["gen"] = generador.generar(imgs, a, valores, obj, get_api_key(), progreso=status.write)
+                    status.update(label="Modelo generado", state="complete", expanded=False)
+                except Exception as exc:  # noqa: BLE001
+                    status.update(label="No se pudo generar el modelo", state="error")
+                    st.error(str(exc))
+        if "gen" in st.session_state:
+            mostrar_generado(st.session_state["gen"])
 
 # ------------------------------------------------------------------ 1. modelos a medida
 with tabs[1]:
@@ -201,6 +285,13 @@ with tabs[1]:
     st.write("Modelos diseñados a partir de tus fotos, planos y medidas. Cada uno vive en la carpeta "
              "`modelos/` y sus medidas se pueden ajustar aquí antes de exportar.")
     models = custom.discover()
+    subido = st.file_uploader("…o abre un diseño guardado (.json)", type=["json"], key="custom_json")
+    if subido:
+        try:
+            dj = diseno.Diseno.model_validate_json(subido.getvalue())
+            models = {f"📂 {dj.nombre}": diseno.como_modelo(dj), **models}
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"El archivo no es un diseño válido: {exc}")
     if not models:
         st.info("Todavía no hay modelos. Mira la pestaña «Cómo pedir una réplica».")
     else:
@@ -318,7 +409,8 @@ El **📸 Asistente de medidas** te dice qué medir en tu caso concreto. Como re
 5. **Uso de la pieza**: ¿encaja con algo? ¿soporta peso? ¿exterior? ¿tornillos de qué métrica?
 
 ### 2 · Qué hace Claude
-- Interpreta fotos y planos y escribe el modelo como código en `modelos/<nombre>.py` con todas las
+- En el **📸 Asistente de medidas** puede generar el modelo automáticamente y verificarlo contra tus fotos.
+- Por chat, interpreta fotos y planos y escribe el modelo como código en `modelos/<nombre>.py` con todas las
   medidas como parámetros ajustables.
 - Añade holguras de encaje, elige orientación de impresión y señala zonas que necesiten soportes.
 - El modelo aparece en la pestaña **🧩 Modelos a medida**, donde puedes retocar medidas y descargar el 3MF.

@@ -13,3 +13,9 @@ Proyecto: herramienta para crear piezas imprimibles en una Bambu Lab P2S (256×2
   puntos de orientación incierta usa `CrossSection.hull_points` o asegura sentido antihorario.
 - Si devuelves varias piezas usa un dict {"nombre": Manifold} y sepáralas en X.
 - Verifica: `python -m pytest -q tests` (comprueba que todos los modelos son watertight).
+
+## Diseños JSON (asistente de generación)
+- `modelos/*.json` son diseños declarativos (`printlab.diseno.Diseno`) que la app carga como modelos.
+  Operaciones y convenciones: `printlab/diseno.py` (SPEC y REFERENCIA_OPS). Instrucciones a Claude: `printlab/generador.py`.
+- Si cambias el esquema de `Diseno`, actualiza `tests/fixtures/*.json` y `modelos/*.json`.
+- La API de Anthropic se prueba sin red con `tests/fake_api.py` (servidor SSE local).
