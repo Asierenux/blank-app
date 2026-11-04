@@ -1,13 +1,14 @@
 """Taller 3D para Bambu Lab P2S: de fotos, planos o medidas a STL/3MF listos para imprimir."""
 from __future__ import annotations
 
+import os
 import re
 
 import numpy as np
 import streamlit as st
 import trimesh
 
-from printlab import custom, geometry, image2d, parametric, preview, printer
+from printlab import asesor, custom, geometry, image2d, parametric, preview, printer
 from printlab.export import to_3mf, to_stl
 
 st.set_page_config(page_title="Taller 3D · Bambu Lab P2S", page_icon="🧊", layout="wide")
@@ -107,11 +108,95 @@ with st.sidebar:
         st.caption("Valores típicos con boquilla 0.4 mm. Imprime una pieza de prueba si el encaje es crítico.")
 
 
-tabs = st.tabs(["🧩 Modelos a medida", "📐 Plano / silueta → 3D", "🖼️ Foto → relieve",
+def get_api_key() -> str | None:
+    try:
+        key = st.secrets.get("ANTHROPIC_API_KEY")
+    except Exception:  # noqa: BLE001 - no hay secrets.toml
+        key = None
+    return key or os.environ.get("ANTHROPIC_API_KEY") or st.session_state.get("api_key_input") or None
+
+
+tabs = st.tabs(["📸 Asistente de medidas", "🧩 Modelos a medida", "📐 Plano / silueta → 3D", "🖼️ Foto → relieve",
                 "🔧 Piezas paramétricas", "📋 Cómo pedir una réplica"])
 
-# ------------------------------------------------------------------ 1. modelos a medida
+# ------------------------------------------------------------------ 0. asistente de medidas
 with tabs[0]:
+    st.header("Asistente de medidas")
+    st.write("Sube fotos de la pieza que quieres copiar **o del problema que quieres resolver**. "
+             "Claude te dirá qué medidas tomar, dónde y cómo, marcadas sobre tus propias fotos.")
+    if not get_api_key():
+        st.info("Para usar el asistente hace falta una clave de API de Anthropic "
+                "([consíguela aquí](https://platform.claude.com/settings/keys)). "
+                "Se usa solo en esta sesión y no se guarda.")
+        st.text_input("Clave de API de Anthropic", type="password", key="api_key_input")
+
+    fotos = st.file_uploader("Fotos (hasta 4, desde distintos ángulos)", type=["png", "jpg", "jpeg", "webp"],
+                             accept_multiple_files=True, key="as_fotos")
+    objetivo = st.text_area("¿Qué quieres conseguir?", key="as_objetivo",
+                            placeholder="Ej.: Se ha roto la pestaña de este clip de la persiana y quiero uno nuevo igual. "
+                                        "/ Necesito un soporte para colgar esta herramienta en la pared.")
+    st.caption("Consejo: pon una regla, una tarjeta bancaria o una moneda junto a la pieza para que "
+               "pueda estimar los tamaños.")
+    if fotos and len(fotos) > 4:
+        st.warning("Se usarán solo las 4 primeras fotos.")
+    if st.button("🔍 Analizar fotos", type="primary", disabled=not fotos or not get_api_key()):
+        imgs = [asesor.prepare_image(f) for f in fotos[:4]]
+        with st.spinner("Claude está estudiando la pieza… (puede tardar un minuto)"):
+            try:
+                st.session_state["as_result"] = (asesor.analizar(imgs, objetivo, get_api_key()), imgs, objetivo)
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"No se pudo completar el análisis: {exc}")
+
+    if "as_result" in st.session_state:
+        a, imgs, obj = st.session_state["as_result"]
+        st.subheader(a.pieza)
+        st.write(a.descripcion)
+        estr = {"silueta_extruida": "📐 Plano / silueta → 3D", "pieza_parametrica": "🔧 Piezas paramétricas",
+                "modelo_a_medida": "🧩 Modelo a medida (Claude lo diseña con tus medidas)",
+                "escaneo_3d": "Escaneo 3D (fotogrametría)"}[a.estrategia]
+        st.info(f"**Cómo se modelará:** {estr}. {a.explicacion_estrategia}")
+        if a.referencia_escala:
+            st.caption(f"Referencia de escala detectada: {a.referencia_escala}")
+        for w in a.advertencias:
+            st.warning(w)
+
+        cols = st.columns(min(len(imgs), 2))
+        for i, img in enumerate(imgs):
+            cols[i % len(cols)].image(asesor.anotar(img, a.medidas, i), caption=f"Foto {i}", width="stretch")
+        st.caption("🔴 Medida crítica (de ella depende el encaje)   🔵 Medida normal")
+
+        st.subheader("Medidas a tomar")
+        valores: dict[int, float | None] = {}
+        for m in a.medidas:
+            icon = "🔴" if m.critica else "🔵"
+            with st.container(border=True):
+                c1, c2 = st.columns([3, 1])
+                c1.markdown(f"**{icon} {m.numero}. {m.nombre}**" + ("" if m.visible else " · _no visible en las fotos_"))
+                c1.markdown(f"📍 **Dónde:** {m.donde}  \n📏 **Cómo:** {m.como_medir}  \n🧰 {m.herramienta}")
+                unidad = "º" if m.tipo == "angulo" else "mm"
+                if m.valor_estimado:
+                    c2.caption(f"Estimado por foto: ≈{m.valor_estimado:g} {unidad}")
+                valores[m.numero] = c2.number_input(f"Valor medido ({unidad})", min_value=0.0, value=None,
+                                                    step=0.1, format="%.2f", key=f"as_val_{m.numero}")
+        if a.fotos_adicionales:
+            st.markdown("**Fotos adicionales recomendadas:**\n" + "\n".join(f"- {f}" for f in a.fotos_adicionales))
+        st.markdown(f"**Material recomendado:** {a.material_recomendado}")
+        if a.consejos_impresion:
+            st.markdown("**Consejos de impresión:**\n" + "\n".join(f"- {c}" for c in a.consejos_impresion))
+
+        faltan = [m.numero for m in a.medidas if valores.get(m.numero) is None]
+        if faltan:
+            st.caption(f"Faltan por rellenar: {', '.join(map(str, faltan))}")
+        else:
+            st.success("✅ Todas las medidas listas. Descarga la ficha y pásasela a Claude con las fotos para crear el modelo.")
+        d1, d2 = st.columns(2)
+        d1.download_button("⬇️ Ficha de medidas (.md)", asesor.ficha_markdown(a, valores, obj),
+                           file_name="ficha_medidas.md", mime="text/markdown", width="stretch")
+        d2.download_button("⬇️ Ficha de medidas (.json)", asesor.ficha_json(a, valores, obj),
+                           file_name="ficha_medidas.json", mime="application/json", width="stretch")
+
+# ------------------------------------------------------------------ 1. modelos a medida
+with tabs[1]:
     st.header("Modelos a medida")
     st.write("Modelos diseñados a partir de tus fotos, planos y medidas. Cada uno vive en la carpeta "
              "`modelos/` y sus medidas se pueden ajustar aquí antes de exportar.")
@@ -134,7 +219,7 @@ with tabs[0]:
                 st.error(f"Error al generar el modelo: {exc}")
 
 # ------------------------------------------------------------------ 2. plano / silueta
-with tabs[1]:
+with tabs[2]:
     st.header("Plano o silueta → pieza extruida")
     st.write("Sube un dibujo, plano escaneado o foto **cenital** de una pieza plana (junta, plantilla, "
              "logotipo, tapa...). La pieza debe verse **oscura sobre fondo claro**. Indica una medida real "
@@ -170,7 +255,7 @@ with tabs[1]:
                 st.error(f"No se pudo extruir: {exc}")
 
 # ------------------------------------------------------------------ 3. relieve / litofanía
-with tabs[2]:
+with tabs[3]:
     st.header("Foto → relieve o litofanía")
     st.write("Convierte una foto en una placa con relieve. **Litofanía**: imprímela en PLA blanco y "
              "en vertical; a contraluz se ve la foto. **Relieve**: lo claro sale hacia arriba.")
@@ -201,7 +286,7 @@ with tabs[2]:
                 st.info("Consejo litofanía: 100 % de relleno, capa 0.12 mm, imprimir en vertical con borde (brim).")
 
 # ------------------------------------------------------------------ 4. paramétricas
-with tabs[3]:
+with tabs[4]:
     st.header("Piezas paramétricas")
     name = st.selectbox("Tipo de pieza", list(parametric.LIBRARY), key="par_choice")
     fn, desc, spec = parametric.LIBRARY[name]
@@ -215,13 +300,15 @@ with tabs[3]:
         st.error(f"Error al generar la pieza: {exc}")
 
 # ------------------------------------------------------------------ 5. guía
-with tabs[4]:
+with tabs[5]:
     st.header("Cómo conseguir una réplica idéntica")
     st.markdown("""
 Una foto sola **no contiene medidas**: para que la pieza salga idéntica hacen falta cotas reales.
 Cuanta más información, más exacta la réplica.
 
 ### 1 · Qué enviar a Claude
+El **📸 Asistente de medidas** te dice qué medir en tu caso concreto. Como regla general:
+
 1. **Fotos** de la pieza desde varios ángulos: frontal, lateral, superior, inferior y una en perspectiva.
    Mejor con luz uniforme y fondo liso.
 2. **Una regla o calibre en la foto**, pegado a la pieza, o una referencia de tamaño conocido.
