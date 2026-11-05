@@ -43,6 +43,29 @@ Además tiene un panel de operaciones web (FastAPI) y alertas por Telegram.
 > En Mac, la primera vez puede salir «no se puede abrir porque es de un desarrollador no identificado»:
 > clic derecho sobre el archivo → **Abrir** → **Abrir**.
 
+## 📱 App para el móvil
+
+El monitor tiene una app para el móvil (una **PWA**: se instala desde el navegador, con su icono y a
+pantalla completa, sin tiendas de aplicaciones). Tiene 5 secciones: Inicio, Agua, Movilidad (bus,
+tranvía y tráfico en el mapa), Clima y Más (luz, alertas, estado). Funciona sin conexión con los
+últimos datos y se actualiza deslizando hacia abajo.
+
+**En casa (misma Wi-Fi):**
+1. Doble clic en **`iniciar-movil.bat`** (Mac: `iniciar-movil.command`). Si Windows pregunta por el
+   cortafuegos, permite el acceso en **redes privadas**.
+2. En el panel del ordenador, pestaña **Sistema**, aparece un **código QR**: escanéalo con el móvil.
+3. Instálala: iPhone → **Compartir → Añadir a pantalla de inicio**; Android → **⋮ → Añadir a pantalla de inicio**.
+
+**Desde fuera de casa (gratis y seguro): Tailscale.** Crea una red privada entre tus dispositivos,
+sin abrir puertos del router.
+1. Instala [Tailscale](https://tailscale.com/download) en el ordenador y en el móvil, con la misma cuenta.
+2. Arranca con `iniciar-movil.bat` y en el móvil abre `http://NOMBRE-DEL-PC:8000/app`
+   (el nombre sale en la app de Tailscale).
+3. Opcional, para que Android la instale como app completa (necesita https): en el ordenador ejecuta
+   `tailscale serve --bg 8000` y usa la dirección `https://…ts.net/app` que te indique.
+
+> Por seguridad, las claves y la configuración solo se pueden cambiar desde el propio ordenador.
+
 ## Uso del panel: filtros
 
 - **Periodo** (barra bajo las pestañas en Agua, Aire, Meteo y Explorar): 6 h, 24 h, 48 h, 7, 30 o 90 días,

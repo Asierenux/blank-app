@@ -9,6 +9,9 @@
 .camara figcaption { padding:6px 8px; font-size:.78rem; display:flex; justify-content:space-between; gap:6px; }
 .lista-trafico { max-height:420px; }
 .mapa-alto { height:520px; }
+.movil-cuerpo { display:flex; gap:16px; align-items:center; }
+.qr:not(:empty) { background:#fff; padding:8px; border-radius:10px; flex:none; line-height:0; }
+@media (max-width: 640px) { .movil-cuerpo { flex-direction:column; align-items:flex-start; } }
 .aviso-version { background:var(--aviso); color:#111; font-weight:600; text-align:center; padding:8px 16px; }
 .aviso-version[hidden] { display:none; }
 /* Vehículos en el mapa: círculo (bus) o rombo (tranvía) con el número de línea */

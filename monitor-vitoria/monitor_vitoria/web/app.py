@@ -58,6 +58,54 @@ def inicio(request: Request):
     return plantillas.TemplateResponse(request, "index.html", {"refresco_s": 60})
 
 
+# --------------------------------------------------------------------------
+# App móvil (PWA): se instala desde el navegador del móvil
+# --------------------------------------------------------------------------
+CARPETA_APP = Path(__file__).parent / "static" / "app"
+
+
+@app.get("/app", response_class=HTMLResponse)
+def app_movil(request: Request):
+    return plantillas.TemplateResponse(request, "app.html", {})
+
+
+@app.get("/sw.js")
+def service_worker():
+    """El service worker tiene que servirse desde la raíz para poder controlar /app."""
+    from fastapi.responses import FileResponse
+    return FileResponse(CARPETA_APP / "sw.js", media_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
+
+
+@app.get("/manifest.webmanifest")
+def manifiesto():
+    from fastapi.responses import FileResponse
+    return FileResponse(CARPETA_APP / "manifest.webmanifest", media_type="application/manifest+json")
+
+
+@app.get("/api/red")
+def api_red(request: Request):
+    """Direcciones para abrir el monitor desde el móvil (misma Wi-Fi)."""
+    import socket
+    ips = set()
+    try:
+        # Truco estándar: "conectar" un socket UDP (no envía nada) revela la IP de la red local
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("192.168.1.1", 80))
+            ips.add(s.getsockname()[0])
+    except OSError:
+        pass
+    try:
+        ips |= {i[4][0] for i in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET)}
+    except OSError:
+        pass
+    ips = sorted(ip for ip in ips if not ip.startswith("127."))
+    puerto = request.url.port or 80
+    escuchando_en_red = config.web_host in ("0.0.0.0", "::")
+    return {"ips": ips, "puerto": puerto, "escuchando_en_red": escuchando_en_red,
+            "urls": [f"http://{ip}:{puerto}/app" for ip in ips]}
+
+
 @app.get("/api/panel")
 def api_panel(conn: sqlite3.Connection = Depends(obtener_conexion)):
     """Todo lo que necesita el panel de operaciones, ya interpretado

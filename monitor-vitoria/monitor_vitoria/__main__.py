@@ -34,6 +34,8 @@ def main(argv: list[str] | None = None) -> int:
     p_ini.add_argument("--demo", action="store_true", help="con datos simulados, sin recoger nada")
     p_ini.add_argument("--puerto", type=int, help="puerto del panel (por defecto 8000)")
     p_ini.add_argument("--sin-navegador", action="store_true", help="no abrir el navegador")
+    p_ini.add_argument("--movil", action="store_true",
+                       help="permite abrirlo desde el móvil en la misma Wi-Fi (escucha en 0.0.0.0)")
     sub.add_parser("init-db", help="crea la base de datos")
     p_rec = sub.add_parser("recoger", help="ejecuta recolectores una vez")
     p_rec.add_argument("fuente", nargs="?", default="todas",
@@ -142,6 +144,8 @@ def _iniciar(args) -> int:
     asegurar_env()                                   # crea .env la primera vez
     if args.demo:
         os.environ["MONITOR_DEMO"] = "1"
+    if args.movil:
+        os.environ["MONITOR_MOVIL"] = "1"            # visible en la red de casa (no en internet)
     config = cargar_config()
     logging.basicConfig(level=config.log_level, format="%(asctime)s %(message)s", datefmt="%H:%M:%S")
     # El planificador escribe "Job ... executed successfully" cada vez: ruido para el día a día
@@ -200,6 +204,16 @@ def _iniciar(args) -> int:
     print("  MONITOR VITORIA-GASTEIZ")
     print(f"  Modo:  {modo}")
     print(f"  Panel: {url}")
+    if config.web_host in ("0.0.0.0", "::"):
+        import socket as _s
+        try:
+            with _s.socket(_s.AF_INET, _s.SOCK_DGRAM) as s:
+                s.connect(("192.168.1.1", 80))
+                ip = s.getsockname()[0]
+            print(f"  Móvil: http://{ip}:{puerto}/app   (misma Wi-Fi; QR en Sistema del panel)")
+        except OSError:
+            print("  Móvil: no se pudo averiguar la IP de este ordenador en la red")
+        print("  Si Windows pregunta por el cortafuegos, permite el acceso en redes PRIVADAS.")
     print("  No cierres esta ventana. Para parar: pulsa Ctrl + C")
     print("=" * 62 + "\n")
     if not args.sin_navegador:

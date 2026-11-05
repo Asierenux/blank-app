@@ -9,6 +9,8 @@
   <!-- Leaflet: mapas (pestaña Tráfico) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <!-- QR para abrir la app en el móvil (Sistema) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 <div class="aviso-version" id="aviso-version" hidden>⟳ Has copiado una versión nueva del monitor, pero sigue funcionando la anterior.
@@ -305,6 +307,13 @@
 
   <!-- ============================= SISTEMA ============================ -->
   <section class="vista" id="vista-sistema" role="tabpanel" aria-labelledby="tab-sistema" hidden>
+    <article class="tarjeta movil-tarjeta" id="movil">
+      <h2><span>📱 App para el móvil</span></h2>
+      <div class="movil-cuerpo">
+        <div id="movil-qr" class="qr" aria-label="Código QR para abrir la app en el móvil"></div>
+        <div id="movil-texto" class="nota" style="margin:0"></div>
+      </div>
+    </article>
     <article class="tarjeta" id="configuracion">
       <h2><span>Configuración · claves y códigos</span><span class="gris" id="config-nota"></span></h2>
       <p class="nota" style="margin-top:0">Pega cada clave y pulsa <b>Guardar y probar</b>: se guarda en el archivo

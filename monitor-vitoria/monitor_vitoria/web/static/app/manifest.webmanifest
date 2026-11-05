@@ -1,0 +1,22 @@
+{
+  "name": "Vitoria · Monitor",
+  "short_name": "Vitoria",
+  "description": "Agua, movilidad, clima y energía de Vitoria-Gasteiz en tiempo real",
+  "lang": "es",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0d12",
+  "theme_color": "#0a0d12",
+  "icons": [
+    { "src": "/static/app/icono-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/static/app/icono-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/static/app/icono-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/static/app/icono.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Tranvía", "url": "/app#movilidad" },
+    { "name": "Agua", "url": "/app#agua" }
+  ]
+}

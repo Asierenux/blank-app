@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Vitoria · Monitor</title>
+  <meta name="description" content="Agua, movilidad, clima y energía de Vitoria-Gasteiz en tiempo real">
+  <meta name="theme-color" content="#0a0d12" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f3f5f8" media="(prefers-color-scheme: light)">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/app/icono.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/static/app/icono-180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Vitoria">
+  <link rel="stylesheet" href="/static/app/app.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
+</head>
+<body>
+  <!-- Iconos (se reutilizan con <use href="#i-...">) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-inicio" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-agua" viewBox="0 0 24 24"><path d="M12 3s6.5 7 6.5 11.5A6.5 6.5 0 0 1 5.5 14.5C5.5 10 12 3 12 3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9 15a3 3 0 0 0 3 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-movilidad" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="14" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5 11h14M8.5 14.5h.01M15.5 14.5h.01M8 17l-1.5 3M16 17l1.5 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-clima" viewBox="0 0 24 24"><path d="M7 18h10.5a3.5 3.5 0 0 0 .4-7A5.5 5.5 0 0 0 7.2 9.6 4.2 4.2 0 0 0 7 18z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mas" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="18" cy="12" r="1.6" fill="currentColor"/></symbol>
+    <symbol id="i-refrescar" viewBox="0 0 24 24"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-flecha" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-estrella" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" fill="currentColor"/></symbol>
+  </svg>
+
+  <header class="barra-app">
+    <div class="marca-app">
+      <img src="/static/app/icono.svg" alt="" width="30" height="30">
+      <div><h1 id="titulo-pantalla">Vitoria-Gasteiz</h1><p id="subtitulo">Cargando…</p></div>
+    </div>
+    <button class="boton-icono" id="btn-refrescar" aria-label="Actualizar datos"><svg><use href="#i-refrescar"/></svg></button>
+  </header>
+  <div class="aviso-offline" id="aviso-offline" hidden></div>
+  <div class="tirador" id="tirador" aria-hidden="true"><svg><use href="#i-refrescar"/></svg></div>
+
+  <main id="contenido">
+    <!-- ============================== INICIO ============================== -->
+    <section class="pantalla activa" id="p-inicio" aria-label="Inicio">
+      <div class="estado" id="estado"><div class="esqueleto alto"></div></div>
+      <h2 class="seccion">Ahora mismo</h2>
+      <div class="rejilla-2" id="inicio-ahora"></div>
+      <h2 class="seccion">Tu ciudad</h2>
+      <div class="pila" id="inicio-tarjetas"></div>
+    </section>
+
+    <!-- =============================== AGUA =============================== -->
+    <section class="pantalla" id="p-agua" aria-label="Agua">
+      <div class="chips-datos" id="agua-lluvia"></div>
+      <h2 class="seccion">Embalses</h2>
+      <div class="pila" id="agua-embalses"></div>
+      <h2 class="seccion">Ríos</h2>
+      <div class="pila" id="agua-rios"></div>
+      <h2 class="seccion">Lluvia y embalses · 7 días</h2>
+      <div class="tarjeta"><div class="grafica"><canvas id="g-agua"></canvas></div></div>
+    </section>
+
+    <!-- ============================ MOVILIDAD ============================ -->
+    <section class="pantalla pantalla-mapa" id="p-movilidad" aria-label="Movilidad">
+      <div class="segmentos" role="tablist" id="modos">
+        <button role="tab" data-modo="bus" aria-selected="true">Autobús</button>
+        <button role="tab" data-modo="tranvia" aria-selected="false">Tranvía</button>
+        <button role="tab" data-modo="trafico" aria-selected="false">Tráfico</button>
+      </div>
+      <div class="mapa-app" id="mapa-movil"></div>
+      <div class="hoja" id="hoja">
+        <button class="asa" id="asa" aria-label="Ampliar o reducir la lista"><span></span></button>
+        <div class="hoja-cab" id="hoja-cab"></div>
+        <div class="hoja-cuerpo" id="hoja-cuerpo"></div>
+      </div>
+    </section>
+
+    <!-- ============================== CLIMA ============================== -->
+    <section class="pantalla" id="p-clima" aria-label="Clima">
+      <div class="hero-clima" id="clima-hero"></div>
+      <div class="rejilla-2" id="clima-datos"></div>
+      <h2 class="seccion">Temperatura · 48 h</h2>
+      <div class="tarjeta"><div class="grafica"><canvas id="g-clima"></canvas></div></div>
+      <h2 class="seccion">Kapildui · 1.173 m</h2>
+      <div class="rejilla-2" id="clima-kapildui"></div>
+      <h2 class="seccion">Calidad del aire</h2>
+      <div class="pila" id="clima-aire"></div>
+    </section>
+
+    <!-- =============================== MÁS =============================== -->
+    <section class="pantalla" id="p-mas" aria-label="Más">
+      <h2 class="seccion">Precio de la luz</h2>
+      <div class="tarjeta" id="mas-luz"></div>
+      <h2 class="seccion">Alertas recientes</h2>
+      <div class="pila" id="mas-alertas"></div>
+      <h2 class="seccion">Estado de las fuentes</h2>
+      <div class="tarjeta lista-simple" id="mas-fuentes"></div>
+      <a class="tarjeta enlace" href="/">Abrir el panel completo<svg><use href="#i-flecha"/></svg></a>
+      <p class="pie">Datos públicos: AEMET, Euskalmet, Gobierno Vasco, SAIH Ebro, Red Eléctrica, WAQI, Tuvisa y Euskotren.</p>
+    </section>
+  </main>
+
+  <nav class="nav-inferior" aria-label="Secciones">
+    <button data-p="inicio" aria-current="page"><svg><use href="#i-inicio"/></svg><span>Inicio</span></button>
+    <button data-p="agua"><svg><use href="#i-agua"/></svg><span>Agua</span></button>
+    <button data-p="movilidad"><svg><use href="#i-movilidad"/></svg><span>Movilidad</span></button>
+    <button data-p="clima"><svg><use href="#i-clima"/></svg><span>Clima</span></button>
+    <button data-p="mas"><svg><use href="#i-mas"/></svg><span>Más</span></button>
+  </nav>
+
+  <script src="/static/app/app.js" defer></script>
+</body>
+</html>

@@ -124,6 +124,16 @@ Dos procesos independientes que comparten el archivo SQLite (modo WAL):
 4. JSON de ejemplo en `tests/datos/`, ruta en `cliente_falso` (`tests/conftest.py`) y test.
 5. Reglas de alerta opcionales en `alertas.construir_reglas`.
 
+## App móvil (PWA)
+
+- `/app` (`templates/app.html` + `static/app/app.css|app.js`): 5 pantallas (inicio, agua, movilidad, clima, más),
+  navegación inferior, mapa a pantalla completa con hoja inferior, deslizar para actualizar. Misma API que el panel.
+- `/sw.js` (service worker, `Service-Worker-Allowed: /`): carcasa en caché; `/api/*` red primero y copia
+  guardada sin conexión (cabecera `X-Desde-Cache`). `/manifest.webmanifest` + iconos PNG generados del SVG.
+- Acceso desde el móvil: `iniciar --movil` (`MONITOR_MOVIL=1` → escucha en 0.0.0.0; no usar WEB_HOST: .env lo pisa).
+  `/api/red` da las IP de la LAN para el QR (pestaña Sistema). Configuración solo desde localhost.
+- Cuidado CSS: nada de `transform` en ancestros del mapa (position: fixed) ni reglas `svg {}` globales (Leaflet usa svg).
+
 ## Arranque fácil
 
 - `iniciar.bat` / `demo.bat` (Windows, CRLF, `-text` en `.gitattributes`), `iniciar.command` / `demo.command` (Mac),

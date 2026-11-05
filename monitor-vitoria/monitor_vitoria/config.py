@@ -148,7 +148,9 @@ def cargar_config() -> Config:
         alerta_pvpc_caro=_decimal("ALERTA_PVPC_CARO", 0.25),
         alerta_embalse_pct=_decimal("ALERTA_EMBALSE_PCT", 95),
         alerta_crecida_factor=_decimal("ALERTA_CRECIDA_FACTOR", 3),
-        web_host=_texto("WEB_HOST", "127.0.0.1"),
+        # Modo móvil (iniciar-movil.bat): escucha en toda la red de casa. Va en una variable
+        # propia porque .env se relee con override y pisaría WEB_HOST.
+        web_host="0.0.0.0" if os.getenv("MONITOR_MOVIL") == "1" else _texto("WEB_HOST", "127.0.0.1"),
         web_port=_entero("WEB_PORT", 8000),
         log_level=_texto("LOG_LEVEL", "INFO").upper(),
     )

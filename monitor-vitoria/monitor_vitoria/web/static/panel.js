@@ -344,7 +344,11 @@ const CARGADORES = {
     if (!expSel.length) return null;
     return getJSON(`/api/datos?${paramsPeriodo({series: expSel.join(","), funcion: expFuncion})}`);
   },
-  async sistema() { cache.config = await getJSON("/api/config"); return null; },
+  async sistema() {
+    cache.config = await getJSON("/api/config");
+    cache.red = await getJSON("/api/red").catch(() => null);
+    return null;
+  },
 };
 async function cargarVista(v) {
   if (!CARGADORES[v]) return;
@@ -511,6 +515,32 @@ function pintarExplorar() {
 // =====================================================================
 // SISTEMA: configuración y alertas
 // =====================================================================
+// Tarjeta "App para el móvil": QR con la dirección del ordenador en la Wi-Fi de casa
+let qrPintado = null;
+function pintarMovil() {
+  const red = cache.red; if (!red) return;
+  const url = red.urls[0];
+  if (!red.escuchando_en_red || !url) {
+    $("movil-qr").innerHTML = "";
+    qrPintado = null;
+    $("movil-texto").innerHTML = `Ahora mismo el monitor solo se ve desde este ordenador.<br>
+      Para usarlo en el móvil: cierra esta ventana negra y abre <b>iniciar-movil.bat</b> (en Mac, <b>iniciar-movil.command</b>).
+      Aparecerá aquí un código QR para abrir la app con la cámara del móvil.<br>
+      También puedes probarla en este ordenador: <a href="/app" style="color:var(--info)">abrir la app</a>.`;
+    return;
+  }
+  if (qrPintado !== url && window.QRCode) {
+    $("movil-qr").innerHTML = "";
+    new QRCode($("movil-qr"), { text: url, width: 148, height: 148, colorDark: "#0a0d12", colorLight: "#ffffff" });
+    qrPintado = url;
+  }
+  $("movil-texto").innerHTML = `<b>1.</b> Con el móvil conectado a la <b>misma Wi-Fi</b>, apunta la cámara a este código (o escribe
+    <code>${esc(url)}</code>).<br><b>2.</b> Para instalarla: en iPhone, botón <b>Compartir → Añadir a pantalla de inicio</b>;
+    en Android, menú <b>⋮ → Añadir a pantalla de inicio</b> (o «Instalar aplicación»).<br>
+    ${red.urls.length > 1 ? `Otras direcciones de este ordenador: ${red.urls.slice(1).map(u => `<code>${esc(u)}</code>`).join(" ")}<br>` : ""}
+    Fuera de casa no funcionará: para eso mira «Usarla desde fuera de casa» en el README.`;
+}
+
 const resultadosConfig = {};             // último resultado de cada campo (sobrevive a los repintados)
 function pintarConfig() {
   const c = cache.config; if (!c || c.error) return;
@@ -992,6 +1022,7 @@ const PINTORES = {
   },
   explorar() { pintarExplorar(); },
   sistema(d) {
+    pintarMovil();
     pintarConfig();
     pintarFuentes("sistema-fuentes", d.fuentes, true);
     pintarAlertas("sistema-alertas", "sistema-alertas-num", alertasFiltradas(d.alertas), 200);
