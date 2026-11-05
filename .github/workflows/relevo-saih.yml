@@ -42,6 +42,16 @@ jobs:
         run: |
           git fetch --depth=1 origin datos-saih && git show origin/datos-saih:saih.json > anterior.json || echo '{}' > anterior.json
 
+      - name: Diagnóstico de conexión con el SAIH
+        continue-on-error: true
+        run: |
+          echo "IP y país de este servidor:"; curl -s -m 10 https://ipinfo.io/json | grep -E '"(ip|city|country|org)"' || true
+          echo "DNS:"; getent hosts www.saihebro.com saihebro.com || true
+          for u in https://www.saihebro.com/ http://www.saihebro.com/ https://saihebro.com/; do
+            echo "== $u"; curl -s -o /dev/null -m 20 -w "código %{http_code} · tiempo %{time_total}s · ip %{remote_ip}\n" "$u" || echo "sin respuesta (curl $?)"
+          done
+          echo "== certificado"; timeout 20 openssl s_client -connect www.saihebro.com:443 -servername www.saihebro.com -showcerts </dev/null 2>&1 | grep -E "s:|i:|Verify return code" || true
+
       - name: Leer el SAIH
         working-directory: monitor-vitoria
         run: python -m monitor_vitoria.relevo_saih ../anterior.json ../saih.json
