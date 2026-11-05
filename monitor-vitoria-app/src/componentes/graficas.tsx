@@ -31,9 +31,11 @@ export function GraficaLinea({ serie, color, alto = 120, decimales = 1, marcas =
   const margenIzq = mini ? 0 : 4, margenDer = mini ? 0 : 44, margenSup = 8, margenInf = mini ? 2 : 20;
   const valores = [...serie.map(p => p[1]), ...marcas.map(m => m.valor)];
   let min = Math.min(...valores), max = Math.max(...valores);
+  const sinNegativos = min >= 0;
   if (max - min < 1e-9) { min -= 1; max += 1; }
   const holgura = (max - min) * 0.08;
   min -= holgura; max += holgura;
+  if (sinNegativos) min = Math.max(0, min);   // lluvia, caudal…: nunca por debajo de cero
   const t0 = serie[0][0], t1 = serie.at(-1)![0];
   const altoUtil = (mini ? 36 : alto) - margenSup - margenInf;
   const x = (t: number) => margenIzq + ((t - t0) / (t1 - t0 || 1)) * Math.max(1, ancho - margenIzq - margenDer);

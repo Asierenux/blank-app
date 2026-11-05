@@ -5,7 +5,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { Barra, GraficaPvpc } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
-import { hora, num } from "../lib/formato";
+import { fechaMadrid, hora, num } from "../lib/formato";
 import type { Indicador } from "../lib/panel";
 import { alfa, colorNivel, useColores } from "../lib/tema";
 
@@ -67,7 +67,7 @@ export default function Inicio() {
               </View>
               <GraficaPvpc puntos={pvpc.puntos} ahora={panel.generado} pasoMin={pvpc.pasoMin} alto={110} />
               {pvpc.mejorFranja && (
-                <Aviso nivel="ok" texto={`Mejores ${pvpc.mejorFranja.horas} h: de ${hora(pvpc.mejorFranja.inicio)} a ${hora(pvpc.mejorFranja.fin)} · ${num(pvpc.mejorFranja.media, 3)} €/kWh de media`} />
+                <Aviso nivel="ok" texto={`Mejores ${pvpc.mejorFranja.horas} h: ${fechaMadrid(pvpc.mejorFranja.inicio) === fechaMadrid(panel.generado) ? "hoy" : "mañana"} de ${hora(pvpc.mejorFranja.inicio)} a ${hora(pvpc.mejorFranja.fin)} · ${num(pvpc.mejorFranja.media, 3)} €/kWh de media`} />
               )}
             </>
           ) : <Etiqueta>Aún no hay precios. Desliza hacia abajo para actualizar.</Etiqueta>}

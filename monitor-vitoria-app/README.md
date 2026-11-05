@@ -3,6 +3,11 @@
 App nativa que funciona **sola en el móvil**: descarga los datos directamente de cada web pública,
 los guarda en el iPhone y avisa con notificaciones. No necesita el ordenador encendido ni un servidor.
 
+![Capturas en modo claro](capturas/claro.png)
+![Capturas en modo oscuro](capturas/oscuro.png)
+
+*Capturas con datos de ejemplo (`EXPO_PUBLIC_DEMO=1`). En el iPhone el mapa es el de Apple.*
+
 | Pestaña | Qué enseña |
 |---|---|
 | **Inicio** | Estado general, precio de la luz ahora y mejores horas, tiempo, aire, embalses y tráfico |
@@ -65,6 +70,7 @@ npm install --legacy-peer-deps
 npm test               # 52 tests de la lógica (Node, sin móvil)
 npx tsc --noEmit       # tipos
 npx expo start         # vista previa con Expo Go en la misma wifi
+EXPO_PUBLIC_DEMO=1 npx expo start --web   # demostración en el navegador con datos simulados
 ```
 
 - `src/lib/`: lógica sin React (fuentes, histórico, niveles, alertas, motor). Es la traducción de `monitor-vitoria/`.

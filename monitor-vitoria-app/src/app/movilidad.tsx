@@ -235,7 +235,7 @@ export default function Movilidad() {
                 <View key={i.id} style={{ gap: 4, paddingVertical: 8, borderBottomWidth: k === trafico.activas.length - 1 ? 0 : 0.5, borderBottomColor: c.linea }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                     <Text style={{ color: c.texto, fontSize: 16, fontWeight: "600", flex: 1 }}>{i.nombre}</Text>
-                    <Insignia nivel={i.nivelEstado} texto={NOMBRE_TIPO[i.tipo]} />
+                    <Insignia nivel={i.nivelEstado} texto={i.nombre.startsWith(NOMBRE_TIPO[i.tipo] ?? "-") ? undefined : NOMBRE_TIPO[i.tipo]} />
                   </View>
                   <Etiqueta>{[i.carretera, i.pkInicio != null ? `km ${i.pkInicio}` : null, i.sentido, i.municipio].filter(Boolean).join(" · ")}</Etiqueta>
                   <Text style={{ color: c.tenue, fontSize: 12 }}>

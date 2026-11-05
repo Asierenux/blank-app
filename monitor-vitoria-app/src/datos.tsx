@@ -8,21 +8,27 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Notifications from "expo-notifications";
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { guardarClave, guardarPreferencias, leerClaves, leerPreferencias, type Preferencias } from "./lib/ajustes";
 import { UMBRALES_DEFECTO } from "./lib/config";
 import { Transporte, type CacheHorarios } from "./lib/fuentes/transporte";
+import { rellenarDemo, transporteDemo } from "./lib/demo";
 import { Historial } from "./lib/historial";
 import { Motor, faltaConfiguracion, type Fuente } from "./lib/motor";
 import { construirPanel, type Panel } from "./lib/panel";
 import type { Claves } from "./lib/tipos";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false,
-  }),
-});
+/** Modo demostración (datos simulados): se compila con EXPO_PUBLIC_DEMO=1. */
+export const DEMO = process.env.EXPO_PUBLIC_DEMO === "1";
+
+if (Platform.OS !== "web") {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false,
+    }),
+  });
+}
 
 const descargar = (url: string, o?: RequestInit) => fetch(url, o);
 
@@ -41,7 +47,7 @@ interface ValorDatos {
   listo: boolean;
   actualizando: boolean;
   actualizar: (forzar?: boolean, solo?: Fuente[]) => Promise<void>;
-  transporte: Transporte;
+  transporte: Pick<Transporte, "estado" | "recorridos">;
   historial: Historial;
   claves: Claves;
   ponerClave: (campo: keyof Claves, valor: string) => Promise<void>;
@@ -60,7 +66,7 @@ export function useDatos(): ValorDatos {
 
 export function ProveedorDatos({ children }: { children: ReactNode }) {
   const historial = useMemo(() => new Historial(AsyncStorage), []);
-  const transporte = useMemo(() => new Transporte(descargar, cacheHorarios), []);
+  const transporte = useMemo(() => (DEMO ? transporteDemo : new Transporte(descargar, cacheHorarios)), []);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [listo, setListo] = useState(false);
   const [actualizando, setActualizando] = useState(false);
@@ -87,19 +93,25 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   const actualizar = useCallback(async (forzar = false, solo?: Fuente[]) => {
     setActualizando(true);
     try {
+      if (DEMO) {
+        rellenarDemo(historial);
+        return;
+      }
       await motor.actualizar(forzar, solo);
     } finally {
       setActualizando(false);
       repintar();
     }
-  }, [motor, repintar]);
+  }, [motor, repintar, historial]);
 
   // Arranque: histórico guardado → pintar → actualizar
   useEffect(() => {
     let vivo = true;
     (async () => {
-      const [c, p] = await Promise.all([leerClaves(), leerPreferencias(), historial.cargar()]);
+      const [guardadas, p] = await Promise.all([leerClaves(), leerPreferencias(), historial.cargar()]);
       if (!vivo) return;
+      const c = DEMO ? { aemet: "demo", waqi: "demo", euskalmetEmail: "demo", euskalmetPem: "demo" } : guardadas;
+      if (DEMO) rellenarDemo(historial);
       ref.current = { claves: c, preferencias: p };
       setClaves(c);
       setPreferencias(p);
@@ -146,7 +158,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
 
   // Pedir permiso de notificaciones la primera vez (si las alertas están activadas)
   useEffect(() => {
-    if (listo && preferencias.alertas) void Notifications.requestPermissionsAsync().catch(() => null);
+    if (listo && preferencias.alertas && Platform.OS !== "web") void Notifications.requestPermissionsAsync().catch(() => null);
   }, [listo, preferencias.alertas]);
 
   const valor: ValorDatos = {
