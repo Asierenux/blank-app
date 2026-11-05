@@ -117,8 +117,19 @@ export function convertirCamara(x: any): Camara | null {
   const nombre = ["cameraName", "name", "description", "address", "road"].map(k => x[k]).find(Boolean) ?? "Cámara";
   return {
     id: String(x.cameraId ?? x.id ?? imagen), nombre: String(nombre), carretera: texto(x.road),
-    lat, lon, imagen, candidatas: [imagen, ...enlaces.map(([, v]) => v).filter(v => v !== imagen)],
+    lat, lon, imagen, candidatas: variantes([imagen, ...enlaces.map(([, v]) => v).filter(v => v !== imagen)]),
   };
+}
+
+/** Para cada dirección, también la versión http:// y sin "www." (algunas cámaras solo responden así). */
+export function variantes(urls: string[]): string[] {
+  const salida: string[] = [];
+  for (const u of urls) {
+    for (const v of [u, u.replace(/^https:/, "http:"), u.replace("://www.", "://"), u.replace(/^https:/, "http:").replace("://www.", "://")]) {
+      if (!salida.includes(v)) salida.push(v);
+    }
+  }
+  return salida;
 }
 
 export function contarActivas(incidencias: Incidencia[], ahora: number): Lectura[] {
@@ -143,18 +154,22 @@ async function incidenciasDelDia(descargar: Descargar, t: number): Promise<any[]
   return salida;
 }
 
-async function bajarCamaras(descargar: Descargar): Promise<Camara[]> {
+export interface CamarasGuardadas { t: number; lista: Camara[]; recibidas?: number; muestra?: string; error?: string }
+
+async function bajarCamaras(descargar: Descargar, t: number): Promise<CamarasGuardadas> {
   const crudas: any[] = [];
   for (let pagina = 1, total = 1; pagina <= Math.min(total, 20); pagina++) {
     const d = await bajarJson(descargar, `${URL}/cameras?_page=${pagina}`);
     total = Number(d?.totalPages) || 1;
     crudas.push(...(d?.cameras ?? d?.items ?? (Array.isArray(d) ? d : [])));
   }
-  return crudas.map(convertirCamara).filter((c): c is Camara => !!c && cerca(c.lat, c.lon));
+  const lista = crudas.map(convertirCamara).filter((c): c is Camara => !!c && cerca(c.lat, c.lon));
+  // Una muestra de lo que llega, para poder ver el formato si algo no cuadra
+  return { t, lista, recibidas: crudas.length, muestra: JSON.stringify(crudas[0] ?? null).slice(0, 400) };
 }
 
 export async function recogerTrafico(
-  descargar: Descargar, camarasGuardadas: { t: number; lista: Camara[] } | undefined, ahora = Date.now(),
+  descargar: Descargar, camarasGuardadas: CamarasGuardadas | undefined, ahora = Date.now(),
 ): Promise<Resultado> {
   const crudas = [...await incidenciasDelDia(descargar, ahora - 86400e3), ...await incidenciasDelDia(descargar, ahora)];
   const porId = new Map<string, Incidencia>();
@@ -164,11 +179,14 @@ export async function recogerTrafico(
   }
   const incidencias = [...porId.values()];
   let camaras = camarasGuardadas;
-  if (!camaras || ahora - camaras.t > 86400e3) {
+  // Se renuevan cada día; si la última vez no hubo ninguna, se reintenta cada hora
+  const espera = camaras?.lista.length ? 86400e3 : 3600e3;
+  if (!camaras || ahora - camaras.t > espera) {
     try {
-      camaras = { t: ahora, lista: await bajarCamaras(descargar) };
-    } catch {
-      // las cámaras son un extra: si fallan, seguimos con las de ayer
+      camaras = await bajarCamaras(descargar, ahora);
+    } catch (e) {
+      // las cámaras son un extra: si fallan, seguimos con las de antes, pero se apunta el motivo
+      camaras = { t: ahora, lista: camaras?.lista ?? [], error: (e as Error).message };
     }
   }
   return { lecturas: contarActivas(incidencias, ahora), extra: { incidencias, camaras } };

@@ -4,7 +4,7 @@
  */
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Image, Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -40,23 +40,26 @@ function Chapa({ v, c }: { v: Vehiculo; c: ReturnType<typeof useColores> }) {
 function ImagenCamara({ cam }: { cam: Camara }) {
   const c = useColores();
   const [i, setI] = useState(0);
-  const [marca] = useState(() => Date.now());
   const url = cam.candidatas[i];
+  const fallida = !url;
   return (
-    <View style={{ width: 260, gap: 6 }}>
-      {url ? (
+    <Pressable style={{ width: 260, gap: 6 }} onPress={() => Linking.openURL(cam.imagen)}>
+      {!fallida ? (
         <Image
-          source={{ uri: `${url}${url.includes("?") ? "&" : "?"}t=${marca}`, headers: { Referer: "https://www.trafikoa.eus/" } }}
+          // sin "?t=…" (estropeaba algunas direcciones); "reload" evita ver una foto antigua guardada
+          source={{ uri: url, cache: "reload", headers: { Referer: "https://www.trafikoa.eus/" } }}
           onError={() => setI(x => x + 1)}
           style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta }}
         />
       ) : (
-        <View style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta, alignItems: "center", justifyContent: "center" }}>
-          <Etiqueta>Imagen no disponible</Etiqueta>
+        <View style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta, padding: 12, gap: 4, justifyContent: "center" }}>
+          <Text style={{ color: c.texto, fontWeight: "600" }}>Imagen no disponible</Text>
+          <Text style={{ color: c.suave, fontSize: 11 }} numberOfLines={3}>{cam.imagen}</Text>
+          <Text style={{ color: c.acento, fontSize: 12 }}>Toca para abrirla en Safari ↗</Text>
         </View>
       )}
       <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{cam.nombre}</Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -244,10 +247,17 @@ export default function Movilidad() {
                 </View>
               ))}
             </Tarjeta>
-            {trafico.camaras.length > 0 && (
+            <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras</Text>
+            {trafico.camaras.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {trafico.camaras.slice(0, 15).map(cam => <ImagenCamara key={cam.id} cam={cam} />)}
               </ScrollView>
+            ) : (
+              <Aviso nivel="aviso" texto={
+                !trafico.infoCamaras ? "Aún no se ha descargado la lista de cámaras."
+                  : trafico.infoCamaras.error ? `No se pudo bajar la lista de cámaras: ${trafico.infoCamaras.error}`
+                  : `La web dio ${trafico.infoCamaras.recibidas ?? 0} cámaras, pero ninguna con foto y posición cerca de Vitoria. Formato recibido: ${trafico.infoCamaras.muestra ?? "—"}`
+              } />
             )}
           </>
         )}

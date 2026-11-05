@@ -140,7 +140,10 @@ test("Tráfico: cámara con imagen y coordenadas", () => {
   const c = convertirCamara({ cameraId: 2201, cameraName: "A-1 Arkaute", latitude: "42.85", longitude: "-2.62",
     urlCam: "https://www.trafikoa.eus/static/files/tr/camaras/2201.jpg", web: "https://www.trafikoa.eus" })!;
   assert.equal(c.imagen, "https://www.trafikoa.eus/static/files/tr/camaras/2201.jpg");
-  assert.equal(c.candidatas.length, 2);
+  assert.deepEqual(c.candidatas.slice(0, 4), [
+    "https://www.trafikoa.eus/static/files/tr/camaras/2201.jpg", "http://www.trafikoa.eus/static/files/tr/camaras/2201.jpg",
+    "https://trafikoa.eus/static/files/tr/camaras/2201.jpg", "http://trafikoa.eus/static/files/tr/camaras/2201.jpg"]);
+  assert.equal(c.candidatas.length, 8);
   assert.equal(convertirCamara({ cameraName: "sin foto", latitude: 1, longitude: 2 }), null);
 });
 

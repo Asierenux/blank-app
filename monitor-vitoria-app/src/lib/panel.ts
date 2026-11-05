@@ -6,7 +6,7 @@
  */
 import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
 import { fechaMadrid, inicioDiaMadrid } from "./formato";
-import type { Camara, Incidencia, TipoIncidencia } from "./fuentes/trafico";
+import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
 import { activa, ventanaMs } from "./fuentes/trafico";
 import type { Historial, Punto } from "./historial";
 import type { Nivel } from "./tipos";
@@ -342,8 +342,8 @@ export function construirTrafico(h: Historial, ahora: number) {
   const porTipo: Partial<Record<TipoIncidencia, number>> = {};
   for (const i of activas) porTipo[i.tipo] = (porTipo[i.tipo] ?? 0) + 1;
   const nivel: Nivel = activas.some(i => i.nivelEstado !== "info") ? "aviso" : "ok";
-  const camaras = h.extra<{ t: number; lista: Camara[] }>("camaras")?.lista ?? [];
-  return { nivel, activas, porTipo, camaras };
+  const guardadas = h.extra<CamarasGuardadas>("camaras");
+  return { nivel, activas, porTipo, camaras: guardadas?.lista ?? [], infoCamaras: guardadas ?? null };
 }
 
 // --------------------------------------------------------------------------

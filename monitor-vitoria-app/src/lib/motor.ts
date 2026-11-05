@@ -15,7 +15,7 @@ import { recogerGeneracion } from "./fuentes/generacion";
 import { recogerPvpc } from "./fuentes/pvpc";
 import { recogerEmbalses } from "./fuentes/embalses";
 import { recogerHidro, type CacheHidro } from "./fuentes/hidro";
-import { recogerTrafico, type Camara, type Incidencia } from "./fuentes/trafico";
+import { recogerTrafico, type CamarasGuardadas, type Incidencia } from "./fuentes/trafico";
 import { recogerWaqi } from "./fuentes/waqi";
 import type { Historial } from "./historial";
 import type { Claves, Descargar } from "./tipos";
@@ -96,7 +96,7 @@ export class Motor {
         return recogerHidro(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheHidro>("estacionesHidro"), ahora);
       case "embalses": return recogerEmbalses(d, ahora);
       case "generacion": return recogerGeneracion(d, ahora);
-      case "trafico": return recogerTrafico(d, this.h.extra<{ t: number; lista: Camara[] }>("camaras"), ahora);
+      case "trafico": return recogerTrafico(d, this.h.extra<CamarasGuardadas>("camaras"), ahora);
     }
   }
 
