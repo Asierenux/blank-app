@@ -884,6 +884,8 @@ $("tema").addEventListener("click", () => {
 async function refrescar() {
   try {
     ultimo = await getJSON("/api/panel");
+    // ¿Se ha copiado una versión nueva mientras este servidor seguía abierto?
+    getJSON("/salud").then(v => { $("aviso-version").hidden = !v.version || v.version === v.disco; }).catch(() => {});
     await cargarVista(vista);
     pintar();
     $("aviso-conexion").classList.remove("visible");

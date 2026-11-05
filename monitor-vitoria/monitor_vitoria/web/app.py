@@ -288,5 +288,18 @@ async def api_camara(camara_id: str, diagnostico: bool = False):
 
 @app.get("/salud")
 def salud():
-    """Para comprobar rápidamente que el servidor está vivo."""
+    """Para comprobar rápidamente que el servidor está vivo (y qué versión del código ejecuta)."""
+    from ..version import VERSION_CODIGO, huella
+    # "disco": versión de los archivos AHORA; si no coincide, hay que reiniciar
+    return {"ok": True, "version": VERSION_CODIGO, "disco": huella()}
+
+
+@app.post("/api/apagar")
+def api_apagar(request: Request):
+    """Lo usa iniciar.bat para cerrar una versión antigua que siga abierta. Solo desde este ordenador."""
+    import os
+    import threading
+    if not _es_local(request):
+        raise HTTPException(403, "Solo desde el propio ordenador")
+    threading.Timer(0.5, os._exit, [0]).start()       # tras responder, el proceso termina
     return {"ok": True}

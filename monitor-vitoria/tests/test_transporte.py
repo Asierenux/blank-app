@@ -17,19 +17,21 @@ def gtfs(paradas, lineas, viajes) -> bytes:
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("stops.txt", "stop_id,stop_name,stop_lat,stop_lon\n" +
                    "".join(f"{i},{n},{la},{lo}\n" for i, n, la, lo in paradas))
-        z.writestr("routes.txt", "route_id,route_short_name,route_long_name,route_color\n" +
-                   "".join(f"{i},{c},{l},{col}\n" for i, c, l, col in lineas))
+        z.writestr("routes.txt", "route_id,route_short_name,route_long_name,route_color,route_type\n" +
+                   "".join(f"{i},{c},{l},{col},{t}\n" for i, c, l, col, t in lineas))
         z.writestr("trips.txt", "route_id,service_id,trip_id,trip_headsign\n" +
                    "".join(f"{r},S,{t},{h}\n" for t, r, h in viajes))
     return buf.getvalue()
 
 
-GTFS_TUVISA = gtfs([("100", "Dato", 42.846, -2.672)], [("L2", "2", "Zaramaga-Mariturri", "E30613")],
+GTFS_TUVISA = gtfs([("100", "Dato", 42.846, -2.672)], [("L2", "2", "Zaramaga-Mariturri", "E30613", "3")],
                    [("v1", "L2", "Mariturri")])
 GTFS_EUSKOTREN = gtfs(
     [("euskotren:N:501", "Angulema", 42.8462, -2.6728), ("euskotren:N:502", "Florida", 42.8425, -2.6705),
      ("euskotren:N:900", "Bilbao Zazpikaleak", 43.2569, -2.9236)],          # fuera de Vitoria
-    [("TG1", "41", "Abetxuko-Universidad", "7AB800")], [("t1", "TG1", "Universidad")])
+    [("TG1", "TG1", "Abetxuko-Universidad", "7AB800", "0"),
+     ("E1", "E1", "Bilbao-Donostia", "D50000", "2")],                       # tren: no es tranvía de Vitoria
+    [("t1", "TG1", "Universidad"), ("t2", "TG1", "Abetxuko"), ("tren", "E1", "Donostia")])
 
 
 def feed_posiciones() -> bytes:
@@ -53,6 +55,17 @@ def feed_llegadas() -> bytes:
     pasada.arrival.time = int(AHORA - 200)                                   # ya pasó por Angulema
     prox = e.trip_update.stop_time_update.add(stop_id="ES:Euskotren:Quay:N_502")
     prox.arrival.time, prox.arrival.delay = int(AHORA + 150), 120          # llega a Florida en 2,5 min
+    # Viaje programado para dentro de 20 min: aún no circula (no va al mapa, sí a "próximos")
+    e2 = f.entity.add(id="e2")
+    e2.trip_update.trip.trip_id = "t2"
+    futura = e2.trip_update.stop_time_update.add(stop_id="ES:Euskotren:Quay:N_502")
+    futura.arrival.time = int(AHORA + 1200)
+    # Un TREN cuyo id de parada "normalizado" coincide con uno de Vitoria: debe ignorarse
+    e3 = f.entity.add(id="e3")
+    e3.trip_update.trip.trip_id = "tren"
+    e3.trip_update.trip.route_id = "E1"
+    falsa = e3.trip_update.stop_time_update.add(stop_id="ES:Euskotren:Quay:X_502")
+    falsa.arrival.time = int(AHORA + 60)
     return f.SerializeToString()
 
 
@@ -71,10 +84,15 @@ def test_tranvia_en_su_proxima_parada():
     cerca = lambda la, lo: abs(la - 42.85) < 0.2                            # solo Vitoria
     h = leer_gtfs(GTFS_EUSKOTREN, "tranvia", cerca)
     assert set(h.paradas) == {"euskotren:N:501", "euskotren:N:502"}         # Bilbao fuera
-    [v], por_parada = llegadas(leer_feed(feed_llegadas()), h, "euskotren", AHORA)
+    from monitor_vitoria.transporte import lineas_tranvia_vitoria
+    validas = lineas_tranvia_vitoria(h)
+    assert validas == {"TG1"}                                               # sin el tren E1
+    [v], por_parada = llegadas(leer_feed(feed_llegadas()), h, "euskotren", AHORA, validas)
     assert v["parada"] == "Florida" and v["estimada"] and 140 <= v["llega_en_s"] <= 150
-    assert v["linea"] == "41" and v["retraso_s"] == 120
+    assert v["linea"] == "TG1" and v["retraso_s"] == 120                    # solo 1 en circulación
     assert list(por_parada) == ["euskotren:N:502"]                         # Angulema ya pasó
+    destinos = [x["destino"] for x in por_parada["euskotren:N:502"]]
+    assert destinos == ["Universidad", "Abetxuko"]                          # el de dentro de 20 min, en "próximos"
 
 
 def test_servicio_completo_y_fuentes(tmp_path):

@@ -50,7 +50,7 @@ def test_panel_web(config, monkeypatch):
     db.guardar_lecturas(conn, [lectura(valor=12.5)])
 
     cliente = TestClient(modulo_web.app)
-    assert cliente.get("/salud").json() == {"ok": True}
+    assert cliente.get("/salud").json()["ok"] is True
     assert "/static/panel.js" in cliente.get("/").text   # la página pide los datos por JS
     assert cliente.get("/static/panel.js").status_code == 200
     panel = cliente.get("/api/panel").json()

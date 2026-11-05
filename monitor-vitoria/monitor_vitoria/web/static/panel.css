@@ -8,6 +8,8 @@
 .camara figcaption { padding:6px 8px; font-size:.78rem; display:flex; justify-content:space-between; gap:6px; }
 .lista-trafico { max-height:420px; }
 .mapa-alto { height:520px; }
+.aviso-version { background:var(--aviso); color:#111; font-weight:600; text-align:center; padding:8px 16px; }
+.aviso-version[hidden] { display:none; }
 /* Vehículos en el mapa: círculo (bus) o rombo (tranvía) con el número de línea */
 .vehiculo { width:26px; height:26px; display:grid; place-items:center; background:var(--color); color:#fff;
   border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.6); font:700 10px/1 Inter, system-ui, sans-serif; }

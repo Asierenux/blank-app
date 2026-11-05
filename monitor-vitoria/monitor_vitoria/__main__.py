@@ -150,12 +150,39 @@ def _iniciar(args) -> int:
     puerto = args.puerto or config.web_port
     url = f"http://127.0.0.1:{puerto}"
 
-    # ¿Ya está funcionando (p. ej. doble clic dos veces)? Entonces solo abrimos el navegador.
-    with socket.socket() as sock:
-        if sock.connect_ex(("127.0.0.1", puerto)) == 0:
+    # ¿Ya está funcionando (p. ej. doble clic dos veces)?
+    #   - misma versión → solo abrimos el navegador
+    #   - versión ANTIGUA (copiaste archivos nuevos encima) → la cerramos y arrancamos la nueva
+    def ocupado() -> bool:
+        with socket.socket() as sock:
+            return sock.connect_ex(("127.0.0.1", puerto)) == 0
+
+    if ocupado():
+        import time
+
+        import httpx
+
+        from .version import huella
+        try:
+            version_abierta = httpx.get(f"{url}/salud", timeout=5).json().get("version")
+        except Exception:  # noqa: BLE001
+            version_abierta = None
+        if version_abierta == huella():
             print(f"El panel ya está en marcha en {url}. Abriendo el navegador…")
             webbrowser.open(url)
             return 0
+        print("Hay una versión ANTIGUA del monitor abierta. Cerrándola para arrancar la nueva…")
+        try:
+            httpx.post(f"{url}/api/apagar", timeout=5)
+        except Exception:  # noqa: BLE001
+            pass
+        for _ in range(40):
+            if not ocupado():
+                break
+            time.sleep(0.25)
+        else:
+            print("✘ No se pudo cerrar sola. Cierra la otra ventana negra del monitor y vuelve a abrir iniciar.bat.")
+            return 1
 
     sched = None
     if args.demo:

@@ -102,6 +102,7 @@ def leer_gtfs(contenido: bytes, tipo: str, filtro_paradas=None) -> Horario:
             color = (r.get("route_color") or "").strip()
             h.lineas[r["route_id"]] = {
                 "id": r["route_id"],
+                "route_type": (r.get("route_type") or "").strip(),   # 0 = tranvía, 2 = tren, 3 = bus, 7 = funicular
                 "nombre": (r.get("route_short_name") or r.get("route_long_name") or r["route_id"]).strip(),
                 "largo": (r.get("route_long_name") or "").strip(),
                 "color": f"#{color}" if re.fullmatch(r"[0-9A-Fa-f]{6}", color) else None,
@@ -147,17 +148,41 @@ def posiciones(feed, h: Horario, operador: str, ahora: float) -> list[dict]:
     return salida
 
 
-def llegadas(feed, h: Horario, operador: str, ahora: float) -> tuple[list[dict], dict[str, list]]:
-    """Del trip_updates saca: (vehículos situados en su próxima parada, próximas llegadas por parada)."""
+def lineas_tranvia_vitoria(h: Horario) -> set[str]:
+    """Euskotren mezcla trenes (E1, E2…), funiculares y tranvías de Bilbao y Vitoria.
+    Nos quedamos con los TRANVÍAS (route_type 0) de VITORIA (nombre TG… o que diga Gasteiz/Vitoria)."""
+    tranvias = {i for i, l in h.lineas.items() if l.get("route_type") == "0"}
+    de_vitoria = {i for i in tranvias
+                  if re.match(r"TG", h.lineas[i]["nombre"], re.I)
+                  or re.search(r"gasteiz|vitoria", h.lineas[i].get("largo", ""), re.I)}
+    return de_vitoria or tranvias
+
+
+# Un viaje que aún no ha pasado por ninguna parada solo cuenta como "en circulación"
+# si llega a la primera en menos de esto (si no, es un viaje programado para más tarde)
+MARGEN_INICIO_S = 180
+
+
+def llegadas(feed, h: Horario, operador: str, ahora: float,
+             lineas_validas: set[str] | None = None) -> tuple[list[dict], dict[str, list]]:
+    """Del trip_updates saca: (vehículos EN CIRCULACIÓN situados en su próxima parada,
+    próximas llegadas por parada — incluidos los viajes que aún no han salido)."""
     vehiculos, por_parada = [], {}
     for e in feed.entity:
         if not e.HasField("trip_update"):
             continue
         tu = e.trip_update
         viaje = h.viajes.get(tu.trip.trip_id, {})
-        linea = h.lineas.get(tu.trip.route_id or viaje.get("linea") or "", {})
-        proxima = None
+        linea_id = tu.trip.route_id or viaje.get("linea") or ""
+        if lineas_validas is not None and linea_id not in lineas_validas:
+            continue                              # trenes, funiculares, tranvía de Bilbao…
+        linea = h.lineas.get(linea_id, {})
+        proxima, ya_salio = None, False
         for stu in tu.stop_time_update:
+            hora_stu = (stu.arrival.time if stu.HasField("arrival") and stu.arrival.time else
+                        stu.departure.time if stu.HasField("departure") else 0)
+            if hora_stu and hora_stu < ahora - 30:
+                ya_salio = True                   # ha pasado por alguna parada: está circulando
             parada = h.parada(stu.stop_id)
             if parada is None:
                 continue                          # parada fuera de Vitoria (o desconocida)
@@ -171,7 +196,7 @@ def llegadas(feed, h: Horario, operador: str, ahora: float) -> tuple[list[dict],
             por_parada.setdefault(parada["id"], []).append(llegada)
             if proxima is None:
                 proxima = (parada, llegada)
-        if proxima:
+        if proxima and (ya_salio or proxima[1]["en_s"] <= MARGEN_INICIO_S):
             parada, llegada = proxima
             vehiculos.append({
                 "id": tu.vehicle.id or tu.trip.trip_id or e.id, "operador": operador,
@@ -236,7 +261,7 @@ class Transporte:
             if self._ultimo and time.time() - self._ultimo[0] < max_edad_s:
                 return self._ultimo[1]
             ahora = time.time()
-            vehiculos, paradas_info, errores, lineas = [], {}, [], {}
+            vehiculos, paradas_info, errores = [], {}, []
             for op, datos in OPERADORES.items():
                 try:
                     h = self.horario(cliente, op)
@@ -253,7 +278,8 @@ class Transporte:
                     if clave == "posiciones":
                         vehiculos += posiciones(feed, h, op, ahora)
                     else:
-                        estimados, por_parada = llegadas(feed, h, op, ahora)
+                        validas = lineas_tranvia_vitoria(h) if op == "euskotren" else None
+                        estimados, por_parada = llegadas(feed, h, op, ahora, validas)
                         ya = {v["id"] for v in vehiculos if v["operador"] == op}
                         # si el operador ya da GPS, no duplicamos con posiciones estimadas
                         if not any(v["operador"] == op for v in vehiculos):
@@ -262,8 +288,6 @@ class Transporte:
                             for pid, lista in por_parada.items():
                                 p = h.paradas[pid]
                                 paradas_info[pid] = {**p, "proximos": lista[:6]}
-                for lid, l in h.lineas.items():
-                    lineas[f"{op}:{lid}"] = {**l, "operador": op}
             resumen: dict[str, dict] = {}
             for v in vehiculos:
                 k = f"{v['tipo']}:{v['linea']}"
