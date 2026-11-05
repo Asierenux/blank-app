@@ -4,7 +4,7 @@
  */
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Image, Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Alert, Image, Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -43,7 +43,8 @@ function ImagenCamara({ cam }: { cam: Camara }) {
   const url = cam.candidatas[i];
   const fallida = !url;
   return (
-    <Pressable style={{ width: 260, gap: 6 }} onPress={() => Linking.openURL(cam.imagen)}>
+    <Pressable style={{ width: 260, gap: 6 }} onPress={() => Linking.openURL(cam.imagen).catch(e =>
+      Alert.alert("No se puede abrir", `${cam.imagen}\n\n${(e as Error).message}`))}>
       {!fallida ? (
         <Image
           // sin "?t=…" (estropeaba algunas direcciones); "reload" evita ver una foto antigua guardada
@@ -54,7 +55,7 @@ function ImagenCamara({ cam }: { cam: Camara }) {
       ) : (
         <View style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta, padding: 12, gap: 4, justifyContent: "center" }}>
           <Text style={{ color: c.texto, fontWeight: "600" }}>Imagen no disponible</Text>
-          <Text style={{ color: c.suave, fontSize: 11 }} numberOfLines={3}>{cam.imagen}</Text>
+          <Text selectable style={{ color: c.suave, fontSize: 11 }} numberOfLines={4}>{cam.imagen}</Text>
           <Text style={{ color: c.acento, fontSize: 12 }}>Toca para abrirla en Safari ↗</Text>
         </View>
       )}
@@ -252,7 +253,13 @@ export default function Movilidad() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {trafico.camaras.slice(0, 15).map(cam => <ImagenCamara key={cam.id} cam={cam} />)}
               </ScrollView>
-            ) : (
+            ) : null}
+            {trafico.camaras.length > 0 && trafico.infoCamaras?.muestra ? (
+              <Text selectable style={{ color: c.tenue, fontSize: 11 }}>
+                Diagnóstico · {trafico.infoCamaras.recibidas} cámaras recibidas. Ejemplo: {trafico.infoCamaras.muestra}
+              </Text>
+            ) : null}
+            {trafico.camaras.length > 0 ? null : (
               <Aviso nivel="aviso" texto={
                 !trafico.infoCamaras ? "Aún no se ha descargado la lista de cámaras."
                   : trafico.infoCamaras.error ? `No se pudo bajar la lista de cámaras: ${trafico.infoCamaras.error}`

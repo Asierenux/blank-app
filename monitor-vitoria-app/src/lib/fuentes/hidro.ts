@@ -83,7 +83,13 @@ export function candidatas(datos: unknown): Candidata[] {
 }
 
 export async function descubrir(get: Get): Promise<EstacionHidro[]> {
-  const lista = candidatas(await get("/euskalmet/stations"));
+  const datos = await get("/euskalmet/stations");
+  const lista = candidatas(datos);
+  if (!lista.length) {
+    // Para poder ajustar el buscador: cuántas llegaron y cómo es una de ellas
+    const todas: unknown[] = Array.isArray(datos) ? datos : (Object.values(datos ?? {}).find(Array.isArray) as unknown[]) ?? [];
+    throw new ErrorFuente(`Euskalmet: de ${todas.length} estaciones, ninguna parece de la zona. Ejemplo recibido: ${JSON.stringify(todas[0]).slice(0, 300)}`);
+  }
   const estaciones: EstacionHidro[] = [];
   for (const c of lista) {
     try {

@@ -180,7 +180,9 @@ export async function recogerTrafico(
   const incidencias = [...porId.values()];
   let camaras = camarasGuardadas;
   // Se renuevan cada día; si la última vez no hubo ninguna, se reintenta cada hora
-  const espera = camaras?.lista.length ? 86400e3 : 3600e3;
+  // (las guardadas por versiones anteriores, sin "recibidas", se vuelven a bajar)
+  const espera = camaras?.lista.length && camaras.recibidas != null ? 86400e3 : 3600e3;
+  if (camaras && camaras.recibidas == null && !camaras.error) camaras = undefined;
   if (!camaras || ahora - camaras.t > espera) {
     try {
       camaras = await bajarCamaras(descargar, ahora);
