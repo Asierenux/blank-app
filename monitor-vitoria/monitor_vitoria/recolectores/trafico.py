@@ -193,8 +193,9 @@ class RecolectorTrafico(Recolector):
 
     def actualizar_camaras(self) -> None:
         archivo = self.archivo_camaras()
-        if archivo.exists() and time.time() - archivo.stat().st_mtime < 86400:
-            return
+        if archivo.exists() and time.time() - archivo.stat().st_mtime < 86400 \
+                and '"candidatas"' in archivo.read_text(encoding="utf-8"):
+            return                     # reciente y con el formato actual (si no, se vuelve a bajar)
         crudas, pagina, total = [], 1, 1
         while pagina <= min(total, 20):
             r = self.cliente.get(f"{URL}/cameras", params={"_page": pagina}, headers={"Accept": "application/json"})
@@ -236,6 +237,9 @@ def convertir_camara(x: dict) -> dict | None:
     if not imagen or lat is None or lon is None:
         return None
     nombre = next((str(x[k]) for k in ("cameraName", "name", "description", "address", "road") if x.get(k)), "Cámara")
+    # Todas las direcciones que trae, la elegida primero: si esa falla, el panel prueba las demás
+    candidatas = [imagen] + [v for v in enlaces.values() if v != imagen]
     return {"id": str(x.get("cameraId") or x.get("id") or imagen), "nombre": nombre,
             "carretera": _texto(x.get("road")), "pk": _num(x.get("kilometer")), "lat": lat, "lon": lon,
-            "imagen": imagen}
+            "imagen": imagen, "candidatas": candidatas,
+            "original": {k: v for k, v in x.items() if isinstance(v, (str, int, float))}}

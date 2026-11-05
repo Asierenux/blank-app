@@ -623,7 +623,12 @@ window.errorCamara = async (img, id) => {
   img.replaceWith(caja);
   try {
     const r = await getJSON(`/api/camara/${encodeURIComponent(id)}?diagnostico=1`);
-    if (!r.ok) { caja.textContent = "Imagen no disponible: " + r.error; caja.title = r.url; }
+    if (!r.ok) {
+      const probadas = (r.intentos || []).length;
+      caja.innerHTML = `<span>Imagen no disponible: ${esc(r.error)}${probadas > 1 ? ` (probadas ${probadas} direcciones)` : ""}
+        <br><small class="url-camara">${esc(r.url)}</small></span>`;
+      caja.title = (r.intentos || []).map(i => `${i.url} → ${i.error}`).join("\n");
+    }
   } catch {}
 };
 

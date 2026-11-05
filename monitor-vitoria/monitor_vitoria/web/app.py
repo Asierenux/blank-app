@@ -274,16 +274,27 @@ async def api_camara(camara_id: str, diagnostico: bool = False):
     camara = next((c for c in camaras if str(c["id"]) == camara_id), None)
     if camara is None:
         raise HTTPException(404, "Cámara desconocida")
-    try:
-        contenido, tipo = await run_in_threadpool(_descargar_imagen, camara["imagen"])
-    except Exception as e:  # noqa: BLE001
-        detalle = explicar_error(e) if not isinstance(e, ValueError) else str(e)
+    # Probamos primero la dirección que ya funcionó; si no, todas las que trae la cámara
+    candidatas = list(dict.fromkeys([_url_buena.get(camara_id)] + camara.get("candidatas", [camara["imagen"]])))
+    intentos = []
+    for url in [u for u in candidatas if u]:
+        try:
+            contenido, tipo = await run_in_threadpool(_descargar_imagen, url)
+        except Exception as e:  # noqa: BLE001
+            intentos.append({"url": url, "error": explicar_error(e) if not isinstance(e, ValueError) else str(e)})
+            continue
+        _url_buena[camara_id] = url
         if diagnostico:
-            return {"ok": False, "url": camara["imagen"], "error": detalle}
-        raise HTTPException(502, f"No se pudo traer la imagen: {detalle}") from e
+            return {"ok": True, "url": url, "tipo": tipo, "bytes": len(contenido), "intentos": intentos}
+        return Response(contenido, media_type=tipo, headers={"Cache-Control": "max-age=50"})
+    detalle = intentos[0]["error"] if intentos else "la cámara no trae ninguna dirección"
     if diagnostico:
-        return {"ok": True, "url": camara["imagen"], "tipo": tipo, "bytes": len(contenido)}
-    return Response(contenido, media_type=tipo, headers={"Cache-Control": "max-age=50"})
+        return {"ok": False, "url": camara["imagen"], "error": detalle, "intentos": intentos,
+                "original": camara.get("original")}
+    raise HTTPException(502, f"No se pudo traer la imagen: {detalle}")
+
+
+_url_buena: dict[str, str] = {}      # cámara → dirección que devolvió una imagen
 
 
 @app.get("/salud")

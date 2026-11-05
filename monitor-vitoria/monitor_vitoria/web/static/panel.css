@@ -5,6 +5,7 @@
 .camara { margin:0; background:var(--panel-2); border:1px solid var(--borde); border-radius:8px; overflow:hidden; }
 .camara img, .camara .sin-imagen { width:100%; aspect-ratio: 4 / 3; object-fit:cover; display:block; background:#000; }
 .camara .sin-imagen { display:grid; place-items:center; color:var(--suave); font-size:.75rem; padding:10px; text-align:center; }
+.url-camara { display:block; margin-top:6px; font-size:.65rem; color:var(--tenue); word-break:break-all; }
 .camara figcaption { padding:6px 8px; font-size:.78rem; display:flex; justify-content:space-between; gap:6px; }
 .lista-trafico { max-height:420px; }
 .mapa-alto { height:520px; }

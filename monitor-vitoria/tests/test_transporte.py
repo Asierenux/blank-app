@@ -158,3 +158,32 @@ def test_proxy_de_camaras(config, monkeypatch):
     diag = cliente.get("/api/camara/c2", params={"diagnostico": True}).json()
     assert diag["ok"] is False and "text/html" in diag["error"]
     assert cliente.get("/api/camara/nada").status_code == 404
+
+
+def test_camara_prueba_otras_direcciones(config, monkeypatch):
+    """Si la dirección elegida da 404, prueba las demás que trae la cámara y recuerda la buena."""
+    import json
+
+    from monitor_vitoria import servicio
+    from monitor_vitoria.web import app as modulo_web
+    monkeypatch.setattr(modulo_web, "config", config)
+    modulo_web._url_buena.clear()
+    modulo_web._cache_imagenes.clear()
+    (config.db_path.parent / f"camaras_{config.db_path.stem}.json").write_text(json.dumps([
+        {"id": "c9", "nombre": "Foronda", "lat": 42.8, "lon": -2.7, "imagen": "https://x/antigua.jpg",
+         "candidatas": ["https://x/antigua.jpg", "https://x/visor", "https://x/snapshot?id=9"]}]))
+    pedidas = []
+
+    def responder(req):
+        pedidas.append(req.url.path)
+        if req.url.path == "/snapshot":
+            return httpx.Response(200, content=b"\x89PNG", headers={"content-type": "image/png"})
+        if req.url.path == "/visor":
+            return httpx.Response(200, text="<html>", headers={"content-type": "text/html"})
+        return httpx.Response(404)
+    monkeypatch.setattr(servicio, "crear_cliente",
+                        lambda *a, **k: httpx.Client(transport=httpx.MockTransport(responder)))
+    cliente = TestClient(modulo_web.app)
+    diag = cliente.get("/api/camara/c9", params={"diagnostico": True}).json()
+    assert diag["ok"] and diag["url"].endswith("snapshot?id=9") and len(diag["intentos"]) == 2
+    assert modulo_web._url_buena["c9"].endswith("snapshot?id=9")      # la próxima vez va directa
