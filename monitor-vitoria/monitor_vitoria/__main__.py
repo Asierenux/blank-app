@@ -12,6 +12,7 @@
     probar-saih CODIGO      descarga la ficha SAIH Ebro de una estación y enseña qué se extrae
     probar-euskalmet        comprueba la clave de Euskalmet y qué mide Kapildui
     probar-trafico          comprueba la API de tráfico (incidencias y cámaras cerca de Vitoria)
+    probar-transporte       comprueba los datos de autobuses Tuvisa y tranvía
 """
 
 from __future__ import annotations
@@ -48,6 +49,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("demo", help="datos simulados en datos/demo.db")
     sub.add_parser("probar-euskalmet", help="comprueba la API de Euskalmet (Kapildui)")
     sub.add_parser("probar-trafico", help="comprueba la API de tráfico del Gobierno Vasco")
+    sub.add_parser("probar-transporte", help="comprueba autobuses Tuvisa y tranvía")
     p_saih = sub.add_parser("probar-saih", help="comprueba una estación del SAIH Ebro")
     p_saih.add_argument("codigo", help="p. ej. E028")
     p_saih.add_argument("--estacion", help="id del catálogo (urrunaga, ullibarri, zadorra_arce...)")
@@ -117,6 +119,9 @@ def main(argv: list[str] | None = None) -> int:
     elif args.orden == "probar-trafico":
         return _probar_trafico(config)
 
+    elif args.orden == "probar-transporte":
+        return _probar_transporte(config)
+
     elif args.orden == "probar-saih":
         return _probar_saih(config, args.codigo.upper(), args.estacion)
 
@@ -180,6 +185,36 @@ def _iniciar(args) -> int:
         if sched:
             sched.shutdown(wait=False)
     return 0
+
+
+def _probar_transporte(config) -> int:
+    """Diagnóstico de autobuses y tranvía: qué direcciones responden y qué llega."""
+    from .servicio import crear_cliente
+    from .transporte import OPERADORES, Transporte
+    t = Transporte(config.db_path.parent, (config.latitud, config.longitud))
+    with crear_cliente(timeout=30) as cliente:
+        for op, datos in OPERADORES.items():
+            print(f"\n{datos['nombre']}")
+            for clave in ("gtfs", "posiciones", "llegadas"):
+                for url in datos[clave]:
+                    try:
+                        r = cliente.get(url)
+                        estado = f"HTTP {r.status_code} · {len(r.content):,} bytes".replace(",", ".")
+                        marca = "✔" if r.status_code == 200 and r.content else "✘"
+                    except Exception as e:  # noqa: BLE001
+                        marca, estado = "✘", type(e).__name__
+                    print(f"  {marca} {clave:<10} {url}\n               {estado}")
+        e = t.estado(cliente, max_edad_s=0)
+    print(f"\nResultado: {e['buses']} autobuses y {e['tranvias']} tranvías situados en el mapa; "
+          f"{len(e['paradas_tranvia'])} paradas de tranvía con llegadas.")
+    for linea in e["lineas_activas"][:20]:
+        print(f"   {linea['tipo']:<8} línea {linea['linea']:<6} {linea['n']} vehículo(s)")
+    for err in e["errores"]:
+        print("  ⚠", err)
+    if e["vehiculos"]:
+        v = e["vehiculos"][0]
+        print(f"  Ejemplo: {v['tipo']} {v['linea']} → {v['destino']} en ({v['lat']}, {v['lon']})")
+    return 0 if e["vehiculos"] else 1
 
 
 def _probar_trafico(config) -> int:

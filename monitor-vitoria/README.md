@@ -5,6 +5,7 @@ Recoge datos públicos de Vitoria-Gasteiz y los guarda en SQLite:
 - 🌦️ **Meteorología**: AEMET OpenData, estación Vitoria-Gasteiz Aeropuerto (Foronda)
 - 💡 **Precio de la luz (PVPC)**: Red Eléctrica (ESIOS, o REData sin token)
 - 😷 **Calidad del aire**: WAQI (aqicn.org)
+- 🚌 **Bus y tranvía**: autobuses Tuvisa (GPS) y tranvía (próximas llegadas) en un mapa en directo
 - 🚗 **Tráfico**: incidencias (accidentes, obras, cortes, retenciones) y cámaras del Gobierno Vasco, en un mapa
 - ⛰️ **Kapildui** (Montes de Vitoria, 1.173 m): Euskalmet, para comparar montaña y valle
 - 🌊 **Embalses y ríos**: SAIH Ebro (Ullíbarri-Gamboa, Urrunaga, río Zadorra)

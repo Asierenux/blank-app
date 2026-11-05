@@ -8,8 +8,8 @@
 "use strict";
 
 const ZONA = "Europe/Madrid";
-const VISTAS = ["resumen", "agua", "trafico", "energia", "aire", "meteo", "explorar", "sistema"];
-const VISTAS_CON_PERIODO = ["agua", "trafico", "aire", "meteo", "explorar"];
+const VISTAS = ["resumen", "agua", "trafico", "transporte", "energia", "aire", "meteo", "explorar", "sistema"];
+const VISTAS_CON_PERIODO = ["agua", "trafico", "transporte", "aire", "meteo", "explorar"];
 const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
 const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
 
@@ -328,6 +328,10 @@ let expFuncion = leer("exp.fun", "auto"), expBarras = leer("exp.barras", false);
 
 const CARGADORES = {
   agua: () => getJSON(`/api/agua/historico?${paramsPeriodo()}`),
+  async transporte() {
+    cache.directo = await getJSON("/api/transporte").catch(e => ({error: e.message}));
+    return getJSON(`/api/datos?${paramsPeriodo({series: "transporte:buses_en_servicio,transporte:tranvias_en_servicio", funcion: "max"})}`);
+  },
   trafico: () => getJSON(`/api/datos?${paramsPeriodo({series: "trafico:incidencias_activas,trafico:accidentes_activos,trafico:obras_activas", funcion: "max"})}`),
   aire: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_AIRE.join(",")})}`),
   meteo: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_METEO.join(",")})}`),
@@ -604,14 +608,24 @@ function pintarMapa(t) {
   }
   for (const c of t.camaras) {
     L.marker([c.lat, c.lon], { icon: L.divIcon({ className: "marca-camara", html: "■", iconSize: [14, 14] }) })
-      .bindPopup(`<b>${esc(c.nombre)}</b><br><img src="${esc(conRefresco(c.imagen))}" alt="Cámara ${esc(c.nombre)}" width="280">`)
+      .bindPopup(`<b>${esc(c.nombre)}</b><br><img src="${esc(imagenCamara(c))}" alt="Cámara ${esc(c.nombre)}" width="280">`)
       .addTo(capaMapa);
   }
 }
 
-// Añade ?t=<minuto> para que el navegador no muestre una imagen antigua guardada
-const conRefresco = url => url.startsWith("data:") ? url       // imágenes incrustadas (demo): tal cual
-  : url + (url.includes("?") ? "&" : "?") + "t=" + Math.floor(Date.now() / 60000);
+// La imagen la trae nuestro servidor (/api/camara/<id>); ?t=<minuto> evita ver una foto vieja guardada
+const imagenCamara = c => c.imagen.startsWith("data:") ? c.imagen       // imágenes incrustadas (demo): tal cual
+  : `/api/camara/${encodeURIComponent(c.id)}?t=${Math.floor(Date.now() / 60000)}`;
+
+// Si una imagen falla, preguntamos al servidor por qué y lo enseñamos
+window.errorCamara = async (img, id) => {
+  const caja = Object.assign(document.createElement("div"), { className: "sin-imagen", textContent: "Imagen no disponible" });
+  img.replaceWith(caja);
+  try {
+    const r = await getJSON(`/api/camara/${encodeURIComponent(id)}?diagnostico=1`);
+    if (!r.ok) { caja.textContent = "Imagen no disponible: " + r.error; caja.title = r.url; }
+  } catch {}
+};
 
 function pintarTrafico(d) {
   const t = d.trafico; if (!t) return;
@@ -635,8 +649,8 @@ function pintarTrafico(d) {
         <div class="det">Nada activo cerca de Vitoria ahora mismo</div></div><div></div></li>`;
 
   $("trafico-camaras").innerHTML = t.camaras.length ? t.camaras.slice(0, 12).map(c => `<figure class="camara">
-      <img src="${esc(conRefresco(c.imagen))}" alt="Cámara ${esc(c.nombre)}" loading="lazy"
-        onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'sin-imagen',textContent:'Imagen no disponible'}))">
+      <img src="${esc(imagenCamara(c))}" alt="Cámara ${esc(c.nombre)}" loading="lazy"
+        onerror="errorCamara(this, ${esc(JSON.stringify(String(c.id)))})">
       <figcaption><b>${esc(c.nombre)}</b> <span class="gris">${num(c.distancia_km, 1)} km</span></figcaption></figure>`).join("")
     : `<p class="vacio">Aún no hay cámaras. Se descargan con la primera recogida de tráfico (una vez al día).</p>`;
 
@@ -648,6 +662,100 @@ function pintarTrafico(d) {
   }
 }
 $("trafico-filtro").addEventListener("change", () => pintar());
+
+// =====================================================================
+// BUS Y TRANVÍA: mapa en directo (se refresca cada 20 s con la pestaña abierta)
+// =====================================================================
+let mapaTransporte = null, capaTransporte = null;
+let lineasOcultas = new Set(leer("transporte.ocultas", []));
+const claveLinea = v => `${v.tipo}:${v.linea}`;
+const enMinutos = s => s < 60 ? "llegando" : `${Math.round(s / 60)} min`;
+
+function iconoVehiculo(v) {
+  const color = v.color || (v.tipo === "tranvia" ? "#7AB800" : css("--info"));
+  const forma = v.tipo === "tranvia" ? "vehiculo tranvia" : "vehiculo bus";
+  return L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 13],
+    html: `<div class="${forma}" style="--color:${esc(color)}"><span>${esc(v.linea)}</span></div>` });
+}
+
+function pintarMapaTransporte(d) {
+  if (!window.L) { $("mapa-transporte").innerHTML = `<p class="vacio">No se pudo cargar el mapa (¿sin conexión a internet?).</p>`; return; }
+  if (!mapaTransporte) {
+    mapaTransporte = L.map("mapa-transporte", { scrollWheelZoom: false }).setView([42.8467, -2.6716], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapaTransporte);
+    capaTransporte = L.layerGroup().addTo(mapaTransporte);
+  }
+  setTimeout(() => mapaTransporte.invalidateSize(), 50);
+  capaTransporte.clearLayers();
+  for (const p of d.paradas_tranvia || []) {
+    L.circleMarker([p.lat, p.lon], { radius: 4, color: "#7AB800", weight: 2, fillColor: "#fff", fillOpacity: 1 })
+      .bindTooltip(p.nombre).addTo(capaTransporte);
+  }
+  for (const v of d.vehiculos || []) {
+    if (lineasOcultas.has(claveLinea(v))) continue;
+    const texto = v.estimada
+      ? `<b>Tranvía ${esc(v.linea)}</b> → ${esc(v.destino)}<br>Próxima parada: <b>${esc(v.parada)}</b> (${enMinutos(v.llega_en_s)})
+         ${v.retraso_s > 60 ? `<br>Retraso: ${Math.round(v.retraso_s / 60)} min` : ""}<br><small>Posición estimada</small>`
+      : `<b>Bus ${esc(v.linea)}</b>${v.destino ? " → " + esc(v.destino) : ""}<br><small>GPS ${v.hace_s != null ? "hace " + v.hace_s + " s" : ""}</small>`;
+    L.marker([v.lat, v.lon], { icon: iconoVehiculo(v), zIndexOffset: v.tipo === "tranvia" ? 500 : 0 })
+      .bindPopup(texto).addTo(capaTransporte);
+  }
+}
+
+function pintarTransporte() {
+  const d = cache.directo;
+  if (!d) return;
+  if (d.error) { $("transporte-errores").innerHTML = `<p class="vacio">No se pudo consultar: ${esc(d.error)}</p>`; return; }
+  const lineas = d.lineas_activas || [];
+  $("transporte-resumen").innerHTML =
+    dato("🚌 Autobuses Tuvisa", String(d.buses), "en servicio ahora") +
+    dato("🚊 Tranvías", String(d.tranvias), "circulando ahora") +
+    dato("Líneas de bus activas", String(lineas.filter(l => l.tipo === "bus").length), "con algún autobús") +
+    dato("Paradas de tranvía", String((d.paradas_tranvia || []).length), "con próximas llegadas");
+  $("transporte-actualizado").textContent = d.actualizado ? "datos de las " + hora(d.actualizado) : "";
+
+  // Líneas: chips para ocultar/mostrar en el mapa
+  $("transporte-lineas").innerHTML = lineas.map(l => `<button type="button" class="chip" data-linea="${esc(l.tipo + ":" + l.linea)}"
+      aria-pressed="${!lineasOcultas.has(l.tipo + ":" + l.linea)}"><i class="${l.tipo === "tranvia" ? "" : "barra"}" style="background:${esc(l.color || (l.tipo === "tranvia" ? "#7AB800" : css("--info")))}"></i>
+      ${l.tipo === "tranvia" ? "🚊" : "🚌"} ${esc(l.linea)} <span class="gris">${l.n}</span></button>`).join("")
+    || `<span class="vacio">Ningún vehículo en servicio ahora mismo.</span>`;
+
+  // Próximas llegadas a la parada elegida
+  const sel = $("transporte-parada"), paradas = d.paradas_tranvia || [];
+  const elegida = sel.value || leer("transporte.parada", "") || paradas[0]?.id;
+  sel.innerHTML = paradas.map(p => `<option value="${esc(p.id)}" ${p.id === elegida ? "selected" : ""}>${esc(p.nombre)}</option>`).join("");
+  const p = paradas.find(x => x.id === sel.value);
+  $("transporte-llegadas").innerHTML = p && p.proximos.length ? p.proximos.map(x => `<li class="n-${x.en_s < 120 ? "ok" : "sin_datos"}">
+      <div><div class="tit">🚊 ${esc(x.linea)} → ${esc(x.destino || "")}</div>
+        <div class="det">${x.retraso_s > 60 ? `con ${Math.round(x.retraso_s / 60)} min de retraso` : "a su hora"}</div></div>
+      <div class="der"><b class="num" style="font-size:1.1rem">${enMinutos(x.en_s)}</b></div></li>`).join("")
+    : `<li class="n-sin_datos"><div><div class="tit">Sin llegadas previstas</div>
+        <div class="det">${paradas.length ? "No hay tranvías previstos en esta parada" : "No hay datos del tranvía ahora mismo"}</div></div><div></div></li>`;
+
+  $("transporte-errores").innerHTML = (d.errores || []).map(e => `<p class="nota">⚠ ${esc(e)}</p>`).join("");
+  pintarMapaTransporte(d);
+
+  const r = cache.transporte;
+  if (r && !r.error) {
+    $("transporte-resolucion").textContent = textoRango(r);
+    graficaSeries("g-transporte", "ley-transporte", r, r.series, {colores: [css("--info"), "#7AB800"]});
+  }
+}
+$("transporte-lineas").addEventListener("click", ev => {
+  const b = ev.target.closest(".chip"); if (!b) return;
+  const k = b.dataset.linea;
+  lineasOcultas.has(k) ? lineasOcultas.delete(k) : lineasOcultas.add(k);
+  guardar("transporte.ocultas", [...lineasOcultas]);
+  b.setAttribute("aria-pressed", !lineasOcultas.has(k));
+  if (cache.directo) pintarMapaTransporte(cache.directo);
+});
+$("transporte-parada").addEventListener("change", () => { guardar("transporte.parada", $("transporte-parada").value); pintarTransporte(); });
+// Directo: con la pestaña abierta, posiciones nuevas cada 20 s (sin recargar la gráfica)
+setInterval(async () => {
+  if (vista !== "transporte" || document.hidden) return;
+  cache.directo = await getJSON("/api/transporte").catch(e => ({error: e.message}));
+  pintarTransporte();
+}, 20000);
 
 // =====================================================================
 // PINTAR CADA VISTA
@@ -668,6 +776,7 @@ const PINTORES = {
     graficasAgua();
   },
   trafico(d) { pintarTrafico(d); },
+  transporte() { pintarTransporte(); },
   energia(d) {
     datosLuz("energia-luz-datos", d.pvpc); graficaLuz("g-energia-luz", d.pvpc);
     $("energia-luz-nota").textContent = !d.pvpc.puntos?.length ? "Sin datos de precio todavía."
@@ -748,7 +857,7 @@ document.querySelectorAll('[role="tab"]').forEach(tab => {
 window.addEventListener("hashchange", () => { if (location.hash.slice(1) !== vista) mostrar(location.hash.slice(1)); });
 
 // Modo pared: rota por las pestañas de consulta (no por Explorar ni Sistema)
-const VISTAS_ROTAR = ["resumen", "agua", "trafico", "energia", "aire", "meteo"];
+const VISTAS_ROTAR = ["resumen", "agua", "trafico", "transporte", "energia", "aire", "meteo"];
 let temporizadorRotar = null;
 function rotar(segundos) {
   pararRotacion();

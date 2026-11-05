@@ -4,9 +4,18 @@
 .camaras { display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 .camara { margin:0; background:var(--panel-2); border:1px solid var(--borde); border-radius:8px; overflow:hidden; }
 .camara img, .camara .sin-imagen { width:100%; aspect-ratio: 4 / 3; object-fit:cover; display:block; background:#000; }
-.camara .sin-imagen { display:grid; place-items:center; color:var(--suave); font-size:.8rem; }
+.camara .sin-imagen { display:grid; place-items:center; color:var(--suave); font-size:.75rem; padding:10px; text-align:center; }
 .camara figcaption { padding:6px 8px; font-size:.78rem; display:flex; justify-content:space-between; gap:6px; }
 .lista-trafico { max-height:420px; }
+.mapa-alto { height:520px; }
+/* Vehículos en el mapa: círculo (bus) o rombo (tranvía) con el número de línea */
+.vehiculo { width:26px; height:26px; display:grid; place-items:center; background:var(--color); color:#fff;
+  border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.6); font:700 10px/1 Inter, system-ui, sans-serif; }
+.vehiculo.bus { border-radius:50%; }
+.vehiculo.tranvia { border-radius:4px; transform:rotate(45deg); }
+.vehiculo.tranvia span { transform:rotate(-45deg); }
+.avisos-fuente { margin-top:8px; }
+@media (max-width: 640px) { .mapa-alto { height:360px; } }
 .leaflet-popup-content { font: .82rem/1.4 Inter, "Segoe UI", system-ui, sans-serif; }
 @media (max-width: 640px) { .mapa { height:300px; } }
 

@@ -86,6 +86,7 @@ class Config:
     intervalo_generacion_min: int
     intervalo_euskalmet_min: int
     intervalo_trafico_min: int
+    intervalo_transporte_min: int
     trafico_radio_km: float
 
     alerta_temp_max: float | None
@@ -137,6 +138,7 @@ def cargar_config() -> Config:
         intervalo_generacion_min=_entero("INTERVALO_GENERACION_MIN", 360),
         intervalo_euskalmet_min=_entero("INTERVALO_EUSKALMET_MIN", 30),
         intervalo_trafico_min=_entero("INTERVALO_TRAFICO_MIN", 10),
+        intervalo_transporte_min=_entero("INTERVALO_TRANSPORTE_MIN", 5),
         trafico_radio_km=_decimal("TRAFICO_RADIO_KM", 25) or 25,
         alerta_temp_max=_decimal("ALERTA_TEMP_MAX", 35),
         alerta_temp_min=_decimal("ALERTA_TEMP_MIN", -3),

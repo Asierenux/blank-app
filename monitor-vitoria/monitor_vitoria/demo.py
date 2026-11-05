@@ -121,6 +121,10 @@ def generar_trafico(conn, ruta: Path, ahora: datetime, L, rnd) -> None:
         L("trafico", "incidencias_activas", t, total if h else 5, "nº")   # ahora: las 5 activas de arriba
         L("trafico", "accidentes_activos", t, (punta and rnd.random() < .6) + (h == 0), "nº")
         L("trafico", "obras_activas", t, 1, "nº")
+        # Transporte: más buses en hora punta, casi ninguno de madrugada
+        servicio = 0 if hora_local < 6 else (1 if 7 <= hora_local <= 21 else 0.4)
+        L("transporte", "buses_en_servicio", t, round((30 + 14 * punta) * servicio), "nº")
+        L("transporte", "tranvias_en_servicio", t, round((6 + 2 * punta) * servicio), "nº")
 
     # Cámaras de ejemplo: la "imagen" es un dibujo SVG (en real, una foto de la cámara)
     def imagen(texto: str, color: str) -> str:
@@ -142,6 +146,76 @@ def generar_trafico(conn, ruta: Path, ahora: datetime, L, rnd) -> None:
     ]
     from .recolectores.trafico import archivo_camaras
     archivo_camaras(ruta).write_text(json.dumps(camaras, ensure_ascii=False), encoding="utf-8")
+
+
+# Recorridos aproximados (solo para la demo) por Vitoria-Gasteiz
+RECORRIDOS_BUS = {
+    ("2", "#E30613", "Zaramaga ↔ Mariturri"): [(42.8640, -2.6650), (42.8560, -2.6700), (42.8495, -2.6727),
+                                                (42.8450, -2.6820), (42.8420, -2.6950), (42.8400, -2.7080)],
+    ("3", "#009FE3", "Zabalgana ↔ Salburua"): [(42.8410, -2.7150), (42.8440, -2.6950), (42.8470, -2.6760),
+                                                (42.8500, -2.6550), (42.8520, -2.6400)],
+    ("5", "#95C11F", "Lakua ↔ Adurtza"): [(42.8680, -2.6900), (42.8600, -2.6830), (42.8510, -2.6740),
+                                           (42.8420, -2.6650), (42.8360, -2.6600)],
+    ("7", "#F39200", "Arana ↔ Ali"): [(42.8560, -2.6550), (42.8510, -2.6650), (42.8480, -2.6790),
+                                       (42.8510, -2.6950), (42.8560, -2.7050)],
+}
+PARADAS_TRANVIA = [  # (nombre, lat, lon) — trazado norte-sur aproximado
+    ("Abetxuko", 42.8738, -2.6917), ("Kristo", 42.8690, -2.6880), ("Arriaga", 42.8645, -2.6850),
+    ("Lakua", 42.8590, -2.6832), ("Wellington", 42.8545, -2.6815), ("Europa", 42.8505, -2.6782),
+    ("Angulema", 42.8462, -2.6728), ("Florida", 42.8425, -2.6705), ("Universidad", 42.8385, -2.6718),
+]
+
+
+def _a_lo_largo(puntos, fraccion):
+    """Punto a una fracción (0-1) del recorrido, ida y vuelta."""
+    f = fraccion % 2
+    f = f if f <= 1 else 2 - f
+    tramos = len(puntos) - 1
+    i = min(int(f * tramos), tramos - 1)
+    local = f * tramos - i
+    (a1, b1), (a2, b2) = puntos[i], puntos[i + 1]
+    return a1 + (a2 - a1) * local, b1 + (b2 - b1) * local
+
+
+def transporte_simulado(ahora: float | None = None) -> dict:
+    """Mismo formato que transporte.Transporte.estado(), con vehículos que se mueven."""
+    import time
+    ahora = ahora or time.time()
+    vehiculos = []
+    for (linea, color, nombre), puntos in RECORRIDOS_BUS.items():
+        for k in range(3):                                   # 3 buses por línea
+            lat, lon = _a_lo_largo(puntos, ahora / 900 + k * 0.66 + int(linea) % 7 / 10)
+            vehiculos.append({"id": f"bus-{linea}-{k}", "operador": "tuvisa", "tipo": "bus", "linea": linea,
+                              "color": color, "destino": nombre.split(" ↔ ")[k % 2], "lat": round(lat, 5),
+                              "lon": round(lon, 5), "rumbo": None, "hace_s": 12, "estimada": False})
+    paradas = []
+    n = len(PARADAS_TRANVIA)
+    for j, (nombre, lat, lon) in enumerate(PARADAS_TRANVIA):
+        proximos = []
+        for sentido, destino in ((1, "Universidad"), (-1, "Abetxuko")):
+            for m in range(2):
+                en = int(((j if sentido == 1 else n - 1 - j) * 90 - ahora % 600 + m * 600) % 1200) + 30
+                proximos.append({"linea": "T1", "color": "#7AB800", "destino": destino, "en_s": en, "retraso_s": 0})
+        paradas.append({"id": f"t{j}", "nombre": nombre, "lat": lat, "lon": lon,
+                        "proximos": sorted(proximos, key=lambda x: x["en_s"])[:4]})
+    for k in range(4):                                          # 4 tranvías: en su próxima parada
+        idx = int((ahora / 90 + k * n / 2) % (2 * n - 2))
+        j = idx if idx < n else 2 * n - 2 - idx
+        nombre, lat, lon = PARADAS_TRANVIA[j]
+        vehiculos.append({"id": f"tranvia-{k}", "operador": "euskotren", "tipo": "tranvia", "linea": "T1",
+                          "color": "#7AB800", "destino": "Universidad" if idx < n else "Abetxuko",
+                          "lat": lat, "lon": lon, "rumbo": None, "hace_s": None, "estimada": True,
+                          "parada": nombre, "llega_en_s": int(90 - ahora % 90), "retraso_s": 0})
+    resumen = {}
+    for v in vehiculos:
+        resumen.setdefault(f"{v['tipo']}:{v['linea']}", {"tipo": v["tipo"], "linea": v["linea"],
+                                                         "color": v["color"], "n": 0})["n"] += 1
+    return {"actualizado": datetime.fromtimestamp(ahora, timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "vehiculos": vehiculos, "paradas_tranvia": paradas,
+            "lineas_activas": sorted(resumen.values(), key=lambda x: (x["tipo"], x["linea"])),
+            "buses": sum(v["tipo"] == "bus" for v in vehiculos),
+            "tranvias": sum(v["tipo"] == "tranvia" for v in vehiculos),
+            "errores": [], "fuentes": {"demo": "datos simulados"}}
 
 
 def generar(ruta: Path, semilla: int = 7) -> None:
@@ -212,6 +286,8 @@ def generar(ruta: Path, semilla: int = 7) -> None:
     db.registrar_ejecucion(conn, "waqi", inicio, ok=False, error="ReadTimeout: timed out")
     db.registrar_ejecucion(conn, "saih", inicio - timedelta(minutes=10), ok=True, recibidas=14, nuevas=14)
     db.registrar_ejecucion(conn, "euskalmet", inicio - timedelta(minutes=8), ok=True, recibidas=60, nuevas=30)
+    db.registrar_ejecucion(conn, "trafico", inicio - timedelta(minutes=3), ok=True, recibidas=3, nuevas=3)
+    db.registrar_ejecucion(conn, "transporte", inicio - timedelta(minutes=2), ok=True, recibidas=2, nuevas=2)
     db.registrar_ejecucion(conn, "generacion", inicio - timedelta(hours=2), ok=True, recibidas=124, nuevas=4)
 
     with conn:

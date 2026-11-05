@@ -28,6 +28,7 @@
     <button role="tab" id="tab-resumen" data-vista="resumen" class="n-ok"><span class="marca-nivel"></span>Resumen</button>
     <button role="tab" id="tab-agua" data-vista="agua" class="n-ok"><span class="marca-nivel"></span>Agua</button>
     <button role="tab" id="tab-trafico" data-vista="trafico" class="n-ok"><span class="marca-nivel"></span>Tráfico</button>
+    <button role="tab" id="tab-transporte" data-vista="transporte" class="n-ok"><span class="marca-nivel"></span>Bus y tranvía</button>
     <button role="tab" id="tab-energia" data-vista="energia" class="n-ok"><span class="marca-nivel"></span>Energía</button>
     <button role="tab" id="tab-aire" data-vista="aire" class="n-ok"><span class="marca-nivel"></span>Aire</button>
     <button role="tab" id="tab-meteo" data-vista="meteo" class="n-ok"><span class="marca-nivel"></span>Meteo</button>
@@ -147,6 +148,31 @@
       <p class="nota">Fuente: API de tráfico del Gobierno Vasco. Esa API publica cuándo <b>empieza</b> cada incidencia pero
         casi nunca cuándo termina, así que se considera activa durante un tiempo estimado (accidentes y otras 4 h; obras y
         meteorología 12 h). La hora «hasta» es esa estimación.</p>
+    </article>
+  </section>
+
+  <!-- ========================== BUS Y TRANVÍA ========================= -->
+  <section class="vista" id="vista-transporte" role="tabpanel" aria-labelledby="tab-transporte" hidden>
+    <div class="datos d4" id="transporte-resumen"></div>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span>Dónde van ahora</span><span class="gris" id="transporte-actualizado"></span></h2>
+        <div class="leyenda-int" id="transporte-lineas" aria-label="Líneas (pulsa para ocultar o mostrar)"></div>
+        <div class="mapa mapa-alto" id="mapa-transporte" role="region" aria-label="Mapa de autobuses y tranvías"></div>
+        <p class="nota">● autobús Tuvisa (posición GPS) · ◆ tranvía (situado en la <b>próxima parada</b> a la que llega:
+          Euskotren no publica la posición, solo la hora de llegada a cada parada). Se actualiza cada 20 segundos.</p>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Próximos tranvías</span>
+          <select id="transporte-parada" aria-label="Parada de tranvía"></select></h2>
+        <ul class="lista larga" id="transporte-llegadas"></ul>
+        <div class="avisos-fuente" id="transporte-errores"></div>
+      </article>
+    </div>
+    <article class="tarjeta">
+      <h2><span>Vehículos en servicio</span><span class="gris" id="transporte-resolucion"></span></h2>
+      <div class="leyenda-int" id="ley-transporte"></div>
+      <div class="lienzo"><canvas id="g-transporte"></canvas></div>
     </article>
   </section>
 

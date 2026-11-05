@@ -216,6 +216,76 @@ def api_probar_telegram(request: Request):
     return {"ok": telegram.enviar(config, "✅ monitor-vitoria: Telegram funciona")}
 
 
+# --------------------------------------------------------------------------
+# Autobuses y tranvía en directo (no se guarda: se pide cada 20 s desde el mapa)
+# --------------------------------------------------------------------------
+
+@app.get("/api/transporte")
+async def api_transporte():
+    import os
+
+    if os.getenv("MONITOR_DEMO") == "1":
+        from ..demo import transporte_simulado
+        return transporte_simulado()
+    from ..servicio import crear_cliente
+    from ..transporte import servicio
+
+    def consultar():
+        with crear_cliente(timeout=20) as cliente:
+            return servicio(config.db_path.parent, (config.latitud, config.longitud)).estado(cliente)
+    return await run_in_threadpool(consultar)
+
+
+# --------------------------------------------------------------------------
+# Cámaras de tráfico: el servidor descarga la imagen y se la pasa al navegador
+# (evita bloqueos por "hotlinking", certificados raros y parámetros no admitidos)
+# --------------------------------------------------------------------------
+_cache_imagenes: dict[str, tuple[float, bytes, str]] = {}
+
+
+def _descargar_imagen(url: str) -> tuple[bytes, str]:
+    import time
+
+    from ..servicio import crear_cliente
+    ahora = time.time()
+    if url in _cache_imagenes and ahora - _cache_imagenes[url][0] < 50:   # 50 s: no saturar sus servidores
+        _, contenido, tipo = _cache_imagenes[url]
+        return contenido, tipo
+    with crear_cliente(timeout=12) as cliente:
+        r = cliente.get(url, headers={"Accept": "image/*,*/*;q=0.5"})
+        r.raise_for_status()
+    tipo = r.headers.get("content-type", "").split(";")[0].strip()
+    if not tipo.startswith("image/"):
+        raise ValueError(f"la dirección no devuelve una imagen sino «{tipo or 'desconocido'}»")
+    _cache_imagenes[url] = (ahora, r.content, tipo)
+    if len(_cache_imagenes) > 200:                                     # que la memoria no crezca sin fin
+        _cache_imagenes.pop(min(_cache_imagenes, key=lambda k: _cache_imagenes[k][0]))
+    return r.content, tipo
+
+
+@app.get("/api/camara/{camara_id}")
+async def api_camara(camara_id: str, diagnostico: bool = False):
+    import json
+
+    from ..recolectores.trafico import archivo_camaras
+    from ..servicio import explicar_error
+    archivo = archivo_camaras(config.db_path)
+    camaras = json.loads(archivo.read_text(encoding="utf-8")) if archivo.exists() else []
+    camara = next((c for c in camaras if str(c["id"]) == camara_id), None)
+    if camara is None:
+        raise HTTPException(404, "Cámara desconocida")
+    try:
+        contenido, tipo = await run_in_threadpool(_descargar_imagen, camara["imagen"])
+    except Exception as e:  # noqa: BLE001
+        detalle = explicar_error(e) if not isinstance(e, ValueError) else str(e)
+        if diagnostico:
+            return {"ok": False, "url": camara["imagen"], "error": detalle}
+        raise HTTPException(502, f"No se pudo traer la imagen: {detalle}") from e
+    if diagnostico:
+        return {"ok": True, "url": camara["imagen"], "tipo": tipo, "bytes": len(contenido)}
+    return Response(contenido, media_type=tipo, headers={"Cache-Control": "max-age=50"})
+
+
 @app.get("/salud")
 def salud():
     """Para comprobar rápidamente que el servidor está vivo."""

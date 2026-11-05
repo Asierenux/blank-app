@@ -226,12 +226,11 @@ def convertir_camara(x: dict) -> dict | None:
     las coordenadas (campos con 'lat'/'lon') y un nombre."""
     if not isinstance(x, dict):
         return None
-    imagen = None
-    for k, v in x.items():
-        if isinstance(v, str) and v.startswith("http") and (
-                re.search(r"\.(jpe?g|png|gif)(\?|$)", v, re.I) or "url" in k.lower() or "image" in k.lower()):
-            imagen = v
-            break
+    enlaces = {k: v for k, v in x.items() if isinstance(v, str) and v.startswith("http")}
+    # Preferencia: 1) URL que acaba en .jpg/.png  2) campo que se llama "image/imagen/foto"  3) cualquier "url"
+    imagen = (next((v for v in enlaces.values() if re.search(r"\.(jpe?g|png|gif)(\?|$)", v, re.I)), None)
+              or next((v for k, v in enlaces.items() if re.search(r"imag|foto|photo|snapshot", k, re.I)), None)
+              or next((v for k, v in enlaces.items() if "url" in k.lower()), None))
     lat = next((_num(v) for k, v in x.items() if k.lower().startswith("lat")), None)
     lon = next((_num(v) for k, v in x.items() if k.lower().startswith(("lon", "lng"))), None)
     if not imagen or lat is None or lon is None:
