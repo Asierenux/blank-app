@@ -13,13 +13,14 @@ import { recogerAemet } from "./fuentes/aemet";
 import { recogerEuskalmet, type CacheMedidas } from "./fuentes/euskalmet";
 import { recogerGeneracion } from "./fuentes/generacion";
 import { recogerPvpc } from "./fuentes/pvpc";
-import { recogerSaih } from "./fuentes/saih";
+import { recogerEmbalses } from "./fuentes/embalses";
+import { recogerHidro, type CacheHidro } from "./fuentes/hidro";
 import { recogerTrafico, type Camara, type Incidencia } from "./fuentes/trafico";
 import { recogerWaqi } from "./fuentes/waqi";
 import type { Historial } from "./historial";
 import type { Claves, Descargar } from "./tipos";
 
-export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "saih", "generacion", "trafico"] as const;
+export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"] as const;
 export type Fuente = (typeof FUENTES)[number];
 
 /** Qué falta para poder usar cada fuente (null = nada, lista para funcionar). */
@@ -28,6 +29,7 @@ export function faltaConfiguracion(c: Claves): Record<string, string | null> {
     aemet: c.aemet ? null : "Falta la clave de AEMET",
     waqi: c.waqi ? null : "Falta el token de WAQI",
     euskalmet: c.euskalmetEmail && c.euskalmetPem ? null : "Falta la clave de Euskalmet",
+    hidro: c.euskalmetEmail && c.euskalmetPem ? null : "Falta la clave de Euskalmet",
   };
 }
 
@@ -90,7 +92,9 @@ export class Motor {
       case "pvpc": return recogerPvpc(d, ahora);
       case "euskalmet":
         return recogerEuskalmet(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheMedidas>("euskalmetMedidas"), ahora);
-      case "saih": return recogerSaih(d, ahora);
+      case "hidro":
+        return recogerHidro(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheHidro>("estacionesHidro"), ahora);
+      case "embalses": return recogerEmbalses(d, ahora);
       case "generacion": return recogerGeneracion(d, ahora);
       case "trafico": return recogerTrafico(d, this.h.extra<{ t: number; lista: Camara[] }>("camaras"), ahora);
     }

@@ -25,8 +25,7 @@ export function construirReglas(u: Umbrales): Regla[] {
     ["pvpc_barato", "pvpc", "precio", false, u.pvpcBarato, "💡 Luz barata"],
   ];
   for (const e of ESTACIONES) {
-    if (e.tipo === "embalse") c.push([`embalse_${e.id}`, "saih", `${e.id}.porcentaje`, true, u.embalsePct, `🌊 ${e.corto} casi lleno`]);
-    if (e.tipo === "rio" && e.caudalAlerta) c.push([`caudal_${e.id}`, "saih", `${e.id}.caudal`, true, e.caudalAlerta, `🌊 Caudal alto: ${e.nombre}`]);
+    if (e.tipo === "embalse") c.push([`embalse_${e.id}`, "agua", `${e.id}.porcentaje`, true, u.embalsePct, `🌊 ${e.corto} casi lleno`]);
   }
   return c.filter(x => x[4] != null).map(([id, fuente, metrica, mayor, umbral, titulo]) =>
     ({ id, fuente, metrica, mayor, umbral: umbral!, titulo }));
@@ -60,13 +59,13 @@ export function detectarCrecidas(h: Historial, u: Umbrales, nuevas: Lectura[]): 
   if (!u.crecidaFactor) return [];
   const avisos: Aviso[] = [];
   for (const l of nuevas) {
-    if (l.fuente !== "saih" || !l.metrica.endsWith(".caudal")) continue;
-    const hist = h.serie(`saih.${l.metrica}`, l.t - 7 * 86400e3, l.t).map(p => p[1]).sort((a, b) => a - b);
+    if (l.fuente !== "hidro" || !l.metrica.endsWith(".caudal")) continue;
+    const hist = h.serie(`hidro.${l.metrica}`, l.t - 7 * 86400e3, l.t).map(p => p[1]).sort((a, b) => a - b);
     if (hist.length < 12) continue;
     const normal = hist[Math.floor(hist.length / 2)];
     if (l.valor >= CAUDAL_MINIMO_CRECIDA && l.valor > u.crecidaFactor * normal) {
       const id = l.metrica.split(".")[0];
-      const nombre = ESTACIONES.find(e => e.id === id)?.nombre ?? id;
+      const nombre = h.extra<{ estaciones: { id: string; nombre: string }[] }>("estacionesHidro")?.estaciones.find(e => e.id === id)?.nombre ?? id;
       avisos.push({
         regla: `crecida_${id}`,
         titulo: `🌊 Crecida en ${nombre}`,

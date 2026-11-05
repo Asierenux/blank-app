@@ -31,7 +31,8 @@ export const INTERVALOS_MIN: Record<string, number> = {
   pvpc: 60,
   waqi: 30,
   euskalmet: 30,
-  saih: 30,
+  embalses: 360,
+  hidro: 30,
   generacion: 360,
   trafico: 10,
 };
@@ -65,12 +66,10 @@ export interface Estacion {
 export const ESTACIONES: Estacion[] = [
   { id: "ullibarri", nombre: "Embalse de Ullíbarri-Gamboa", corto: "Ullíbarri", tipo: "embalse",
     rio: "Zadorra", codigo: "E027", claves: ["ullivarri", "ullibarri"], slug: "ullivarri",
-    capacidadHm3: 147, aforoSalida: "zadorra_mendivil" },
+    capacidadHm3: 147 },
   { id: "urrunaga", nombre: "Embalse de Urrunaga", corto: "Urrunaga", tipo: "embalse",
     rio: "Santa Engracia", codigo: "E028", claves: ["urrunaga"], slug: "urrunaga",
     capacidadHm3: 71.77, cotaMinima: 530, cotaAliviadero: 544.5, cotaNmn: 546.5, cotaCoronacion: 548 },
-  { id: "zadorra_mendivil", nombre: "Zadorra en Mendivil", corto: "Mendivil", tipo: "rio",
-    rio: "Zadorra", codigo: "A315", claves: ["mendivil", "mendibil"], slug: "zadorra-mendivil" },
 ];
 
 export const SENALES = {

@@ -39,7 +39,7 @@ export default function Inicio() {
         </View>
         <Text style={{ color: c.suave, fontSize: 14 }}>
           {[...panel.indicadores, ...agua.embalses.map(e => ({ nivel: e.nivelEstado, etiqueta: e.corto, texto: e.texto })),
-            ...agua.rios.map(r => ({ nivel: r.nivelEstado, etiqueta: r.corto, texto: r.texto }))]
+            ...agua.rios.map(r => ({ nivel: r.nivelEstado, etiqueta: r.nombre, texto: r.texto }))]
             .filter(i => i.nivel === "aviso" || i.nivel === "critico")
             .map(i => `${i.etiqueta}: ${i.texto}`).join(" · ") || "Tiempo, aire y agua dentro de lo normal."}
         </Text>

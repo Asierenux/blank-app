@@ -71,23 +71,22 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
     curva.forEach((v, i) => add("pvpc", "precio", hoy + (d * 24 + i) * H, v * (d ? 0.92 : 1) + r() * 0.008, "€/kWh"));
   }
 
-  // Embalses y río: cada hora, 7 días. Suben tras la lluvia.
-  let acumulado = 0;
+  // Ríos (estaciones de Euskalmet): cada hora, 7 días. Suben tras la lluvia.
   for (let i = 7 * 24; i >= 0; i--) {
     const t = horaActual - i * H;
-    acumulado += lluviaEn(i);
-    const efecto = Math.min(1, acumulado / 40);
     const crecida = Math.max(0, 7 * Math.exp(-(((i - 38) / 10) ** 2)));
-    add("saih", "urrunaga.nivel", t, 543.02 + efecto * 0.42 + i * 0.0003, "msnm");
-    add("saih", "urrunaga.porcentaje", t, 78.4 + efecto * 2.9, "%");
-    add("saih", "urrunaga.volumen", t, (78.4 + efecto * 2.9) * 0.7177, "hm³");
-    add("saih", "urrunaga.entrada", t, 2.1 + crecida * 0.7 + r() * 0.2, "m³/s");
-    add("saih", "urrunaga.salida", t, 1.6 + r() * 0.1, "m³/s");
-    add("saih", "ullibarri.porcentaje", t, 70.8 + efecto * 2.1, "%");
-    add("saih", "ullibarri.volumen", t, (70.8 + efecto * 2.1) * 1.47, "hm³");
-    add("saih", "ullibarri.entrada", t, 4.2 + crecida + r() * 0.3, "m³/s");
-    add("saih", "zadorra_mendivil.caudal", t, 6.1 + crecida * 1.1 + r() * 0.3, "m³/s");
-    add("saih", "zadorra_mendivil.nivel", t, 0.82 + crecida * 0.06, "m");
+    add("hidro", "DEMO1.caudal", t, 6.1 + crecida * 1.1 + r() * 0.3, "m³/s");
+    add("hidro", "DEMO1.nivel", t, 0.82 + crecida * 0.06, "m");
+    add("hidro", "DEMO2.caudal", t, 3.2 + crecida * 0.6 + r() * 0.2, "m³/s");
+  }
+  // Embalses: un dato por semana, 13 semanas (boletín semanal)
+  for (let k = 12; k >= 0; k--) {
+    const t = hoy - (k * 7 + 2) * 24 * H + 12 * H;
+    const urr = 66 + (12 - k) * 1.2 + (k === 0 ? 2.6 : 0), ull = 61 + (12 - k) * 0.9 + (k === 0 ? 1.8 : 0);
+    add("agua", "urrunaga.porcentaje", t, urr, "%");
+    add("agua", "urrunaga.volumen", t, urr * 0.7177, "hm³");
+    add("agua", "ullibarri.porcentaje", t, ull, "%");
+    add("agua", "ullibarri.volumen", t, ull * 1.47, "hm³");
   }
 
   // Generación hidráulica: 30 días
@@ -111,7 +110,9 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
   ];
   h.ponerExtra("incidencias", incidencias);
   h.ponerExtra("estacionAire", "Vitoria-Gasteiz · Avenida Gasteiz");
-  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "saih", "generacion", "trafico"]) {
+  h.ponerExtra("estacionesHidro", { t: ahora, estaciones: [
+    { id: "DEMO1", nombre: "Zadorra en Abetxuko", medidas: [] }, { id: "DEMO2", nombre: "Zadorra en Arce", medidas: [] }] });
+  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"]) {
     h.apuntarEjecucion(f, true, null, 1, ahora - (f === "generacion" ? 3 * H : 4 * 60000));
   }
 }

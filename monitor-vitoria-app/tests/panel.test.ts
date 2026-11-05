@@ -59,10 +59,12 @@ async function historialDePrueba() {
     l("aemet", "temperatura", AHORA - 2 * H, 10), l("aemet", "temperatura", AHORA - H, 12),
     l("aemet", "racha", AHORA - H, 5), l("aemet", "precipitacion", AHORA - H, 3.5),
     l("waqi", "aqi", AHORA - 30 * 60000, 34),
-    l("saih", "urrunaga.nivel", AHORA - H, 543.2), l("saih", "urrunaga.porcentaje", AHORA - H, 80),
-    l("saih", "urrunaga.nivel", AHORA - 25 * H, 543.0),
-    l("saih", "ullibarri.porcentaje", AHORA - H, 70), l("saih", "ullibarri.entrada", AHORA - H, 3),
-    l("saih", "zadorra_mendivil.caudal", AHORA - H, 9),
+    // Embalses: dato semanal (hace 2 días y la semana anterior)
+    l("agua", "urrunaga.porcentaje", AHORA - 2 * 24 * H, 80), l("agua", "urrunaga.porcentaje", AHORA - 9 * 24 * H, 78.5),
+    l("agua", "urrunaga.volumen", AHORA - 2 * 24 * H, 57.4),
+    l("agua", "ullibarri.porcentaje", AHORA - 12 * 24 * H, 70),                  // demasiado antiguo: no vale
+    // Río de una estación de Euskalmet
+    l("hidro", "C0X1.caudal", AHORA - H, 9), l("hidro", "C0X1.caudal", AHORA - 4 * H, 8.7),
   ]);
   return h;
 }
@@ -79,12 +81,18 @@ test("Panel completo", async () => {
   assert.equal(new Date(p.pvpc.mejorFranja!.inicio).toISOString(), "2026-11-05T23:00:00.000Z");   // madrugada de mañana
   assert.equal(p.pvpc.minimoHoy!.v, 0.05);
   const urr = p.agua.embalses.find(e => e.id === "urrunaga")!;
-  assert.equal(urr.var24hCm, 20);
-  assert.equal(urr.margenAliviadero, 1.3);
+  assert.equal(urr.porcentaje, 80);
+  assert.equal(urr.varSemanaPct, 1.5);
+  assert.equal(urr.edadDias, 2);
+  assert.equal(urr.nivelEstado, "ok");
   const ull = p.agua.embalses.find(e => e.id === "ullibarri")!;
-  assert.equal(ull.salida, 9);                                   // medida en Mendivil, aguas abajo
-  assert.equal(ull.salidaMedidaEn, "Zadorra en Mendivil");
-  assert.equal(ull.maniobra!.texto, "Desembalsando");
+  assert.equal(ull.nivelEstado, "sin_datos");
+  assert.equal(p.agua.rios.length, 0);                            // sin estaciones descubiertas, no hay ríos
+  h.ponerExtra("estacionesHidro", { t: AHORA, estaciones: [{ id: "C0X1", nombre: "Zadorra en Abetxuko", medidas: [] }] });
+  const [rio] = construirPanel(h, U, {}, AHORA).agua.rios;
+  assert.equal(rio.nombre, "Zadorra en Abetxuko");
+  assert.equal(rio.caudal, 9);
+  assert.equal(rio.tendencia3h, 0.3);
   assert.equal(p.agua.lluvia.h24, 3.5);
   assert.equal(p.fuentes.find(f => f.nombre === "aemet")!.texto, "Pendiente");
 });
@@ -103,11 +111,13 @@ test("Alertas: una por regla y sin repetir", async () => {
 
 test("Crecida: caudal muy por encima de lo normal de la semana", async () => {
   const h = new Historial(almacenEnMemoria());
-  const semana = Array.from({ length: 20 }, (_, i) => l("saih", "zadorra_mendivil.caudal", AHORA - (i + 2) * 6 * H, 8));
-  const pico = l("saih", "zadorra_mendivil.caudal", AHORA, 30);
+  const semana = Array.from({ length: 20 }, (_, i) => l("hidro", "C0X1.caudal", AHORA - (i + 2) * 6 * H, 8));
+  const pico = l("hidro", "C0X1.caudal", AHORA, 30);
+  h.ponerExtra("estacionesHidro", { t: AHORA, estaciones: [{ id: "C0X1", nombre: "Zadorra en Abetxuko", medidas: [] }] });
   h.guardar([...semana, pico]);
   const [a] = detectarCrecidas(h, U, [pico]);
-  assert.equal(a.regla, "crecida_zadorra_mendivil");
+  assert.equal(a.regla, "crecida_C0X1");
+  assert.equal(a.titulo, "🌊 Crecida en Zadorra en Abetxuko");
   assert.match(a.cuerpo, /×3,8/);
 });
 
@@ -130,8 +140,9 @@ test("Motor: actualiza lo que toca, apunta errores y avisa una vez", async () =>
   const hechas = await m.actualizar();
   assert.deepEqual(hechas, ["pvpc"]);
   assert.equal(h.ejecuciones.aemet, undefined);                    // sin clave: ni se intenta
-  assert.equal(h.ejecuciones.saih.ok, false);
-  assert.match(h.ejecuciones.saih.error!, /404/);
+  assert.equal(h.ejecuciones.embalses.ok, false);
+  assert.match(h.ejecuciones.embalses.error!, /404/);
+  assert.equal(h.ejecuciones.hidro, undefined);                   // necesita la clave de Euskalmet
   assert.deepEqual(avisos, ["pvpc_barato"]);
   assert.deepEqual(m.pendientes(false).includes("pvpc"), false);
   await m.actualizar(true);

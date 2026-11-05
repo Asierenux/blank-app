@@ -11,7 +11,7 @@ los guarda en el iPhone y avisa con notificaciones. No necesita el ordenador enc
 | Pestaña | Qué enseña |
 |---|---|
 | **Inicio** | Estado general, precio de la luz ahora y mejores horas, tiempo, aire, embalses y tráfico |
-| **Agua** | Ullíbarri y Urrunaga (llenado, cota frente al aliviadero y el NMN, entra/sale, si está desembalsando), Zadorra en Mendivil, lluvia y energía hidráulica |
+| **Agua** | Ríos en tiempo real (estaciones de Euskalmet del Zadorra), llenado semanal de Ullíbarri y Urrunaga, lluvia y energía hidráulica |
 | **Movilidad** | Mapa en directo: autobuses de Tuvisa (GPS cada 15 s), tranvía (se mueve entre paradas) y tráfico (incidencias y cámaras) |
 | **Clima** | Vitoria (AEMET) y Kapildui (Euskalmet) con gráficas de 24 h / 3 días / 7 días, y calidad del aire |
 | **Ajustes** | Claves, umbrales de alerta y estado de cada fuente |
@@ -45,7 +45,7 @@ Están en la pestaña **Ajustes**. Se guardan cifradas en el llavero del iPhone.
   ábrelo en el PC con el Bloc de notas, cópialo y envíatelo (por ejemplo, en una nota o un correo a ti mismo).
   Pega el texto completo, incluidas las líneas `-----BEGIN…` y `-----END…`.
 
-Sin claves ya funcionan: luz, embalses, ríos, energía, tráfico, autobuses y tranvía.
+Sin claves ya funcionan: luz, embalses (semanal), energía, tráfico, autobuses y tranvía. Los ríos usan la clave de Euskalmet.
 
 ## Qué cambia respecto al programa del ordenador
 
@@ -58,10 +58,12 @@ Sin claves ya funcionan: luz, embalses, ríos, energía, tráfico, autobuses y t
 
 ## Pendiente de comprobar con datos reales
 
-- **SAIH Ebro**: la ficha de cada estación rellena parte de los valores con JavaScript. Si en *Agua* sale
-  "no se encontró ningún dato", hace falta la dirección interna de donde la web saca los valores.
+- **SAIH Ebro**: no se usa en el iPhone. Su web tiene un certificado que iOS no acepta ("el certificado de este
+  servidor no es válido"), y la app no se salta esa comprobación. En su lugar:
+  - **Ríos**: la app busca sola las estaciones de Euskalmet del Zadorra que miden nivel o caudal.
+  - **Embalses**: dato semanal de embalses.net (boletín hidrológico). Formato no comprobado todavía.
 - **Cámaras de tráfico**: la app las pide como un navegador. Si no se ven, la lista de cámaras trae otra dirección.
-- **Euskalmet**: escrito según la documentación; en Ajustes › Fuentes se ve si responde.
+- **Euskalmet**: Kapildui comprobado en un iPhone real (las horas de la API van en UTC).
 
 ## Para programadores
 
