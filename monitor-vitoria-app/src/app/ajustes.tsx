@@ -1,5 +1,4 @@
 /** Ajustes: claves (guardadas cifradas en el iPhone), alertas, umbrales y estado de las fuentes. */
-import Constants from "expo-constants";
 import { useState } from "react";
 import { Alert, Linking, Pressable, Switch, Text, TextInput, View } from "react-native";
 
@@ -7,6 +6,7 @@ import { Aviso, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../
 import { useDatos } from "../datos";
 import { UMBRALES_DEFECTO, type Umbrales } from "../lib/config";
 import { hace } from "../lib/formato";
+import { VERSION_APP } from "../lib/version";
 import type { Fuente } from "../lib/motor";
 import { useColores } from "../lib/tema";
 import type { Claves } from "../lib/tipos";
@@ -156,7 +156,7 @@ export default function Ajustes() {
             [{ text: "Cancelar", style: "cancel" }, { text: "Vaciar", style: "destructive", onPress: () => void vaciar() }])} />
         </Tarjeta>
         <Etiqueta>
-          Monitor Vitoria {Constants.expoConfig?.version ?? ""} · Datos: AEMET, Euskalmet, WAQI, Red Eléctrica, SAIH Ebro,
+          Monitor Vitoria · versión del {VERSION_APP} · Datos: AEMET, Euskalmet, WAQI, Red Eléctrica, SAIH Ebro,
           Open Data Euskadi (tráfico y Moveuskadi, CC BY 4.0).
         </Etiqueta>
       </Seccion>
