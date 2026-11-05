@@ -6,7 +6,6 @@
  * La firma se hace en el propio móvil con jsrsasign: la clave nunca sale del teléfono.
  */
 import { KJUR } from "jsrsasign";
-import { partesMadrid } from "../formato";
 import { ErrorFuente, type Descargar, type Lectura } from "../tipos";
 import { bajarJson, lectura, type Resultado } from "./comun";
 
@@ -79,24 +78,30 @@ export async function recogerEuskalmet(
     if (!medidas.length) throw new ErrorFuente("Euskalmet no devolvió sensores para Kapildui");
   }
 
-  // 2) Valores de la hora anterior y la actual (hora de Madrid)
+  // 2) Valores de las últimas horas. Las horas de la dirección van en UTC (hora universal):
+  //    se piden las 4 últimas para tener siempre alguna completa. Una hora sin datos da 404.
   const horaActual = Math.floor(ahora / 3600e3) * 3600e3;
   const lecturas: Lectura[] = [];
   const errores: string[] = [];
+  let sinDatos = 0;
+  const dos = (n: number) => String(n).padStart(2, "0");
   for (const m of medidas) {
     if (!MEDIDAS[m.medida]) continue;
-    for (const h of [horaActual - 3600e3, horaActual]) {
-      const p = partesMadrid(h);
-      const dos = (n: number) => String(n).padStart(2, "0");
+    for (const h of [3, 2, 1, 0].map(k => horaActual - k * 3600e3)) {
+      const d = new Date(h);
       const ruta = `/euskalmet/readings/forStation/${ESTACION_KAPILDUI}/${m.sensor}/measures/${m.tipo}/${m.medida}` +
-        `/at/${p.anio}/${dos(p.mes)}/${dos(p.dia)}/${dos(p.hora)}`;
+        `/at/${d.getUTCFullYear()}/${dos(d.getUTCMonth() + 1)}/${dos(d.getUTCDate())}/${dos(d.getUTCHours())}`;
       try {
         lecturas.push(...parsearLecturas(await get(ruta), m.medida, h));
       } catch (e) {
-        errores.push(`${m.medida}: ${(e as Error).message}`);
+        if (/\b404\b/.test((e as Error).message)) sinDatos++;
+        else errores.push(`${m.medida}: ${(e as Error).message}`);
       }
     }
   }
-  if (errores.length && !lecturas.length) throw new ErrorFuente("Euskalmet: " + errores.slice(0, 3).join("; "));
+  if (!lecturas.length) {
+    if (errores.length) throw new ErrorFuente("Euskalmet: " + errores.slice(0, 3).join("; "));
+    throw new ErrorFuente(`Euskalmet no tiene lecturas de Kapildui en las últimas 4 horas (${sinDatos} consultas sin datos)`);
+  }
   return { lecturas, extra: { euskalmetMedidas: { t: cache && cache.medidas === medidas ? cache.t : ahora, medidas } } };
 }

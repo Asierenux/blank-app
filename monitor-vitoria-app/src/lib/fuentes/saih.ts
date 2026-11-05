@@ -78,6 +78,8 @@ export function extraerFecha(texto: string): number | null {
   return mejor;
 }
 
+const NAVEGADOR = "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+
 export function urlEstacion(e: Estacion): string {
   return `https://www.saihebro.com/tiempo-real/estacion-${e.tipo === "embalse" ? "embalses" : "aforos"}-${e.codigo}-${e.slug}`;
 }
@@ -103,7 +105,15 @@ export async function recogerSaih(descargar: Descargar, ahora = Date.now()): Pro
   for (const e of ESTACIONES) {
     if (!e.codigo) continue;
     try {
-      const r = await bajar(descargar, urlEstacion(e), { headers: { Accept: "text/html" } });
+      const opciones = { headers: { Accept: "text/html", "User-Agent": NAVEGADOR } };
+      let r: Response;
+      try {
+        r = await bajar(descargar, urlEstacion(e), opciones);
+      } catch (ex) {
+        // Si la conexión segura (https) falla en el iPhone, se prueba la normal (http)
+        if (!/Sin conexión/.test((ex as Error).message)) throw ex;
+        r = await bajar(descargar, urlEstacion(e).replace("https://", "http://"), opciones);
+      }
       lecturas.push(...parsearSaih(e, await r.text(), ahora));
     } catch (ex) {
       errores.push(`${e.corto}: ${(ex as Error).message}`);

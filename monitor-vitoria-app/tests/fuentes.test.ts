@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 import { ESTACIONES, type Estacion } from "../src/lib/config";
 import { decodificarLatin9, parsearAemet, recogerAemet } from "../src/lib/fuentes/aemet";
-import { parsearLecturas, tokenEuskalmet } from "../src/lib/fuentes/euskalmet";
+import { parsearLecturas, recogerEuskalmet, tokenEuskalmet } from "../src/lib/fuentes/euskalmet";
 import { parsearGeneracion } from "../src/lib/fuentes/generacion";
 import { parsearRedata, recogerPvpc } from "../src/lib/fuentes/pvpc";
 import { extraer, normalizar, numeroEs, parsearSaih } from "../src/lib/fuentes/saih";
@@ -165,4 +165,31 @@ test("Euskalmet: 6 valores por hora, cada 10 minutos", () => {
   assert.equal(l.length, 5);
   assert.equal(l[3].t - l[0].t, 40 * 60000);
   assert.equal(l[0].t, h);
+});
+
+test("Euskalmet: pide las últimas horas en UTC y una hora sin datos (404) no es un error", async () => {
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const pedidas: string[] = [];
+  const d = internetFalsa({
+    "/stations/C047/current": () => Response.json({ sensors: [{ sensorKey: "/euskalmet/sensors/S1" }] }),
+    "/sensors/S1": () => Response.json({ meteors: [{ measureType: "measuresForAir", measureId: "temperature" }] }),
+    "/readings/": url => {
+      pedidas.push(url.split("/at/")[1]);
+      return url.endsWith("/22") ? new Response("", { status: 404 }) : Response.json({ values: [5, 5.2] });
+    },
+  });
+  const r = await recogerEuskalmet(d, "yo@x.eus", pem, undefined, Date.UTC(2026, 10, 5, 22, 2));   // 23:02 en Vitoria
+  assert.deepEqual(pedidas, ["2026/11/05/19", "2026/11/05/20", "2026/11/05/21", "2026/11/05/22"]);
+  assert.equal(r.lecturas.length, 6);
+  const vacia = internetFalsa({
+    "/stations/C047/current": () => Response.json({ sensors: [{ sensorKey: "S1" }] }),
+    "/sensors/S1": () => Response.json({ meteors: [{ measureType: "measuresForAir", measureId: "temperature" }] }),
+  });
+  await assert.rejects(recogerEuskalmet(vacia, "yo@x.eus", pem, undefined), /no tiene lecturas de Kapildui/);
+});
+
+test("Sin conexión: el mensaje dice con qué web y por qué", async () => {
+  const d: Descargar = async () => { throw new TypeError("Network request failed"); };
+  await assert.rejects(recogerPvpc(d), /Sin conexión con apidatos\.ree\.es · Network request failed/);
 });

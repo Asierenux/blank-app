@@ -28,7 +28,9 @@ export async function bajar(descargar: Descargar, url: string, opciones: Request
     if (e instanceof ErrorFuente) throw e;
     const nombre = (e as Error)?.name;
     if (nombre === "AbortError") throw new ErrorFuente("La web tardó demasiado en responder");
-    throw new ErrorFuente("Sin conexión con la web (¿hay internet?)");
+    // El motivo real (certificado, nombre de la web, conexión cortada…) ayuda a saber qué pasa
+    const motivo = (e as Error)?.message ? ` · ${(e as Error).message}` : "";
+    throw new ErrorFuente(`Sin conexión con ${/^\w+:\/\/([^/?#]+)/.exec(url)?.[1] ?? "la web"}${motivo}`);
   } finally {
     if (reloj) clearTimeout(reloj);
   }
