@@ -198,14 +198,21 @@ def transporte_simulado(ahora: float | None = None) -> dict:
                 proximos.append({"linea": "T1", "color": "#7AB800", "destino": destino, "en_s": en, "retraso_s": 0})
         paradas.append({"id": f"t{j}", "nombre": nombre, "lat": lat, "lon": lon,
                         "proximos": sorted(proximos, key=lambda x: x["en_s"])[:4]})
-    for k in range(4):                                          # 4 tranvías: en su próxima parada
-        idx = int((ahora / 90 + k * n / 2) % (2 * n - 2))
-        j = idx if idx < n else 2 * n - 2 - idx
-        nombre, lat, lon = PARADAS_TRANVIA[j]
+    vuelta = 2 * n - 2                                          # ida y vuelta, 90 s entre paradas
+    for k in range(4):                                          # 4 tranvías avanzando entre paradas
+        fase = (ahora / 90 + k * vuelta / 4 + k * 0.27) % vuelta    # desfasados entre sí
+        tramo, frac = int(fase), fase - int(fase)
+        a = tramo if tramo < n - 1 else vuelta - tramo           # parada de la que sale
+        b = a + 1 if tramo < n - 1 else a - 1                    # parada a la que va
+        (na, la_a, lo_a), (nb, la_b, lo_b) = PARADAS_TRANVIA[a], PARADAS_TRANVIA[b]
+        sale = ahora - frac * 90
         vehiculos.append({"id": f"tranvia-{k}", "operador": "euskotren", "tipo": "tranvia", "linea": "T1",
-                          "color": "#7AB800", "destino": "Universidad" if idx < n else "Abetxuko",
-                          "lat": lat, "lon": lon, "rumbo": None, "hace_s": None, "estimada": True,
-                          "parada": nombre, "llega_en_s": int(90 - ahora % 90), "retraso_s": 0})
+                          "color": "#7AB800", "destino": "Universidad" if b > a else "Abetxuko",
+                          "lat": la_a + (la_b - la_a) * frac, "lon": lo_a + (lo_b - lo_a) * frac,
+                          "rumbo": None, "hace_s": None, "estimada": True, "parada": nb,
+                          "llega_en_s": int((1 - frac) * 90), "retraso_s": 0,
+                          "desde": {"lat": la_a, "lon": lo_a, "t": int(sale), "nombre": na},
+                          "hacia": {"lat": la_b, "lon": lo_b, "t": int(sale + 90), "nombre": nb}})
     resumen = {}
     for v in vehiculos:
         resumen.setdefault(f"{v['tipo']}:{v['linea']}", {"tipo": v["tipo"], "linea": v["linea"],
@@ -216,6 +223,15 @@ def transporte_simulado(ahora: float | None = None) -> dict:
             "buses": sum(v["tipo"] == "bus" for v in vehiculos),
             "tranvias": sum(v["tipo"] == "tranvia" for v in vehiculos),
             "errores": [], "fuentes": {"demo": "datos simulados"}}
+
+
+def recorridos_simulados() -> dict:
+    """Mismo formato que transporte.Transporte.recorridos()."""
+    rec = [{"tipo": "bus", "linea": linea, "color": color, "formas": [[list(p) for p in puntos]]}
+           for (linea, color, _), puntos in RECORRIDOS_BUS.items()]
+    rec.append({"tipo": "tranvia", "linea": "T1", "color": "#7AB800",
+                "formas": [[[la, lo] for _, la, lo in PARADAS_TRANVIA]]})
+    return {"recorridos": rec, "errores": []}
 
 
 def generar(ruta: Path, semilla: int = 7) -> None:

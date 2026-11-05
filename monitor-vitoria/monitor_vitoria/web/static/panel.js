@@ -8,8 +8,8 @@
 "use strict";
 
 const ZONA = "Europe/Madrid";
-const VISTAS = ["resumen", "agua", "trafico", "transporte", "energia", "aire", "meteo", "explorar", "sistema"];
-const VISTAS_CON_PERIODO = ["agua", "trafico", "transporte", "aire", "meteo", "explorar"];
+const VISTAS = ["resumen", "agua", "trafico", "buses", "tranvia", "energia", "aire", "meteo", "explorar", "sistema"];
+const VISTAS_CON_PERIODO = ["agua", "trafico", "buses", "tranvia", "aire", "meteo", "explorar"];
 const ICONO = { ok:"✓", aviso:"▲", critico:"✖", sin_datos:"–", info:"" };
 const TEXTO_NIVEL = { ok:"OK", aviso:"AVISO", critico:"CRÍTICO", sin_datos:"SIN DATOS", info:"" };
 
@@ -328,9 +328,13 @@ let expFuncion = leer("exp.fun", "auto"), expBarras = leer("exp.barras", false);
 
 const CARGADORES = {
   agua: () => getJSON(`/api/agua/historico?${paramsPeriodo()}`),
-  async transporte() {
-    cache.directo = await getJSON("/api/transporte").catch(e => ({error: e.message}));
-    return getJSON(`/api/datos?${paramsPeriodo({series: "transporte:buses_en_servicio,transporte:tranvias_en_servicio", funcion: "max"})}`);
+  async buses() {
+    await cargarDirecto();
+    return getJSON(`/api/datos?${paramsPeriodo({series: "transporte:buses_en_servicio", funcion: "max"})}`);
+  },
+  async tranvia() {
+    await cargarDirecto();
+    return getJSON(`/api/datos?${paramsPeriodo({series: "transporte:tranvias_en_servicio", funcion: "max"})}`);
   },
   trafico: () => getJSON(`/api/datos?${paramsPeriodo({series: "trafico:incidencias_activas,trafico:accidentes_activos,trafico:obras_activas", funcion: "max"})}`),
   aire: () => getJSON(`/api/datos?${paramsPeriodo({series: SERIES_AIRE.join(",")})}`),
@@ -669,98 +673,271 @@ function pintarTrafico(d) {
 $("trafico-filtro").addEventListener("change", () => pintar());
 
 // =====================================================================
-// BUS Y TRANVÍA: mapa en directo (se refresca cada 20 s con la pestaña abierta)
+// AUTOBUSES Y TRANVÍA: mapas en directo con movimiento
 // =====================================================================
-let mapaTransporte = null, capaTransporte = null;
+// - /api/transporte (cada 20 s): dónde está cada vehículo.
+// - /api/transporte/recorridos (una vez): el dibujo de cada línea.
+// - Los autobuses se desplazan suavemente a su nueva posición y dejan estela.
+// - Los tranvías se recolocan cada segundo entre su parada anterior y la siguiente.
 let lineasOcultas = new Set(leer("transporte.ocultas", []));
-const claveLinea = v => `${v.tipo}:${v.linea}`;
+let verEstela = leer("transporte.estela", true);
+let recorridos = null;
+const mapas = {};                              // id del mapa → {mapa, fondo, estelas, marcas}
+const estelas = new Map();                     // id del autobús → últimas posiciones
 const enMinutos = s => s < 60 ? "llegando" : `${Math.round(s / 60)} min`;
+const COLOR_TRANVIA = "#7AB800";
+const colorDe = v => v.color || (v.tipo === "tranvia" ? COLOR_TRANVIA : css("--info"));
+
+async function cargarDirecto() {
+  cache.directo = await getJSON("/api/transporte").catch(e => ({error: e.message}));
+  if (!recorridos || recorridos.error) recorridos = await getJSON("/api/transporte/recorridos").catch(e => ({error: e.message, recorridos: []}));
+  for (const v of cache.directo.vehiculos || []) {
+    if (v.tipo !== "bus") continue;
+    const e = estelas.get(v.id) || [], ult = e.at(-1);
+    if (!ult || ult[0] !== v.lat || ult[1] !== v.lon) e.push([v.lat, v.lon]);
+    estelas.set(v.id, e.slice(-15));          // ~5 minutos de recorrido
+  }
+}
+
+function mapaBase(id, zoom) {
+  if (!window.L) { $(id).innerHTML = `<p class="vacio">No se pudo cargar el mapa (¿sin conexión a internet?).</p>`; return null; }
+  if (!mapas[id]) {
+    const mapa = L.map(id, { scrollWheelZoom: false }).setView([42.8467, -2.6716], zoom);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapa);
+    mapas[id] = { mapa, fondo: L.layerGroup().addTo(mapa), estelas: L.layerGroup().addTo(mapa), marcas: new Map() };
+  }
+  setTimeout(() => mapas[id].mapa.invalidateSize(), 50);   // el contenedor estaba oculto
+  return mapas[id];
+}
 
 function iconoVehiculo(v) {
-  const color = v.color || (v.tipo === "tranvia" ? "#7AB800" : css("--info"));
   const forma = v.tipo === "tranvia" ? "vehiculo tranvia" : "vehiculo bus";
   return L.divIcon({ className: "", iconSize: [26, 26], iconAnchor: [13, 13],
-    html: `<div class="${forma}" style="--color:${esc(color)}"><span>${esc(v.linea)}</span></div>` });
+    html: `<div class="${forma}" style="--color:${esc(colorDe(v))}"><span>${esc(v.linea)}</span></div>` });
 }
 
-function pintarMapaTransporte(d) {
-  if (!window.L) { $("mapa-transporte").innerHTML = `<p class="vacio">No se pudo cargar el mapa (¿sin conexión a internet?).</p>`; return; }
-  if (!mapaTransporte) {
-    mapaTransporte = L.map("mapa-transporte", { scrollWheelZoom: false }).setView([42.8467, -2.6716], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "© OpenStreetMap" }).addTo(mapaTransporte);
-    capaTransporte = L.layerGroup().addTo(mapaTransporte);
-  }
-  setTimeout(() => mapaTransporte.invalidateSize(), 50);
-  capaTransporte.clearLayers();
-  for (const p of d.paradas_tranvia || []) {
-    L.circleMarker([p.lat, p.lon], { radius: 4, color: "#7AB800", weight: 2, fillColor: "#fff", fillOpacity: 1 })
-      .bindTooltip(p.nombre).addTo(capaTransporte);
-  }
-  for (const v of d.vehiculos || []) {
-    if (lineasOcultas.has(claveLinea(v))) continue;
-    const texto = v.estimada
-      ? `<b>Tranvía ${esc(v.linea)}</b> → ${esc(v.destino)}<br>Próxima parada: <b>${esc(v.parada)}</b> (${enMinutos(v.llega_en_s)})
-         ${v.retraso_s > 60 ? `<br>Retraso: ${Math.round(v.retraso_s / 60)} min` : ""}<br><small>Posición estimada</small>`
-      : `<b>Bus ${esc(v.linea)}</b>${v.destino ? " → " + esc(v.destino) : ""}<br><small>GPS ${v.hace_s != null ? "hace " + v.hace_s + " s" : ""}</small>`;
-    L.marker([v.lat, v.lon], { icon: iconoVehiculo(v), zIndexOffset: v.tipo === "tranvia" ? 500 : 0 })
-      .bindPopup(texto).addTo(capaTransporte);
+function dibujarRecorridos(m, tipo) {
+  m.fondo.clearLayers();
+  for (const r of (recorridos?.recorridos || []).filter(x => x.tipo === tipo)) {
+    if (lineasOcultas.has(`${tipo}:${r.linea}`)) continue;
+    for (const forma of r.formas) {
+      L.polyline(forma, { color: r.color || (tipo === "tranvia" ? COLOR_TRANVIA : css("--info")),
+        weight: tipo === "tranvia" ? 6 : 3, opacity: tipo === "tranvia" ? .75 : .4 })
+        .bindTooltip(`${tipo === "tranvia" ? "Tranvía" : "Línea"} ${esc(r.linea)}`, { sticky: true }).addTo(m.fondo);
+    }
   }
 }
 
-function pintarTransporte() {
-  const d = cache.directo;
-  if (!d) return;
-  if (d.error) { $("transporte-errores").innerHTML = `<p class="vacio">No se pudo consultar: ${esc(d.error)}</p>`; return; }
-  const lineas = d.lineas_activas || [];
-  $("transporte-resumen").innerHTML =
-    dato("🚌 Autobuses Tuvisa", String(d.buses), "en servicio ahora") +
-    dato("🚊 Tranvías", String(d.tranvias), "circulando ahora") +
-    dato("Líneas de bus activas", String(lineas.filter(l => l.tipo === "bus").length), "con algún autobús") +
-    dato("Paradas de tranvía", String((d.paradas_tranvia || []).length), "con próximas llegadas");
-  $("transporte-actualizado").textContent = d.actualizado ? "datos de las " + hora(d.actualizado) : "";
+// Desplazamiento suave (1,5 s) de la posición anterior a la nueva
+function moverSuave(marca, destino, ms = 1500) {
+  const ini = marca.getLatLng(), t0 = performance.now();
+  cancelAnimationFrame(marca._anim);
+  if (ini.distanceTo(destino) > 3000) { marca.setLatLng(destino); return; }   // salto muy grande: sin animar
+  const paso = t => {
+    const f = Math.min(1, (t - t0) / ms), e = f < .5 ? 2 * f * f : 1 - (-2 * f + 2) ** 2 / 2;
+    marca.setLatLng([ini.lat + (destino[0] - ini.lat) * e, ini.lng + (destino[1] - ini.lng) * e]);
+    if (f < 1) marca._anim = requestAnimationFrame(paso);
+  };
+  marca._anim = requestAnimationFrame(paso);
+}
 
-  // Líneas: chips para ocultar/mostrar en el mapa
-  $("transporte-lineas").innerHTML = lineas.map(l => `<button type="button" class="chip" data-linea="${esc(l.tipo + ":" + l.linea)}"
-      aria-pressed="${!lineasOcultas.has(l.tipo + ":" + l.linea)}"><i class="${l.tipo === "tranvia" ? "" : "barra"}" style="background:${esc(l.color || (l.tipo === "tranvia" ? "#7AB800" : css("--info")))}"></i>
-      ${l.tipo === "tranvia" ? "🚊" : "🚌"} ${esc(l.linea)} <span class="gris">${l.n}</span></button>`).join("")
-    || `<span class="vacio">Ningún vehículo en servicio ahora mismo.</span>`;
+function actualizarMarcas(m, lista, textoPopup) {
+  const vistos = new Set();
+  for (const v of lista) {
+    vistos.add(v.id);
+    let marca = m.marcas.get(v.id);
+    if (!marca) {
+      marca = L.marker([v.lat, v.lon], { icon: iconoVehiculo(v), zIndexOffset: v.tipo === "tranvia" ? 500 : 0 })
+        .bindPopup(textoPopup(v)).addTo(m.mapa);
+      m.marcas.set(v.id, marca);
+    } else {
+      if (marca._v.linea !== v.linea || marca._v.color !== v.color) marca.setIcon(iconoVehiculo(v));
+      marca.setPopupContent(textoPopup(v));
+      if (v.tipo === "bus") moverSuave(marca, [v.lat, v.lon]);
+    }
+    marca._v = v;
+  }
+  for (const [id, marca] of m.marcas) if (!vistos.has(id)) { marca.remove(); m.marcas.delete(id); }
+}
+
+// Pulsar un vehículo de la lista → centra el mapa en él y abre su ficha
+function enfocar(mapaId, id) {
+  const m = mapas[mapaId], marca = m?.marcas.get(id);
+  if (!marca) return;
+  m.mapa.setView(marca.getLatLng(), Math.max(m.mapa.getZoom(), 15), { animate: true });
+  marca.openPopup();
+}
+
+function chipsLineas(contenedor, lineas) {
+  $(contenedor).innerHTML = lineas.map(l => {
+    const k = `${l.tipo}:${l.linea}`;
+    return `<button type="button" class="chip" data-linea="${esc(k)}" aria-pressed="${!lineasOcultas.has(k)}">
+      <i class="barra" style="background:${esc(colorDe(l))}"></i>${esc(l.linea)} <span class="gris">${l.n}</span></button>`;
+  }).join("") || `<span class="vacio">Ningún autobús en servicio ahora mismo.</span>`;
+}
+
+function erroresDe(d, texto) {
+  return (d.errores || []).filter(e => e.includes(texto)).map(e => `<p class="nota">⚠ ${esc(e)}</p>`).join("");
+}
+
+// ------------------------------------------------------------- AUTOBUSES
+function pintarBuses() {
+  const d = cache.directo; if (!d) return;
+  if (d.error) { $("buses-errores").innerHTML = `<p class="vacio">No se pudo consultar: ${esc(d.error)}</p>`; return; }
+  const buses = (d.vehiculos || []).filter(v => v.tipo === "bus");
+  const lineas = (d.lineas_activas || []).filter(l => l.tipo === "bus");
+  const visibles = buses.filter(v => !lineasOcultas.has(`bus:${v.linea}`));
+  const masCargada = [...lineas].sort((a, b) => b.n - a.n)[0];
+  const edades = buses.map(v => v.hace_s).filter(x => x != null).sort((a, b) => a - b);
+  $("buses-resumen").innerHTML =
+    dato("🚌 Autobuses en servicio", String(buses.length), `en ${lineas.length} líneas`) +
+    dato("Línea con más autobuses", masCargada ? masCargada.linea : "—", masCargada ? `${masCargada.n} autobuses` : "") +
+    dato("En el mapa", String(visibles.length), lineasOcultas.size ? "hay líneas ocultas" : "todas las líneas") +
+    dato("Antigüedad del GPS", edades.length ? `${edades[Math.floor(edades.length / 2)]} s` : "—", "valor típico (mediana)");
+  $("buses-actualizado").textContent = d.actualizado ? "datos de las " + hora(d.actualizado) : "";
+  chipsLineas("buses-lineas", lineas);
+  $("buses-estela").setAttribute("aria-pressed", verEstela);
+
+  const m = mapaBase("mapa-buses", 13);
+  if (m) {
+    dibujarRecorridos(m, "bus");
+    m.estelas.clearLayers();
+    if (verEstela) for (const v of visibles) {
+      const e = estelas.get(v.id);
+      if (e && e.length > 1) L.polyline(e, { color: colorDe(v), weight: 4, opacity: .55, dashArray: "1 7", lineCap: "round" }).addTo(m.estelas);
+    }
+    actualizarMarcas(m, visibles, v => `<b>Autobús línea ${esc(v.linea)}</b>${v.destino ? " → " + esc(v.destino) : ""}
+      <br><small>GPS ${v.hace_s != null ? "de hace " + v.hace_s + " s" : ""}</small>`);
+  }
+
+  // Lista agrupada por línea
+  const porLinea = {};
+  for (const v of visibles) (porLinea[v.linea] ||= []).push(v);
+  $("buses-cuenta").textContent = `${visibles.length} de ${buses.length}`;
+  $("buses-lista").innerHTML = Object.keys(porLinea).sort((a, b) => a.localeCompare(b, "es", {numeric: true})).map(l =>
+    `<li class="grupo-linea"><span class="marca-linea" style="--color:${esc(colorDe(porLinea[l][0]))}">${esc(l)}</span>
+      <span>${porLinea[l].length} autobús${porLinea[l].length > 1 ? "es" : ""}</span></li>` +
+    porLinea[l].map(v => `<li class="vehiculo-fila" data-mapa="mapa-buses" data-id="${esc(v.id)}" tabindex="0" role="button">
+      <div><div class="tit">→ ${esc(v.destino || "sin destino")}</div><div class="det">vehículo ${esc(String(v.id).replace(/^bus-/, ""))}</div></div>
+      <div class="der det">${v.hace_s != null ? v.hace_s + " s" : ""}</div></li>`).join("")).join("")
+    || `<li class="n-sin_datos"><div><div class="tit">Sin autobuses</div><div class="det">Ninguno en servicio o todas las líneas ocultas</div></div><div></div></li>`;
+  $("buses-errores").innerHTML = erroresDe(d, "Tuvisa");
+
+  const r = cache.buses;
+  if (r && !r.error) {
+    $("buses-resolucion").textContent = textoRango(r);
+    graficaSeries("g-buses", "ley-buses", r, r.series, {colores: [css("--info")]});
+  }
+}
+
+// --------------------------------------------------------------- TRANVÍA
+function posicionTranvia(v, ahora = Date.now() / 1000) {
+  if (!v.desde || !v.hacia || v.hacia.t <= v.desde.t) return [v.lat, v.lon];
+  const f = Math.min(1, Math.max(0, (ahora - v.desde.t) / (v.hacia.t - v.desde.t)));
+  return [v.desde.lat + (v.hacia.lat - v.desde.lat) * f, v.desde.lon + (v.hacia.lon - v.desde.lon) * f];
+}
+
+function textoTranvia(v) {
+  const falta = v.hacia ? Math.max(0, Math.round(v.hacia.t - Date.now() / 1000)) : v.llega_en_s;
+  return `<b>Tranvía ${esc(v.linea)}</b> → ${esc(v.destino)}<br>
+    ${v.desde ? `Entre <b>${esc(v.desde.nombre)}</b> y <b>${esc(v.hacia.nombre)}</b>` : `Llegando a <b>${esc(v.parada)}</b>`}
+    <br>Llega a ${esc(v.parada)}: ${enMinutos(falta)}${v.retraso_s > 60 ? ` · ${Math.round(v.retraso_s / 60)} min de retraso` : ""}
+    <br><small>Posición calculada con los horarios en tiempo real</small>`;
+}
+
+function pintarTranvia() {
+  const d = cache.directo; if (!d) return;
+  if (d.error) { $("tranvia-errores").innerHTML = `<p class="vacio">No se pudo consultar: ${esc(d.error)}</p>`; return; }
+  const tranvias = (d.vehiculos || []).filter(v => v.tipo === "tranvia");
+  const paradas = d.paradas_tranvia || [];
+  const retrasos = tranvias.map(v => v.retraso_s || 0);
+  const conRetraso = retrasos.filter(x => x > 60).length;
 
   // Próximas llegadas a la parada elegida
-  const sel = $("transporte-parada"), paradas = d.paradas_tranvia || [];
+  const sel = $("transporte-parada");
   const elegida = sel.value || leer("transporte.parada", "") || paradas[0]?.id;
   sel.innerHTML = paradas.map(p => `<option value="${esc(p.id)}" ${p.id === elegida ? "selected" : ""}>${esc(p.nombre)}</option>`).join("");
   const p = paradas.find(x => x.id === sel.value);
+  const siguiente = p?.proximos?.[0];
+  $("tranvia-resumen").innerHTML =
+    dato("🚊 Tranvías circulando", String(tranvias.length), "ahora mismo") +
+    dato(`Próximo en ${p ? esc(p.nombre) : "la parada"}`, siguiente ? enMinutos(siguiente.en_s) : "—",
+         siguiente ? `→ ${siguiente.destino}` : "sin llegadas previstas") +
+    dato("Con retraso", String(conRetraso), conRetraso ? "más de 1 minuto" : "todos a su hora") +
+    dato("Paradas", String(paradas.length), "con llegadas previstas");
+  $("tranvia-actualizado").textContent = d.actualizado ? "datos de las " + hora(d.actualizado) : "";
   $("transporte-llegadas").innerHTML = p && p.proximos.length ? p.proximos.map(x => `<li class="n-${x.en_s < 120 ? "ok" : "sin_datos"}">
       <div><div class="tit">🚊 ${esc(x.linea)} → ${esc(x.destino || "")}</div>
         <div class="det">${x.retraso_s > 60 ? `con ${Math.round(x.retraso_s / 60)} min de retraso` : "a su hora"}</div></div>
       <div class="der"><b class="num" style="font-size:1.1rem">${enMinutos(x.en_s)}</b></div></li>`).join("")
-    : `<li class="n-sin_datos"><div><div class="tit">Sin llegadas previstas</div>
-        <div class="det">${paradas.length ? "No hay tranvías previstos en esta parada" : "No hay datos del tranvía ahora mismo"}</div></div><div></div></li>`;
+    : `<li class="n-sin_datos"><div><div class="tit">Sin llegadas previstas</div><div class="det">${paradas.length ? "No hay tranvías previstos en esta parada" : "No hay datos del tranvía ahora mismo"}</div></div><div></div></li>`;
 
-  $("transporte-errores").innerHTML = (d.errores || []).map(e => `<p class="nota">⚠ ${esc(e)}</p>`).join("");
-  pintarMapaTransporte(d);
+  const m = mapaBase("mapa-tranvia", 13);
+  if (m) {
+    dibujarRecorridos(m, "tranvia");
+    m.estelas.clearLayers();                  // (aquí: las paradas)
+    for (const pa of paradas) {
+      L.circleMarker([pa.lat, pa.lon], { radius: 5, color: COLOR_TRANVIA, weight: 3, fillColor: "#fff", fillOpacity: 1 })
+        .bindTooltip(`${esc(pa.nombre)}${pa.proximos[0] ? ` · próximo: ${enMinutos(pa.proximos[0].en_s)}` : ""}`)
+        .on("click", () => { sel.value = pa.id; guardar("transporte.parada", pa.id); pintarTranvia(); })
+        .addTo(m.estelas);
+    }
+    actualizarMarcas(m, tranvias.map(v => { const [lat, lon] = posicionTranvia(v); return {...v, lat, lon}; }), textoTranvia);
+  }
 
-  const r = cache.transporte;
+  $("tranvia-lista").innerHTML = tranvias.length ? tranvias
+    .sort((a, b) => (a.hacia?.t || 0) - (b.hacia?.t || 0))
+    .map(v => `<li class="vehiculo-fila n-${v.retraso_s > 60 ? "aviso" : "ok"}" data-mapa="mapa-tranvia" data-id="${esc(v.id)}" tabindex="0" role="button">
+      <div><div class="tit">🚊 ${esc(v.linea)} → ${esc(v.destino)}</div>
+        <div class="det">${v.desde ? `${esc(v.desde.nombre)} → ${esc(v.hacia.nombre)}` : `hacia ${esc(v.parada)}`}</div></div>
+      <div class="der"><b class="num">${enMinutos(v.hacia ? Math.max(0, v.hacia.t - Date.now() / 1000) : v.llega_en_s)}</b>
+        ${v.retraso_s > 60 ? `<div class="det">+${Math.round(v.retraso_s / 60)} min</div>` : ""}</div></li>`).join("")
+    : `<li class="n-sin_datos"><div><div class="tit">Ningún tranvía circulando</div><div class="det">Puede ser de noche o no haber datos ahora</div></div><div></div></li>`;
+  $("tranvia-errores").innerHTML = erroresDe(d, "Tranvía");
+
+  const r = cache.tranvia;
   if (r && !r.error) {
-    $("transporte-resolucion").textContent = textoRango(r);
-    graficaSeries("g-transporte", "ley-transporte", r, r.series, {colores: [css("--info"), "#7AB800"]});
+    $("tranvia-resolucion").textContent = textoRango(r);
+    graficaSeries("g-tranvia", "ley-tranvia", r, r.series, {colores: [COLOR_TRANVIA]});
   }
 }
-$("transporte-lineas").addEventListener("click", ev => {
+
+// ---------------------------------------------------------- interacción
+$("buses-lineas").addEventListener("click", ev => {
   const b = ev.target.closest(".chip"); if (!b) return;
   const k = b.dataset.linea;
   lineasOcultas.has(k) ? lineasOcultas.delete(k) : lineasOcultas.add(k);
-  guardar("transporte.ocultas", [...lineasOcultas]);
-  b.setAttribute("aria-pressed", !lineasOcultas.has(k));
-  if (cache.directo) pintarMapaTransporte(cache.directo);
+  guardar("transporte.ocultas", [...lineasOcultas]); pintarBuses();
 });
-$("transporte-parada").addEventListener("change", () => { guardar("transporte.parada", $("transporte-parada").value); pintarTransporte(); });
-// Directo: con la pestaña abierta, posiciones nuevas cada 20 s (sin recargar la gráfica)
+$("buses-todas").addEventListener("click", () => {
+  lineasOcultas = new Set([...lineasOcultas].filter(k => !k.startsWith("bus:")));
+  guardar("transporte.ocultas", [...lineasOcultas]); pintarBuses();
+});
+$("buses-ninguna").addEventListener("click", () => {
+  for (const l of cache.directo?.lineas_activas || []) if (l.tipo === "bus") lineasOcultas.add(`bus:${l.linea}`);
+  guardar("transporte.ocultas", [...lineasOcultas]); pintarBuses();
+});
+$("buses-estela").addEventListener("click", () => { verEstela = !verEstela; guardar("transporte.estela", verEstela); pintarBuses(); });
+$("transporte-parada").addEventListener("change", () => { guardar("transporte.parada", $("transporte-parada").value); pintarTranvia(); });
+for (const id of ["buses-lista", "tranvia-lista"]) {
+  $(id).addEventListener("click", ev => { const f = ev.target.closest(".vehiculo-fila"); if (f) enfocar(f.dataset.mapa, f.dataset.id); });
+  $(id).addEventListener("keydown", ev => { const f = ev.target.closest(".vehiculo-fila"); if (f && ev.key === "Enter") enfocar(f.dataset.mapa, f.dataset.id); });
+}
+
+// Directo: posiciones nuevas cada 20 s con la pestaña abierta…
 setInterval(async () => {
-  if (vista !== "transporte" || document.hidden) return;
-  cache.directo = await getJSON("/api/transporte").catch(e => ({error: e.message}));
-  pintarTransporte();
+  if (!["buses", "tranvia"].includes(vista) || document.hidden) return;
+  await cargarDirecto();
+  vista === "buses" ? pintarBuses() : pintarTranvia();
 }, 20000);
+// …y el tranvía avanza cada segundo entre sus paradas
+setInterval(() => {
+  if (vista !== "tranvia" || document.hidden || !mapas["mapa-tranvia"]) return;
+  for (const marca of mapas["mapa-tranvia"].marcas.values()) {
+    if (marca._v?.desde) marca.setLatLng(posicionTranvia(marca._v));
+  }
+}, 1000);
+
 
 // =====================================================================
 // PINTAR CADA VISTA
@@ -781,7 +958,8 @@ const PINTORES = {
     graficasAgua();
   },
   trafico(d) { pintarTrafico(d); },
-  transporte() { pintarTransporte(); },
+  buses() { pintarBuses(); },
+  tranvia() { pintarTranvia(); },
   energia(d) {
     datosLuz("energia-luz-datos", d.pvpc); graficaLuz("g-energia-luz", d.pvpc);
     $("energia-luz-nota").textContent = !d.pvpc.puntos?.length ? "Sin datos de precio todavía."
@@ -862,7 +1040,7 @@ document.querySelectorAll('[role="tab"]').forEach(tab => {
 window.addEventListener("hashchange", () => { if (location.hash.slice(1) !== vista) mostrar(location.hash.slice(1)); });
 
 // Modo pared: rota por las pestañas de consulta (no por Explorar ni Sistema)
-const VISTAS_ROTAR = ["resumen", "agua", "trafico", "transporte", "energia", "aire", "meteo"];
+const VISTAS_ROTAR = ["resumen", "agua", "trafico", "buses", "tranvia", "energia", "aire", "meteo"];
 let temporizadorRotar = null;
 function rotar(segundos) {
   pararRotacion();

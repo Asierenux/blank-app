@@ -30,7 +30,8 @@
     <button role="tab" id="tab-resumen" data-vista="resumen" class="n-ok"><span class="marca-nivel"></span>Resumen</button>
     <button role="tab" id="tab-agua" data-vista="agua" class="n-ok"><span class="marca-nivel"></span>Agua</button>
     <button role="tab" id="tab-trafico" data-vista="trafico" class="n-ok"><span class="marca-nivel"></span>Tráfico</button>
-    <button role="tab" id="tab-transporte" data-vista="transporte" class="n-ok"><span class="marca-nivel"></span>Bus y tranvía</button>
+    <button role="tab" id="tab-buses" data-vista="buses" class="n-ok"><span class="marca-nivel"></span>Autobuses</button>
+    <button role="tab" id="tab-tranvia" data-vista="tranvia" class="n-ok"><span class="marca-nivel"></span>Tranvía</button>
     <button role="tab" id="tab-energia" data-vista="energia" class="n-ok"><span class="marca-nivel"></span>Energía</button>
     <button role="tab" id="tab-aire" data-vista="aire" class="n-ok"><span class="marca-nivel"></span>Aire</button>
     <button role="tab" id="tab-meteo" data-vista="meteo" class="n-ok"><span class="marca-nivel"></span>Meteo</button>
@@ -153,28 +154,62 @@
     </article>
   </section>
 
-  <!-- ========================== BUS Y TRANVÍA ========================= -->
-  <section class="vista" id="vista-transporte" role="tabpanel" aria-labelledby="tab-transporte" hidden>
-    <div class="datos d4" id="transporte-resumen"></div>
+  <!-- ============================ AUTOBUSES =========================== -->
+  <section class="vista" id="vista-buses" role="tabpanel" aria-labelledby="tab-buses" hidden>
+    <div class="datos d4" id="buses-resumen"></div>
     <div class="fila">
       <article class="tarjeta">
-        <h2><span>Dónde van ahora</span><span class="gris" id="transporte-actualizado"></span></h2>
-        <div class="leyenda-int" id="transporte-lineas" aria-label="Líneas (pulsa para ocultar o mostrar)"></div>
-        <div class="mapa mapa-alto" id="mapa-transporte" role="region" aria-label="Mapa de autobuses y tranvías"></div>
-        <p class="nota">● autobús Tuvisa (posición GPS) · ◆ tranvía (situado en la <b>próxima parada</b> a la que llega:
-          Euskotren no publica la posición, solo la hora de llegada a cada parada). Se actualiza cada 20 segundos.</p>
+        <h2><span>Autobuses Tuvisa ahora</span><span class="gris" id="buses-actualizado"></span></h2>
+        <div class="controles-mapa">
+          <div class="leyenda-int" id="buses-lineas" aria-label="Líneas (pulsa para ocultar o mostrar)"></div>
+          <span class="selector">
+            <button class="boton" type="button" id="buses-todas">Todas</button>
+            <button class="boton" type="button" id="buses-ninguna">Ninguna</button>
+            <button class="boton" type="button" id="buses-estela" aria-pressed="true">Estela</button>
+          </span>
+        </div>
+        <div class="mapa mapa-alto" id="mapa-buses" role="region" aria-label="Mapa de autobuses"></div>
+        <p class="nota">Cada círculo es un autobús en su <b>posición GPS</b> con el número de su línea; la línea fina
+          es su recorrido y la estela, por dónde ha pasado en los últimos minutos. Se actualiza cada 20 s y los
+          autobuses se desplazan suavemente hasta su nueva posición. Pulsa una línea para mostrarla u ocultarla.</p>
+      </article>
+      <article class="tarjeta">
+        <h2><span>Autobuses en circulación</span><span class="gris" id="buses-cuenta"></span></h2>
+        <ul class="lista larga lista-vehiculos" id="buses-lista"></ul>
+        <div class="avisos-fuente" id="buses-errores"></div>
+      </article>
+    </div>
+    <article class="tarjeta">
+      <h2><span>Autobuses en servicio</span><span class="gris" id="buses-resolucion"></span></h2>
+      <div class="leyenda-int" id="ley-buses"></div>
+      <div class="lienzo"><canvas id="g-buses"></canvas></div>
+    </article>
+  </section>
+
+  <!-- ============================= TRANVÍA ============================ -->
+  <section class="vista" id="vista-tranvia" role="tabpanel" aria-labelledby="tab-tranvia" hidden>
+    <div class="datos d4" id="tranvia-resumen"></div>
+    <div class="fila">
+      <article class="tarjeta">
+        <h2><span>Tranvías ahora</span><span class="gris" id="tranvia-actualizado"></span></h2>
+        <div class="mapa mapa-alto" id="mapa-tranvia" role="region" aria-label="Mapa del tranvía"></div>
+        <p class="nota">Euskotren no publica la posición GPS del tranvía, pero sí a qué hora salió de la parada
+          anterior y a qué hora llegará a la siguiente: con eso el panel <b>calcula dónde está entre las dos</b> y lo
+          mueve segundo a segundo. Si un tranvía no trae la parada anterior, se dibuja en la siguiente.</p>
       </article>
       <article class="tarjeta">
         <h2><span>Próximos tranvías</span>
           <select id="transporte-parada" aria-label="Parada de tranvía"></select></h2>
-        <ul class="lista larga" id="transporte-llegadas"></ul>
-        <div class="avisos-fuente" id="transporte-errores"></div>
+        <ul class="lista" id="transporte-llegadas"></ul>
+        <h2 style="margin-top:14px"><span>Tranvías en circulación</span></h2>
+        <ul class="lista larga lista-vehiculos" id="tranvia-lista"></ul>
+        <div class="avisos-fuente" id="tranvia-errores"></div>
       </article>
     </div>
     <article class="tarjeta">
-      <h2><span>Vehículos en servicio</span><span class="gris" id="transporte-resolucion"></span></h2>
-      <div class="leyenda-int" id="ley-transporte"></div>
-      <div class="lienzo"><canvas id="g-transporte"></canvas></div>
+      <h2><span>Tranvías en servicio</span><span class="gris" id="tranvia-resolucion"></span></h2>
+      <div class="leyenda-int" id="ley-tranvia"></div>
+      <div class="lienzo"><canvas id="g-tranvia"></canvas></div>
     </article>
   </section>
 

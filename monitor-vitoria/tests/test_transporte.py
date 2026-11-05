@@ -12,15 +12,19 @@ from monitor_vitoria.transporte import Transporte, leer_feed, leer_gtfs, llegada
 AHORA = time.time()
 
 
-def gtfs(paradas, lineas, viajes) -> bytes:
+def gtfs(paradas, lineas, viajes, formas=None) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         z.writestr("stops.txt", "stop_id,stop_name,stop_lat,stop_lon\n" +
                    "".join(f"{i},{n},{la},{lo}\n" for i, n, la, lo in paradas))
         z.writestr("routes.txt", "route_id,route_short_name,route_long_name,route_color,route_type\n" +
                    "".join(f"{i},{c},{l},{col},{t}\n" for i, c, l, col, t in lineas))
-        z.writestr("trips.txt", "route_id,service_id,trip_id,trip_headsign\n" +
-                   "".join(f"{r},S,{t},{h}\n" for t, r, h in viajes))
+        z.writestr("trips.txt", "route_id,service_id,trip_id,trip_headsign,shape_id\n" +
+                   "".join(f"{r},S,{t},{h},forma_{r}\n" for t, r, h in viajes))
+        if formas:
+            z.writestr("shapes.txt", "shape_id,shape_pt_lat,shape_pt_lon,shape_pt_sequence\n" +
+                       "".join(f"{f},{la},{lo},{i}\n" for f, puntos in formas.items()
+                               for i, (la, lo) in enumerate(puntos)))
     return buf.getvalue()
 
 
@@ -31,7 +35,9 @@ GTFS_EUSKOTREN = gtfs(
      ("euskotren:N:900", "Bilbao Zazpikaleak", 43.2569, -2.9236)],          # fuera de Vitoria
     [("TG1", "TG1", "Abetxuko-Universidad", "7AB800", "0"),
      ("E1", "E1", "Bilbao-Donostia", "D50000", "2")],                       # tren: no es tranvía de Vitoria
-    [("t1", "TG1", "Universidad"), ("t2", "TG1", "Abetxuko"), ("tren", "E1", "Donostia")])
+    [("t1", "TG1", "Universidad"), ("t2", "TG1", "Abetxuko"), ("tren", "E1", "Donostia")],
+    {"forma_TG1": [(42.8462, -2.6728), (42.8443, -2.6716), (42.8425, -2.6705)],
+     "forma_E1": [(43.25, -2.92), (43.26, -2.93)]})
 
 
 def feed_posiciones() -> bytes:
@@ -187,3 +193,36 @@ def test_camara_prueba_otras_direcciones(config, monkeypatch):
     diag = cliente.get("/api/camara/c9", params={"diagnostico": True}).json()
     assert diag["ok"] and diag["url"].endswith("snapshot?id=9") and len(diag["intentos"]) == 2
     assert modulo_web._url_buena["c9"].endswith("snapshot?id=9")      # la próxima vez va directa
+
+
+
+def test_recorridos_solo_del_tranvia_de_vitoria():
+    from monitor_vitoria.transporte import lineas_tranvia_vitoria
+    h = leer_gtfs(GTFS_EUSKOTREN, "tranvia", None, lineas_tranvia_vitoria)
+    assert list(h.recorridos) == ["TG1"]                                   # el tren E1 no se dibuja
+    assert h.recorridos["TG1"][0][0] == [42.8462, -2.6728]
+
+
+def test_tranvia_entre_paradas():
+    """Salió de Angulema hace 200 s y llega a Florida en 150 s: está al 57 % del tramo."""
+    from monitor_vitoria.transporte import interpolar, lineas_tranvia_vitoria
+    h = leer_gtfs(GTFS_EUSKOTREN, "tranvia", lambda la, lo: abs(la - 42.85) < 0.2)
+    [v], _ = llegadas(leer_feed(feed_llegadas()), h, "euskotren", AHORA, lineas_tranvia_vitoria(h))
+    assert v["desde"]["nombre"] == "Angulema" and v["hacia"]["nombre"] == "Florida"
+    f = 200 / 350
+    assert abs(v["lat"] - (42.8462 + (42.8425 - 42.8462) * f)) < 1e-4
+    # Sin parada anterior: en la siguiente; y nunca se pasa de la parada
+    assert interpolar(None, {"lat": 1, "lon": 2, "t": 10}, 5) == (1, 2)
+    assert interpolar({"lat": 0, "lon": 0, "t": 0}, {"lat": 1, "lon": 1, "t": 10}, 99) == (1, 1)
+
+
+def test_api_recorridos_demo(config, monkeypatch):
+    from monitor_vitoria.web import app as modulo_web
+    monkeypatch.setenv("MONITOR_DEMO", "1")
+    monkeypatch.setattr(modulo_web, "config", config)
+    cliente = TestClient(modulo_web.app)
+    rec = cliente.get("/api/transporte/recorridos").json()["recorridos"]
+    assert {r["tipo"] for r in rec} == {"bus", "tranvia"} and all(r["formas"][0] for r in rec)
+    d = cliente.get("/api/transporte").json()
+    tranvias = [v for v in d["vehiculos"] if v["tipo"] == "tranvia"]
+    assert all(v["desde"] and v["hacia"]["t"] > v["desde"]["t"] for v in tranvias)

@@ -61,8 +61,9 @@ RADIO_VITORIA_KM = 12        # paradas de Euskotren que cuentan como "de Vitoria
 class Horario:
     lineas: dict[str, dict] = field(default_factory=dict)    # route_id → {nombre, color, tipo}
     paradas: dict[str, dict] = field(default_factory=dict)   # stop_id → {nombre, lat, lon}
-    viajes: dict[str, dict] = field(default_factory=dict)    # trip_id → {linea, destino}
+    viajes: dict[str, dict] = field(default_factory=dict)    # trip_id → {linea, destino, forma}
     alias: dict[str, str] = field(default_factory=dict)      # id "normalizado" → stop_id
+    recorridos: dict[str, list] = field(default_factory=dict)  # route_id → [[(lat, lon), ...], ...]
 
     def parada(self, stop_id: str) -> dict | None:
         """Busca una parada aunque el tiempo real escriba su id distinto que el horario
@@ -87,7 +88,44 @@ def _leer_csv(z: zipfile.ZipFile, nombre: str) -> list[dict]:
         return list(csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")))
 
 
-def leer_gtfs(contenido: bytes, tipo: str, filtro_paradas=None) -> Horario:
+def _simplificar(puntos: list[tuple[float, float]], min_m: float = 15) -> list[list[float]]:
+    """Quita puntos a menos de `min_m` metros del anterior: el dibujo es igual y pesa mucho menos."""
+    salida, grados = [], min_m / 111_000
+    for la, lo in puntos:
+        if not salida or abs(la - salida[-1][0]) > grados or abs(lo - salida[-1][1]) > grados:
+            salida.append([round(la, 5), round(lo, 5)])
+    if puntos and salida[-1] != [round(puntos[-1][0], 5), round(puntos[-1][1], 5)]:
+        salida.append([round(puntos[-1][0], 5), round(puntos[-1][1], 5)])
+    return salida
+
+
+def _leer_recorridos(z: zipfile.ZipFile, h: Horario, lineas: set[str]) -> None:
+    """Dibujo de cada línea (shapes.txt). Por línea, las 2 formas más usadas (ida y vuelta)."""
+    usos: dict[str, dict[str, int]] = {}
+    for v in h.viajes.values():
+        if v.get("forma") and v.get("linea") in lineas:
+            usos.setdefault(v["linea"], {}).setdefault(v["forma"], 0)
+            usos[v["linea"]][v["forma"]] += 1
+    elegidas = {f: linea for linea, formas in usos.items()
+                for f in sorted(formas, key=formas.get, reverse=True)[:2]}
+    if not elegidas or "shapes.txt" not in z.namelist():
+        return
+    puntos: dict[str, list] = {}
+    with z.open("shapes.txt") as f:                       # puede ser grande: se lee fila a fila
+        for p in csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig")):
+            if p.get("shape_id") in elegidas:
+                try:
+                    puntos.setdefault(p["shape_id"], []).append(
+                        (int(p.get("shape_pt_sequence") or 0), float(p["shape_pt_lat"]), float(p["shape_pt_lon"])))
+                except (KeyError, ValueError):
+                    continue
+    for forma, lista in puntos.items():
+        lista.sort()
+        h.recorridos.setdefault(elegidas[forma], []).append(_simplificar([(la, lo) for _, la, lo in lista]))
+
+
+def leer_gtfs(contenido: bytes, tipo: str, filtro_paradas=None, elegir_lineas=None) -> Horario:
+    """`elegir_lineas(h)` dice de qué líneas se leen los recorridos (por defecto, de todas)."""
     h = Horario()
     with zipfile.ZipFile(io.BytesIO(contenido)) as z:
         for s in _leer_csv(z, "stops.txt"):
@@ -109,7 +147,9 @@ def leer_gtfs(contenido: bytes, tipo: str, filtro_paradas=None) -> Horario:
                 "tipo": tipo,
             }
         for t in _leer_csv(z, "trips.txt"):
-            h.viajes[t["trip_id"]] = {"linea": t.get("route_id"), "destino": (t.get("trip_headsign") or "").strip()}
+            h.viajes[t["trip_id"]] = {"linea": t.get("route_id"), "destino": (t.get("trip_headsign") or "").strip(),
+                                      "forma": t.get("shape_id") or None}
+        _leer_recorridos(z, h, elegir_lineas(h) if elegir_lineas else set(h.lineas))
     h.alias = {normalizar_id(i): i for i in h.paradas}
     return h
 
@@ -148,6 +188,16 @@ def posiciones(feed, h: Horario, operador: str, ahora: float) -> list[dict]:
     return salida
 
 
+def interpolar(desde: dict | None, hacia: dict, ahora: float) -> tuple[float, float]:
+    """Dónde está entre la parada anterior (hora de salida) y la siguiente (hora de llegada),
+    suponiendo velocidad constante. Sin parada anterior: en la siguiente."""
+    if not desde or hacia["t"] <= desde["t"]:
+        return round(hacia["lat"], 5), round(hacia["lon"], 5)
+    f = min(1.0, max(0.0, (ahora - desde["t"]) / (hacia["t"] - desde["t"])))
+    return (round(desde["lat"] + (hacia["lat"] - desde["lat"]) * f, 5),
+            round(desde["lon"] + (hacia["lon"] - desde["lon"]) * f, 5))
+
+
 def lineas_tranvia_vitoria(h: Horario) -> set[str]:
     """Euskotren mezcla trenes (E1, E2…), funiculares y tranvías de Bilbao y Vitoria.
     Nos quedamos con los TRANVÍAS (route_type 0) de VITORIA (nombre TG… o que diga Gasteiz/Vitoria)."""
@@ -177,7 +227,7 @@ def llegadas(feed, h: Horario, operador: str, ahora: float,
         if lineas_validas is not None and linea_id not in lineas_validas:
             continue                              # trenes, funiculares, tranvía de Bilbao…
         linea = h.lineas.get(linea_id, {})
-        proxima, ya_salio = None, False
+        proxima, ya_salio, anterior = None, False, None
         for stu in tu.stop_time_update:
             hora_stu = (stu.arrival.time if stu.HasField("arrival") and stu.arrival.time else
                         stu.departure.time if stu.HasField("departure") else 0)
@@ -186,9 +236,12 @@ def llegadas(feed, h: Horario, operador: str, ahora: float,
             parada = h.parada(stu.stop_id)
             if parada is None:
                 continue                          # parada fuera de Vitoria (o desconocida)
-            hora = (stu.arrival.time if stu.HasField("arrival") and stu.arrival.time else
-                    stu.departure.time if stu.HasField("departure") else 0)
+            # para la salida se usa la hora de SALIDA de la parada si viene; si no, la de llegada
+            salida_stu = (stu.departure.time if stu.HasField("departure") and stu.departure.time else hora_stu)
+            hora = hora_stu
             if not hora or hora < ahora - 30:
+                if salida_stu and proxima is None:
+                    anterior = (parada, salida_stu)   # última parada por la que ya pasó
                 continue                          # ya pasó por esa parada
             llegada = {"linea": linea.get("nombre") or "?", "color": linea.get("color"),
                        "destino": viaje.get("destino") or "", "en_s": int(hora - ahora),
@@ -198,12 +251,19 @@ def llegadas(feed, h: Horario, operador: str, ahora: float,
                 proxima = (parada, llegada)
         if proxima and (ya_salio or proxima[1]["en_s"] <= MARGEN_INICIO_S):
             parada, llegada = proxima
+            hacia = {"lat": parada["lat"], "lon": parada["lon"], "t": int(ahora + llegada["en_s"]),
+                     "nombre": parada["nombre"]}
+            desde = ({"lat": anterior[0]["lat"], "lon": anterior[0]["lon"], "t": int(anterior[1]),
+                      "nombre": anterior[0]["nombre"]} if anterior else None)
+            lat, lon = interpolar(desde, hacia, ahora)
             vehiculos.append({
                 "id": tu.vehicle.id or tu.trip.trip_id or e.id, "operador": operador,
                 "tipo": OPERADORES[operador]["tipo"], "linea": llegada["linea"], "color": llegada["color"],
-                "destino": llegada["destino"], "lat": parada["lat"], "lon": parada["lon"], "rumbo": None,
+                "destino": llegada["destino"], "lat": lat, "lon": lon, "rumbo": None,
                 "hace_s": None, "estimada": True, "parada": parada["nombre"], "llega_en_s": llegada["en_s"],
                 "retraso_s": llegada["retraso_s"],
+                # Para que el navegador lo mueva segundo a segundo entre las dos paradas
+                "desde": desde, "hacia": hacia,
             })
     for lista in por_parada.values():
         lista.sort(key=lambda x: x["en_s"])
@@ -251,9 +311,25 @@ class Transporte:
             archivo.write_bytes(contenido)
         # Euskotren incluye trenes y tranvías de todo Euskadi: solo paradas de Vitoria
         filtro = self.cerca_de_vitoria if operador == "euskotren" else None
-        h = leer_gtfs(contenido, OPERADORES[operador]["tipo"], filtro)
+        elegir = lineas_tranvia_vitoria if operador == "euskotren" else None   # recorridos: solo tranvía de Vitoria
+        h = leer_gtfs(contenido, OPERADORES[operador]["tipo"], filtro, elegir)
         self._horarios[operador] = (time.time(), h)
         return h
+
+    def recorridos(self, cliente) -> dict:
+        """El dibujo de cada línea (cambia poco: el navegador lo pide una vez)."""
+        salida, errores = [], []
+        for op, datos in OPERADORES.items():
+            try:
+                h = self.horario(cliente, op)
+            except Exception as e:  # noqa: BLE001
+                errores.append(f"{datos['nombre']}: {e}")
+                continue
+            for linea_id, formas in h.recorridos.items():
+                l = h.lineas.get(linea_id, {})
+                salida.append({"tipo": datos["tipo"], "linea": l.get("nombre") or linea_id,
+                               "color": l.get("color"), "formas": formas})
+        return {"recorridos": salida, "errores": errores}
 
     def estado(self, cliente, max_edad_s: float = 20) -> dict:
         """Todo lo que pinta el mapa. Se reutiliza durante `max_edad_s` segundos."""

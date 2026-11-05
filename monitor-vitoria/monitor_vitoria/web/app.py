@@ -236,6 +236,23 @@ async def api_transporte():
     return await run_in_threadpool(consultar)
 
 
+@app.get("/api/transporte/recorridos")
+async def api_transporte_recorridos():
+    """Dibujo de las líneas de bus y tranvía (del horario oficial)."""
+    import os
+
+    if os.getenv("MONITOR_DEMO") == "1":
+        from ..demo import recorridos_simulados
+        return recorridos_simulados()
+    from ..servicio import crear_cliente
+    from ..transporte import servicio
+
+    def consultar():
+        with crear_cliente(timeout=60) as cliente:
+            return servicio(config.db_path.parent, (config.latitud, config.longitud)).recorridos(cliente)
+    return await run_in_threadpool(consultar)
+
+
 # --------------------------------------------------------------------------
 # Cámaras de tráfico: el servidor descarga la imagen y se la pasa al navegador
 # (evita bloqueos por "hotlinking", certificados raros y parámetros no admitidos)

@@ -18,6 +18,16 @@
 .vehiculo.tranvia { border-radius:4px; transform:rotate(45deg); }
 .vehiculo.tranvia span { transform:rotate(-45deg); }
 .avisos-fuente { margin-top:8px; }
+.controles-mapa { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+.controles-mapa .leyenda-int { margin-bottom:0; flex:1; }
+.lista-vehiculos { max-height:560px; }
+.lista-vehiculos li.grupo-linea { display:flex; align-items:center; gap:10px; background:none; padding:10px 2px 2px;
+  font-size:.78rem; color:var(--suave); }
+.lista-vehiculos li.grupo-linea::before { display:none; }
+.marca-linea { min-width:28px; height:22px; padding:0 6px; border-radius:11px; display:inline-grid; place-items:center;
+  background:var(--color); color:#fff; font-weight:800; font-size:.75rem; }
+.vehiculo-fila { cursor:pointer; }
+.vehiculo-fila:hover, .vehiculo-fila:focus-visible { outline:1px solid var(--info); }
 @media (max-width: 640px) { .mapa-alto { height:360px; } }
 .leaflet-popup-content { font: .82rem/1.4 Inter, "Segoe UI", system-ui, sans-serif; }
 @media (max-width: 640px) { .mapa { height:300px; } }
