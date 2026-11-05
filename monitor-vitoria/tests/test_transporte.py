@@ -192,6 +192,7 @@ def test_camara_prueba_otras_direcciones(config, monkeypatch):
     cliente = TestClient(modulo_web.app)
     diag = cliente.get("/api/camara/c9", params={"diagnostico": True}).json()
     assert diag["ok"] and diag["url"].endswith("snapshot?id=9") and len(diag["intentos"]) == 2
+    assert pedidas.count("/snapshot") == 1
     assert modulo_web._url_buena["c9"].endswith("snapshot?id=9")      # la próxima vez va directa
 
 
@@ -226,3 +227,30 @@ def test_api_recorridos_demo(config, monkeypatch):
     d = cliente.get("/api/transporte").json()
     tranvias = [v for v in d["vehiculos"] if v["tipo"] == "tranvia"]
     assert all(v["desde"] and v["hacia"]["t"] > v["desde"]["t"] for v in tranvias)
+
+
+
+def test_camara_se_presenta_como_navegador_y_prueba_variantes(config, monkeypatch):
+    """Trafikoa: si https://www… da 404, se prueban http:// y sin www; siempre con cabeceras de navegador."""
+    import json
+
+    from monitor_vitoria import servicio
+    from monitor_vitoria.web import app as modulo_web
+    monkeypatch.setattr(modulo_web, "config", config)
+    modulo_web._url_buena.clear()
+    modulo_web._cache_imagenes.clear()
+    url = "https://www.trafikoa.eus/static/files/tr/camaras/2201.jpg"
+    (config.db_path.parent / f"camaras_{config.db_path.stem}.json").write_text(json.dumps([
+        {"id": "2201", "nombre": "Foronda", "lat": 42.8, "lon": -2.7, "imagen": url, "candidatas": [url]}]))
+    vistas = []
+
+    def responder(req):
+        vistas.append((str(req.url), req.headers.get("user-agent", ""), req.headers.get("referer", "")))
+        if str(req.url) == "https://trafikoa.eus/static/files/tr/camaras/2201.jpg":
+            return httpx.Response(200, content=b"\xff\xd8", headers={"content-type": "image/jpeg"})
+        return httpx.Response(404)
+    monkeypatch.setattr(servicio, "crear_cliente",
+                        lambda *a, **k: httpx.Client(transport=httpx.MockTransport(responder)))
+    diag = TestClient(modulo_web.app).get("/api/camara/2201", params={"diagnostico": True}).json()
+    assert diag["ok"] and diag["url"] == "https://trafikoa.eus/static/files/tr/camaras/2201.jpg"
+    assert all("Mozilla" in ua and ref.startswith("http") for _, ua, ref in vistas)

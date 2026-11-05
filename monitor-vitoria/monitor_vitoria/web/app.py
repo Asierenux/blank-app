@@ -268,8 +268,16 @@ def _descargar_imagen(url: str) -> tuple[bytes, str]:
     if url in _cache_imagenes and ahora - _cache_imagenes[url][0] < 50:   # 50 s: no saturar sus servidores
         _, contenido, tipo = _cache_imagenes[url]
         return contenido, tipo
+    from urllib.parse import urlparse
+    origen = f"{urlparse(url).scheme}://{urlparse(url).netloc}/"
+    # Algunos servidores de cámaras responden 404 a lo que no parece un navegador:
+    # nos presentamos como uno y decimos que venimos de su propia web.
+    cabeceras = {"Accept": "image/avif,image/webp,image/*,*/*;q=0.8",
+                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                               "(KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+                 "Referer": origen}
     with crear_cliente(timeout=12) as cliente:
-        r = cliente.get(url, headers={"Accept": "image/*,*/*;q=0.5"})
+        r = cliente.get(url, headers=cabeceras)
         r.raise_for_status()
     tipo = r.headers.get("content-type", "").split(";")[0].strip()
     if not tipo.startswith("image/"):
@@ -292,7 +300,14 @@ async def api_camara(camara_id: str, diagnostico: bool = False):
     if camara is None:
         raise HTTPException(404, "Cámara desconocida")
     # Probamos primero la dirección que ya funcionó; si no, todas las que trae la cámara
-    candidatas = list(dict.fromkeys([_url_buena.get(camara_id)] + camara.get("candidatas", [camara["imagen"]])))
+    base = camara.get("candidatas", [camara["imagen"]])
+    variantes = []
+    for u in base:                       # misma dirección con http:// y sin "www."
+        if u.startswith("https://"):
+            variantes.append("http://" + u[len("https://"):])
+        if "://www." in u:
+            variantes.append(u.replace("://www.", "://", 1))
+    candidatas = list(dict.fromkeys([_url_buena.get(camara_id)] + base + variantes))
     intentos = []
     for url in [u for u in candidatas if u]:
         try:
