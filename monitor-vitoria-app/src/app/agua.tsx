@@ -22,7 +22,9 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700" }}>{e.corto}</Text>
-          <Etiqueta>Río {e.rio}{e.t ? ` · dato del ${fecha(e.t)}` : ""}</Etiqueta>
+          <Etiqueta>
+            Río {e.rio}{e.t ? (e.origen === "saih" ? ` · SAIH ${hace(e.t)}` : ` · boletín del ${fecha(e.t)}`) : ""}
+          </Etiqueta>
         </View>
         <Insignia nivel={e.nivelEstado} texto={e.texto} />
       </View>
@@ -30,27 +32,45 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
         <Cifra valor={e.porcentaje != null ? num(e.porcentaje, 1) : "—"} unidad="%" />
         <View style={{ paddingBottom: 6 }}>
           <Etiqueta>{e.volumen != null ? `${num(e.volumen, 1)} de ${num(e.capacidadHm3 ?? null, 1)} hm³` : ""}</Etiqueta>
-          <Etiqueta>{e.varSemanaPct != null ? `${signo(e.varSemanaPct)} % en una semana` : ""}</Etiqueta>
+          <Etiqueta>
+            {e.var24hPct != null ? `${signo(e.var24hPct)} % en 24 h` : e.varSemanaPct != null ? `${signo(e.varSemanaPct)} % en una semana` : ""}
+          </Etiqueta>
         </View>
       </View>
       <Barra pct={e.porcentaje ?? 0} color={c.agua} marcas={[85]} />
 
       {e.nivel != null && (
         <View style={{ gap: 2 }}>
-          <Fila izquierda="Cota del agua" derecha={`${num(e.nivel, 2)} m`} />
+          <Fila izquierda="Cota del agua" derecha={`${num(e.nivel, 2)} m`}
+            detalle={e.var24hCm != null ? `${signo(e.var24hCm, 0)} cm en 24 h` : undefined} />
           {e.margenAliviadero != null && (
             <Fila izquierda="Hasta el aliviadero" derecha={e.margenAliviadero > 0 ? `${num(e.margenAliviadero, 2)} m` : "Superado"}
-              detalle={`Labio a ${num(e.cotas.aliviadero!, 1)} m · NMN ${num(e.cotas.nmn ?? null, 1)} m`} ultima />
+              detalle={`Labio a ${num(e.cotas.aliviadero!, 1)} m · NMN ${num(e.cotas.nmn ?? null, 1)} m`} ultima={e.margenNmn == null} />
+          )}
+          {e.margenNmn != null && (
+            <Fila izquierda="Hasta el máximo normal" derecha={e.margenNmn > 0 ? `${num(e.margenNmn, 2)} m` : "En el NMN"}
+              detalle={`Coronación de la presa ${num(e.cotas.coronacion ?? null, 1)} m`} ultima />
           )}
         </View>
       )}
+      {(e.entrada != null || e.salida != null) && (
+        <View style={{ flexDirection: "row", gap: 10 }}>
+          {([["Entra", e.entrada], ["Sale", e.salida]] as const).map(([t, v]) => (
+            <View key={t} style={{ flex: 1, backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12, gap: 2 }}>
+              <Etiqueta>{t}</Etiqueta>
+              <Cifra valor={num(v, 2)} unidad="m³/s" tam={22} />
+            </View>
+          ))}
+        </View>
+      )}
+      {e.salidaMedidaEn && <Etiqueta>La salida se mide en {e.salidaMedidaEn}, justo aguas abajo de la presa.</Etiqueta>}
       {e.maniobra && (
         <Aviso nivel={e.maniobra.texto === "Equilibrio" ? "info" : "aviso"}
-          texto={`${e.maniobra.texto}: balance ${signo(e.maniobra.balanceM3s, 2)} m³/s.`} />
+          texto={`${e.maniobra.texto}: balance ${signo(e.maniobra.balanceM3s, 2)} m³/s (${signo(e.maniobra.balanceHm3Dia, 3)} hm³/día). La posición de las compuertas no es pública: se deduce de lo que entra y sale.`} />
       )}
       {e.antiguo && <Aviso nivel="aviso" texto="El último boletín tiene más de una semana." />}
 
-      <Etiqueta>Llenado · últimos 3 meses</Etiqueta>
+      <Etiqueta>Llenado · {e.origen === "saih" ? "últimos 7 días" : "últimos 3 meses"}</Etiqueta>
       <GraficaLinea serie={e.serie} color={c.agua} decimales={1} marcas={[{ valor: 85, texto: "85 %" }]} />
     </Tarjeta>
   );

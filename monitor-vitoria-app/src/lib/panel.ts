@@ -234,7 +234,9 @@ export interface Embalse {
   entrada: number | null; salida: number | null; salidaMedidaEn: string | null;
   t: number | null; edadDias: number | null; antiguo: boolean;
   nivelEstado: Nivel; texto: string;
-  varSemanaPct: number | null; varSemanaHm3: number | null;
+  varSemanaPct: number | null; varSemanaHm3: number | null; var24hCm: number | null; var24hPct: number | null;
+  /** "saih" = al momento (cada 15 min); "semanal" = boletín semanal */
+  origen: "saih" | "semanal" | null;
   maniobra: ReturnType<typeof maniobra>;
   cotas: { minima?: number; aliviadero?: number; nmn?: number; coronacion?: number };
   margenAliviadero: number | null; margenNmn: number | null;
@@ -253,31 +255,51 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 const VIGENCIA_EMBALSE = 10 * 24 * H;
 
 function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number): Embalse {
+  // Primero el SAIH (al momento); si no hay, el boletín semanal
   const s = (senal: string) => {
-    const p = h.ultimo(`agua.${e.id}.${senal}`, ahora);
-    return p && ahora - p[0] < VIGENCIA_EMBALSE ? p : null;
+    const saih = h.ultimo(`agua.${e.id}.${senal}`, ahora);
+    if (saih && ahora - saih[0] < 2 * 24 * H) return saih;
+    const semanal = h.ultimo(`semanal.${e.id}.${senal}`, ahora);
+    return semanal && ahora - semanal[0] < VIGENCIA_EMBALSE ? semanal : null;
   };
+  const deSaih = !!h.ultimo(`agua.${e.id}.porcentaje`, ahora) && ahora - h.ultimo(`agua.${e.id}.porcentaje`, ahora)![0] < 2 * 24 * H;
+  const fuenteSerie = deSaih ? "agua" : "semanal";
   const pPct = s("porcentaje"), pVol = s("volumen"), pNivel = s("nivel");
   const vigentes = [pPct, pVol, pNivel].filter((p): p is Punto => !!p);
   const t = vigentes.length ? Math.max(...vigentes.map(p => p[0])) : null;
   const porcentaje = pPct?.[1] ?? null, volumen = pVol?.[1] ?? null, nivel = pNivel?.[1] ?? null;
   const [nivelEstado, texto] = t == null ? (["sin_datos", "Sin datos"] as Clasificacion) : estadoEmbalse(porcentaje, u, nivel, e);
   // Variación respecto al dato de hace una semana (el anterior del boletín)
-  const anterior = (senal: string) => (t == null ? null : h.valorEn(`agua.${e.id}.${senal}`, t - 6 * 24 * H, 3 * 24 * H));
+  const anterior = (senal: string) => (t == null ? null
+    : h.valorEn(`${fuenteSerie}.${e.id}.${senal}`, t - 6 * 24 * H, 3 * 24 * H) ?? h.valorEn(`semanal.${e.id}.${senal}`, t - 6 * 24 * H, 3 * 24 * H));
+  const hace24 = (senal: string) => (t == null || !deSaih ? null : h.valorEn(`agua.${e.id}.${senal}`, t - 24 * H));
+  const n24 = hace24("nivel"), p24 = hace24("porcentaje");
   const pctAntes = anterior("porcentaje"), volAntes = anterior("volumen");
-  const entrada = s("entrada")?.[1] ?? null, salida = s("salida")?.[1] ?? null;
+  const entrada = s("entrada")?.[1] ?? null;
+  let salida = s("salida")?.[1] ?? null;
+  let salidaMedidaEn: string | null = null;
+  if (salida == null && e.aforoSalida) {
+    // Sin dato de salida propio: el aforo de justo aguas abajo de la presa
+    const abajo = h.ultimo(`hidro.${e.aforoSalida}.caudal`, ahora);
+    if (abajo && ahora - abajo[0] < 6 * H) {
+      salida = abajo[1];
+      salidaMedidaEn = h.extra<{ id: string; nombre: string }[]>("estacionesSaih")?.find(x => x.id === e.aforoSalida)?.nombre ?? "el aforo aguas abajo";
+    }
+  }
   return {
     id: e.id, nombre: e.nombre, corto: e.corto, rio: e.rio, capacidadHm3: e.capacidadHm3,
-    nivel, volumen, porcentaje, entrada, salida, salidaMedidaEn: null,
+    nivel, volumen, porcentaje, entrada, salida, salidaMedidaEn, origen: t == null ? null : deSaih ? "saih" : "semanal",
     t, edadDias: t == null ? null : Math.floor((ahora - t) / (24 * H)), antiguo: t != null && ahora - t > 8 * 24 * H,
     nivelEstado, texto,
     varSemanaPct: porcentaje != null && pctAntes != null ? Math.round((porcentaje - pctAntes) * 10) / 10 : null,
     varSemanaHm3: volumen != null && volAntes != null ? r2(volumen - volAntes) : null,
+    var24hCm: nivel != null && n24 != null ? Math.round((nivel - n24) * 100) : null,
+    var24hPct: porcentaje != null && p24 != null ? Math.round((porcentaje - p24) * 10) / 10 : null,
     maniobra: maniobra(entrada, salida),
     cotas: { minima: e.cotaMinima, aliviadero: e.cotaAliviadero, nmn: e.cotaNmn, coronacion: e.cotaCoronacion },
     margenAliviadero: e.cotaAliviadero != null && nivel != null ? r2(e.cotaAliviadero - nivel) : null,
     margenNmn: e.cotaNmn != null && nivel != null ? r2(e.cotaNmn - nivel) : null,
-    serie: h.serie(`agua.${e.id}.porcentaje`, ahora - 90 * 24 * H, ahora),
+    serie: h.serie(`${fuenteSerie}.${e.id}.porcentaje`, ahora - (deSaih ? 7 : 90) * 24 * H, ahora),
   };
 }
 
@@ -355,6 +377,7 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
+  saih: "SAIH Ebro · embalses al momento (vía GitHub)",
   hidro: "Euskalmet · ríos (nivel y caudal)",
   embalses: "Embalses · dato semanal",
   generacion: "Generación hidráulica (REE)",
@@ -392,7 +415,8 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
   const porId = Object.fromEntries(indicadores.map(i => [i.id, i]));
   const embalses = ESTACIONES.filter(e => e.tipo === "embalse").map(e => construirEmbalse(h, u, e, ahora));
   const estacionesHidro = h.extra<{ estaciones: { id: string; nombre: string }[] }>("estacionesHidro")?.estaciones ?? [];
-  const rios = estacionesHidro.map(e => construirRio(h, u, e, ahora));
+  const estacionesSaih = h.extra<{ id: string; nombre: string }[]>("estacionesSaih") ?? [];
+  const rios = [...estacionesSaih, ...estacionesHidro].map(e => construirRio(h, u, e, ahora));
   const estadosAgua = [...embalses, ...rios].map(x => x.nivelEstado).filter(n => n !== "sin_datos" && n !== "info");
   const fuentes = construirFuentes(h, configuradas, ahora);
   const trafico = construirTrafico(h, ahora);

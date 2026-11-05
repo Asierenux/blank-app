@@ -60,9 +60,9 @@ async function historialDePrueba() {
     l("aemet", "racha", AHORA - H, 5), l("aemet", "precipitacion", AHORA - H, 3.5),
     l("waqi", "aqi", AHORA - 30 * 60000, 34),
     // Embalses: dato semanal (hace 2 días y la semana anterior)
-    l("agua", "urrunaga.porcentaje", AHORA - 2 * 24 * H, 80), l("agua", "urrunaga.porcentaje", AHORA - 9 * 24 * H, 78.5),
-    l("agua", "urrunaga.volumen", AHORA - 2 * 24 * H, 57.4),
-    l("agua", "ullibarri.porcentaje", AHORA - 12 * 24 * H, 70),                  // demasiado antiguo: no vale
+    l("semanal", "urrunaga.porcentaje", AHORA - 2 * 24 * H, 80), l("semanal", "urrunaga.porcentaje", AHORA - 9 * 24 * H, 78.5),
+    l("semanal", "urrunaga.volumen", AHORA - 2 * 24 * H, 57.4),
+    l("semanal", "ullibarri.porcentaje", AHORA - 12 * 24 * H, 70),                  // demasiado antiguo: no vale
     // Río de una estación de Euskalmet
     l("hidro", "C0X1.caudal", AHORA - H, 9), l("hidro", "C0X1.caudal", AHORA - 4 * H, 8.7),
   ]);

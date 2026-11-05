@@ -83,10 +83,27 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
   for (let k = 12; k >= 0; k--) {
     const t = hoy - (k * 7 + 2) * 24 * H + 12 * H;
     const urr = 66 + (12 - k) * 1.2 + (k === 0 ? 2.6 : 0), ull = 61 + (12 - k) * 0.9 + (k === 0 ? 1.8 : 0);
-    add("agua", "urrunaga.porcentaje", t, urr, "%");
-    add("agua", "urrunaga.volumen", t, urr * 0.7177, "hm³");
-    add("agua", "ullibarri.porcentaje", t, ull, "%");
-    add("agua", "ullibarri.volumen", t, ull * 1.47, "hm³");
+    add("semanal", "urrunaga.porcentaje", t, urr, "%");
+    add("semanal", "urrunaga.volumen", t, urr * 0.7177, "hm³");
+    add("semanal", "ullibarri.porcentaje", t, ull, "%");
+    add("semanal", "ullibarri.volumen", t, ull * 1.47, "hm³");
+  }
+  // SAIH (vía relevo): embalses y Mendivil cada hora, 7 días. Suben tras la lluvia.
+  let acumulado = 0;
+  for (let i = 7 * 24; i >= 0; i--) {
+    const t = horaActual - i * H;
+    acumulado += lluviaEn(i);
+    const efecto = Math.min(1, acumulado / 40);
+    const crecida = Math.max(0, 7 * Math.exp(-(((i - 38) / 10) ** 2)));
+    add("agua", "urrunaga.nivel", t, 543.02 + efecto * 0.42, "msnm");
+    add("agua", "urrunaga.porcentaje", t, 78.4 + efecto * 2.9, "%");
+    add("agua", "urrunaga.volumen", t, (78.4 + efecto * 2.9) * 0.7177, "hm³");
+    add("agua", "urrunaga.entrada", t, 2.1 + crecida * 0.7 + r() * 0.2, "m³/s");
+    add("agua", "urrunaga.salida", t, 1.6 + r() * 0.1, "m³/s");
+    add("agua", "ullibarri.porcentaje", t, 70.8 + efecto * 2.1, "%");
+    add("agua", "ullibarri.volumen", t, (70.8 + efecto * 2.1) * 1.47, "hm³");
+    add("agua", "ullibarri.entrada", t, 4.2 + crecida + r() * 0.3, "m³/s");
+    add("hidro", "SAIH-A315.caudal", t, 6.1 + crecida * 1.1 + r() * 0.3, "m³/s");
   }
 
   // Generación hidráulica: 30 días
@@ -110,9 +127,10 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
   ];
   h.ponerExtra("incidencias", incidencias);
   h.ponerExtra("estacionAire", "Vitoria-Gasteiz · Avenida Gasteiz");
+  h.ponerExtra("estacionesSaih", [{ id: "SAIH-A315", nombre: "Zadorra en Mendivil" }]);
   h.ponerExtra("estacionesHidro", { t: ahora, estaciones: [
     { id: "DEMO1", nombre: "Zadorra en Abetxuko", medidas: [] }, { id: "DEMO2", nombre: "Zadorra en Arce", medidas: [] }] });
-  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"]) {
+  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "saih", "hidro", "embalses", "generacion", "trafico"]) {
     h.apuntarEjecucion(f, true, null, 1, ahora - (f === "generacion" ? 3 * H : 4 * 60000));
   }
 }

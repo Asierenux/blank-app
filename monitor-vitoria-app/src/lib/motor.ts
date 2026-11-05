@@ -14,13 +14,14 @@ import { recogerEuskalmet, type CacheMedidas } from "./fuentes/euskalmet";
 import { recogerGeneracion } from "./fuentes/generacion";
 import { recogerPvpc } from "./fuentes/pvpc";
 import { recogerEmbalses } from "./fuentes/embalses";
+import { recogerSaihRelevo } from "./fuentes/saihRelevo";
 import { recogerHidro, type CacheHidro } from "./fuentes/hidro";
 import { recogerTrafico, type CamarasGuardadas, type Incidencia } from "./fuentes/trafico";
 import { recogerWaqi } from "./fuentes/waqi";
 import type { Historial } from "./historial";
 import type { Claves, Descargar } from "./tipos";
 
-export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"] as const;
+export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "saih", "hidro", "embalses", "generacion", "trafico"] as const;
 export type Fuente = (typeof FUENTES)[number];
 
 /** Qué falta para poder usar cada fuente (null = nada, lista para funcionar). */
@@ -95,6 +96,7 @@ export class Motor {
       case "hidro":
         return recogerHidro(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheHidro>("estacionesHidro"), ahora);
       case "embalses": return recogerEmbalses(d, ahora);
+      case "saih": return recogerSaihRelevo(d, ahora);
       case "generacion": return recogerGeneracion(d, ahora);
       case "trafico": return recogerTrafico(d, this.h.extra<CamarasGuardadas>("camaras"), ahora);
     }

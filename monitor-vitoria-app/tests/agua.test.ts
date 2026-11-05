@@ -83,3 +83,37 @@ test("Ríos: descubre la estación, lee nivel y caudal y lo guarda una semana", 
   await recogerHidro(d, "yo@x.eus", pem, cache as any, ahora + 3600e3);
   assert.equal(listas, 1);                                             // la segunda vez no vuelve a buscar
 });
+
+test("Relevo del SAIH: embalses y ríos con todos sus datos, y la salida de Ullíbarri medida en Mendivil", async () => {
+  const { parsearRelevo } = await import("../src/lib/fuentes/saihRelevo");
+  const { Historial, almacenEnMemoria } = await import("../src/lib/historial");
+  const { construirPanel } = await import("../src/lib/panel");
+  const { UMBRALES_DEFECTO } = await import("../src/lib/config");
+  const ahora = Date.UTC(2026, 10, 5, 22, 0);
+  const H = 3600e3;
+  const r = parsearRelevo({
+    generado: "2026-11-05T21:47:00Z", errores: [],
+    estaciones: {
+      urrunaga: { tipo: "embalse", codigo: "E028", series: {
+        nivel: [[ahora - 25 * H, 541.8], [ahora - 15 * 60000, 541.95]], porcentaje: [[ahora - 15 * 60000, 54.27]],
+        entrada: [[ahora - 15 * 60000, 4.2]], salida: [[ahora - 15 * 60000, 1.1]] } },
+      ullibarri: { tipo: "embalse", codigo: "E027", series: { porcentaje: [[ahora - 15 * 60000, 70.1]], entrada: [[ahora - 15 * 60000, 3]] } },
+      zadorra_mendivil: { tipo: "rio", codigo: "A315", nombre: "Zadorra en Mendivil", series: { caudal: [[ahora - 15 * 60000, 9.5]] } },
+    },
+  }, ahora);
+  const h = new Historial(almacenEnMemoria());
+  h.guardar(r.lecturas);
+  for (const [k, v] of Object.entries(r.extra!)) h.ponerExtra(k, v);
+  const p = construirPanel(h, UMBRALES_DEFECTO, {}, ahora);
+  const urr = p.agua.embalses.find(e => e.id === "urrunaga")!;
+  assert.equal(urr.origen, "saih");
+  assert.equal(urr.var24hCm, 15);
+  assert.equal(urr.margenAliviadero, 2.55);
+  assert.equal(urr.maniobra!.texto, "Almacenando");
+  const ull = p.agua.embalses.find(e => e.id === "ullibarri")!;
+  assert.equal(ull.salida, 9.5);
+  assert.equal(ull.salidaMedidaEn, "Zadorra en Mendivil");
+  assert.equal(ull.maniobra!.texto, "Desembalsando");
+  assert.equal(p.agua.rios[0].nombre, "Zadorra en Mendivil");
+  assert.throws(() => parsearRelevo({ estaciones: {}, errores: ["timeout"] }), /sin datos: timeout/);
+});

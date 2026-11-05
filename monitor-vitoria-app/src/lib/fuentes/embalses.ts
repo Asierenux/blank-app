@@ -47,12 +47,12 @@ export function parsearFicha(e: Estacion, html: string, ahora = Date.now()): Lec
     : Math.floor(ahora / 86400e3) * 86400e3;
   const salida: Lectura[] = [];
   const volumen = vol ? numeroEs(vol[1]) : null;
-  if (volumen != null && Number.isFinite(volumen)) salida.push(lectura("agua", `${e.id}.volumen`, momento, volumen, "hm³"));
+  if (volumen != null && Number.isFinite(volumen)) salida.push(lectura("semanal", `${e.id}.volumen`, momento, volumen, "hm³"));
   let porcentaje = pct ? numeroEs(pct[1]) : null;
   if ((porcentaje == null || !Number.isFinite(porcentaje)) && volumen != null && e.capacidadHm3) {
     porcentaje = Math.round((volumen / e.capacidadHm3) * 1000) / 10;
   }
-  if (porcentaje != null && Number.isFinite(porcentaje)) salida.push(lectura("agua", `${e.id}.porcentaje`, momento, porcentaje, "%"));
+  if (porcentaje != null && Number.isFinite(porcentaje)) salida.push(lectura("semanal", `${e.id}.porcentaje`, momento, porcentaje, "%"));
   return salida;
 }
 
