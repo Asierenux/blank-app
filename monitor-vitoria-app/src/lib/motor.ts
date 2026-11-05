@@ -21,7 +21,8 @@ import { recogerWaqi } from "./fuentes/waqi";
 import type { Historial } from "./historial";
 import type { Claves, Descargar } from "./tipos";
 
-export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "saih", "hidro", "embalses", "generacion", "trafico"] as const;
+export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"] as const;
+// "saih" (relevo, ver fuentes/saihRelevo.ts) queda desactivada: el SAIH no responde fuera de España
 export type Fuente = (typeof FUENTES)[number];
 
 /** Qué falta para poder usar cada fuente (null = nada, lista para funcionar). */

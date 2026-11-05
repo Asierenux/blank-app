@@ -377,7 +377,6 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
-  saih: "SAIH Ebro · embalses al momento (vía GitHub)",
   hidro: "Euskalmet · ríos (nivel y caudal)",
   embalses: "Embalses · dato semanal",
   generacion: "Generación hidráulica (REE)",
