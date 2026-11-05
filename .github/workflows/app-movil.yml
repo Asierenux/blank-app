@@ -1,0 +1,55 @@
+# Publica la app del iPhone (monitor-vitoria-app) en los servidores de Expo.
+#
+# Cada vez que se sube un cambio de la app: pasa los tests y, si el secreto EXPO_TOKEN
+# está configurado en GitHub, publica una actualización que se abre con Expo Go.
+# Así no hace falta Mac ni tener el ordenador encendido: el iPhone descarga la app
+# una vez y después funciona solo.
+name: App móvil
+
+on:
+  push:
+    paths: ["monitor-vitoria-app/**", ".github/workflows/app-movil.yml"]
+  workflow_dispatch:
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: monitor-vitoria-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: monitor-vitoria-app/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci --legacy-peer-deps
+
+      - name: Tests y tipos
+        run: |
+          npm test
+          npx tsc --noEmit
+
+      - name: Publicar en Expo (solo si hay EXPO_TOKEN)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Sin el secreto EXPO_TOKEN: no se publica (los tests sí han pasado)." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # Crea el proyecto en tu cuenta de Expo la primera vez (las siguientes, lo reutiliza)
+          npx eas-cli@latest init --non-interactive --force
+          npx eas-cli@latest update --branch main --platform ios --non-interactive \
+            --message "$(git log -1 --pretty=%s)"
+          CUENTA=$(npx eas-cli@latest whoami 2>/dev/null | head -1)
+          {
+            echo "## ✅ App publicada"
+            echo ""
+            echo "Abre en el iPhone: https://expo.dev/accounts/${CUENTA}/projects/monitor-vitoria/updates"
+            echo "Entra en la última actualización → **Preview** → escanea el código QR con la cámara (se abre en Expo Go)."
+          } >> "$GITHUB_STEP_SUMMARY"

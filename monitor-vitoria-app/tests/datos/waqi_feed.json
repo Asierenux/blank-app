@@ -1,0 +1,6 @@
+{"status": "ok", "data": {
+  "aqi": 34, "idx": 8466, "dominentpol": "pm25",
+  "city": {"name": "Vitoria-Gasteiz, Euskadi, Spain", "geo": [42.85, -2.67]},
+  "iaqi": {"pm25": {"v": 34}, "pm10": {"v": 12}, "no2": {"v": 9.2}, "o3": {"v": 21}, "t": {"v": 8}},
+  "time": {"s": "2026-10-31 09:00:00", "tz": "+01:00", "iso": "2026-10-31T09:00:00+01:00"}
+}}

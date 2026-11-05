@@ -1,0 +1,8 @@
+{"data": {"type": "Estructura de la generación"},
+ "included": [
+  {"type": "Hidráulica", "id": "10288", "attributes": {"title": "Hidráulica", "values": [
+     {"value": 512.4, "percentage": 0.061, "datetime": "2026-10-29T00:00:00.000+02:00"},
+     {"value": 845.0, "percentage": 0.097, "datetime": "2026-10-30T00:00:00.000+01:00"}]}},
+  {"type": "Ciclo combinado", "id": "1", "attributes": {"title": "Ciclo combinado", "values": [
+     {"value": 4000, "percentage": 0.5, "datetime": "2026-10-29T00:00:00.000+02:00"}]}}
+ ]}
