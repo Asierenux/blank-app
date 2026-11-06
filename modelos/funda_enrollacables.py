@@ -16,15 +16,16 @@ DESCRIPCION = (
     "Funda que se encaja en el cuerpo del cargador y lo convierte en un carrete para el cable. "
     "Imprime una por cargador, en su color. **Mide con calibre** el ancho, el alto y el radio de las esquinas "
     "de la cara frontal del cargador, y la **profundidad** desde la cara frontal hasta la base que toca el enchufe "
-    "(sin contar las patas). Los valores por defecto son estimaciones a partir de la foto (≈44 × 44 mm), no medidas. "
+    "(sin contar las patas ni la base redonda). Valores por defecto: cargador Apple 20W USB-C (versión EU), estimados "
+    "con datos publicados por terceros (Apple no publica sus medidas): compruébalos con calibre. "
     "Activa «Solo pieza de prueba» para imprimir en 10 minutos un aro que compruebe el ajuste antes de la funda completa."
 )
 
 PARAMS = {
-    "ancho": (44.0, 25.0, 90.0, 0.1, "Ancho del cargador (mm)"),
-    "alto": (44.0, 25.0, 90.0, 0.1, "Alto del cargador (mm)"),
-    "radio": (9.0, 0.5, 30.0, 0.5, "Radio de las esquinas del cargador (mm)"),
-    "profundidad": (26.0, 12.0, 60.0, 0.5, "Profundidad del cuerpo, sin patas (mm)"),
+    "ancho": (45.0, 25.0, 90.0, 0.1, "Ancho del cargador (mm)"),
+    "alto": (45.0, 25.0, 90.0, 0.1, "Alto del cargador (mm)"),
+    "radio": (11.0, 0.5, 30.0, 0.5, "Radio de las esquinas del cargador (mm)"),
+    "profundidad": (28.5, 12.0, 60.0, 0.5, "Profundidad del cuerpo, sin patas (mm)"),
     "holgura": (0.15, 0.0, 0.6, 0.05, "Holgura por lado (mm): 0.1 apretado · 0.2 suave"),
     "d_cable": (4.0, 2.0, 8.0, 0.1, "Ø del cable (mm)"),
     "ala": (8.0, 5.0, 16.0, 0.5, "Cuánto sobresalen las pestañas (mm)"),
