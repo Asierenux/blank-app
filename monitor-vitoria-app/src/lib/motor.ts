@@ -17,10 +17,17 @@ import { recogerEmbalses } from "./fuentes/embalses";
 import { recogerHidro, type CacheHidro, type Exploracion } from "./fuentes/hidro";
 import { recogerTrafico, type CamarasGuardadas, type Incidencia } from "./fuentes/trafico";
 import { recogerWaqi } from "./fuentes/waqi";
+import { recogerPrevision } from "./fuentes/prevision";
+import { recogerAvisos, type Aviso as AvisoMeteo } from "./fuentes/avisos";
+import { recogerGasolina } from "./fuentes/gasolina";
+import { recogerAireOficial, type EstacionAire } from "./fuentes/aireOficial";
+import { construirPvpc } from "./panel";
+import { hora, num } from "./formato";
 import type { Historial } from "./historial";
 import type { Claves, Descargar, ErrorFuente } from "./tipos";
 
-export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"] as const;
+export const FUENTES = ["aemet", "prevision", "avisos", "waqi", "aireoficial", "pvpc", "euskalmet", "hidro", "embalses",
+  "generacion", "trafico", "gasolina"] as const;
 // "saih" (relevo, ver fuentes/saihRelevo.ts) queda desactivada: el SAIH no responde fuera de España
 export type Fuente = (typeof FUENTES)[number];
 
@@ -28,6 +35,8 @@ export type Fuente = (typeof FUENTES)[number];
 export function faltaConfiguracion(c: Claves): Record<string, string | null> {
   return {
     aemet: c.aemet ? null : "Falta la clave de AEMET",
+    prevision: c.aemet ? null : "Falta la clave de AEMET",
+    avisos: c.aemet ? null : "Falta la clave de AEMET",
     waqi: c.waqi ? null : "Falta el token de WAQI",
     euskalmet: c.euskalmetEmail && c.euskalmetPem ? null : "Falta la clave de Euskalmet",
     hidro: c.euskalmetEmail && c.euskalmetPem ? null : "Falta la clave de Euskalmet",
@@ -40,6 +49,8 @@ export interface Opciones {
   umbrales: () => Umbrales;
   alertasActivas: () => boolean;
   notificar: (a: Aviso) => Promise<void>;
+  /** Programa una notificación para una hora futura (sustituye a otra con el mismo id). */
+  programar?: (id: string, cuando: number, titulo: string, cuerpo: string) => Promise<void>;
 }
 
 export class Motor {
@@ -100,6 +111,11 @@ export class Motor {
       case "embalses": return recogerEmbalses(d, ahora);
       case "generacion": return recogerGeneracion(d, ahora);
       case "trafico": return recogerTrafico(d, this.h.extra<CamarasGuardadas>("camaras"), ahora);
+      case "prevision": return recogerPrevision(d, c.aemet, ahora);
+      case "avisos": return recogerAvisos(d, c.aemet, ahora);
+      case "gasolina": return recogerGasolina(d, ahora);
+      case "aireoficial":
+        return recogerAireOficial(d, this.h.extra<{ t: number; estaciones: EstacionAire[] }>("estacionesAire"), ahora);
     }
   }
 
@@ -116,7 +132,10 @@ export class Motor {
   }
 
   private async alertas(r: Resultado, ahora: number) {
-    if (!this.o.alertasActivas() || !r.lecturas.length) return;
+    if (!this.o.alertasActivas()) return;
+    await this.avisosMeteo(r, ahora);
+    await this.luzBarata(r, ahora);
+    if (!r.lecturas.length) return;
     const u = this.o.umbrales();
     const avisos = [...evaluar(construirReglas(u), r.lecturas, ahora), ...detectarCrecidas(this.h, u, r.lecturas)];
     for (const a of avisos) {
@@ -129,6 +148,33 @@ export class Motor {
         // sin permiso para notificar: la alerta queda apuntada igualmente
       }
     }
+    this.limpiar(ahora);
+  }
+
+  /** Avisos oficiales nuevos de AEMET → notificación (una vez por aviso). */
+  private async avisosMeteo(r: Resultado, ahora: number) {
+    for (const a of (r.extra?.avisos as AvisoMeteo[] | undefined) ?? []) {
+      const clave = `aviso_meteo@${a.id}`;
+      if (clave in this.h.alertasEnviadas) continue;
+      this.h.apuntarAlerta(clave, ahora);
+      const icono = { amarillo: "🟡", naranja: "🟠", rojo: "🔴" }[a.nivel];
+      await this.o.notificar({ regla: "aviso_meteo", claves: [clave],
+        titulo: `${icono} Aviso ${a.nivel} por ${a.fenomeno.toLowerCase()}`,
+        cuerpo: `${a.zona}${a.inicio ? ` · desde ${hora(a.inicio)}` : ""}${a.fin ? ` hasta ${hora(a.fin)}` : ""}\n${a.titular}` }).catch(() => undefined);
+    }
+  }
+
+  /** Programa en el iPhone el aviso de la franja de luz más barata (llega aunque la app esté cerrada). */
+  private async luzBarata(r: Resultado, ahora: number) {
+    if (!this.o.programar || !r.lecturas.some(l => l.fuente === "pvpc")) return;
+    const franja = construirPvpc(this.h, ahora).mejorFranja;
+    if (!franja || franja.inicio <= ahora + 60000) return;
+    await this.o.programar("luz-barata", franja.inicio - 5 * 60000, "💡 Empieza la luz barata",
+      `De ${hora(franja.inicio)} a ${hora(franja.fin)}: ${num(franja.media, 3)} €/kWh de media. Buen momento para lavadora o lavavajillas.`)
+      .catch(() => undefined);
+  }
+
+  private limpiar(ahora: number) {
     // limpieza: lo enviado hace más de 8 días ya no hace falta recordarlo
     for (const [k, t] of Object.entries(this.h.alertasEnviadas)) {
       if (ahora - t > 8 * 86400e3) delete this.h.alertasEnviadas[k];

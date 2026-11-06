@@ -35,9 +35,12 @@ export async function guardarClave(campo: keyof Claves, valor: string): Promise<
   else await SecureStore.deleteItemAsync(CLAVES[campo]);
 }
 
+export interface ParadaFavorita { operador: "tuvisa" | "euskotren"; id: string; nombre: string }
+
 export interface Preferencias {
   umbrales: Umbrales;
   alertas: boolean;
+  paradas: ParadaFavorita[];
 }
 
 const PREFS = "mv1:preferencias";
@@ -46,9 +49,9 @@ export async function leerPreferencias(): Promise<Preferencias> {
   try {
     const txt = await AsyncStorage.getItem(PREFS);
     const p = txt ? JSON.parse(txt) : {};
-    return { umbrales: { ...UMBRALES_DEFECTO, ...(p.umbrales ?? {}) }, alertas: p.alertas ?? true };
+    return { umbrales: { ...UMBRALES_DEFECTO, ...(p.umbrales ?? {}) }, alertas: p.alertas ?? true, paradas: p.paradas ?? [] };
   } catch {
-    return { umbrales: UMBRALES_DEFECTO, alertas: true };
+    return { umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [] };
   }
 }
 

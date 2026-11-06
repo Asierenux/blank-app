@@ -47,7 +47,7 @@ interface ValorDatos {
   listo: boolean;
   actualizando: boolean;
   actualizar: (forzar?: boolean, solo?: Fuente[]) => Promise<void>;
-  transporte: Pick<Transporte, "estado" | "recorridos">;
+  transporte: Pick<Transporte, "estado" | "recorridos" | "todasLasParadas" | "proximas">;
   historial: Historial;
   claves: Claves;
   ponerClave: (campo: keyof Claves, valor: string) => Promise<void>;
@@ -71,7 +71,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   const [listo, setListo] = useState(false);
   const [actualizando, setActualizando] = useState(false);
   const [claves, setClaves] = useState<Claves>({});
-  const [preferencias, setPreferencias] = useState<Preferencias>({ umbrales: UMBRALES_DEFECTO, alertas: true });
+  const [preferencias, setPreferencias] = useState<Preferencias>({ umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [] });
   const ref = useRef({ claves, preferencias });
   ref.current = { claves, preferencias };
 
@@ -87,6 +87,14 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
     alertasActivas: () => ref.current.preferencias.alertas,
     notificar: async a => {
       await Notifications.scheduleNotificationAsync({ content: { title: a.titulo, body: a.cuerpo }, trigger: null });
+    },
+    programar: async (id, cuando, titulo, cuerpo) => {
+      if (Platform.OS === "web") return;
+      await Notifications.cancelScheduledNotificationAsync(id).catch(() => undefined);
+      await Notifications.scheduleNotificationAsync({
+        identifier: id, content: { title: titulo, body: cuerpo },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: new Date(cuando) },
+      });
     },
   }), [historial]);
 
@@ -111,7 +119,10 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
       const [guardadas, p] = await Promise.all([leerClaves(), leerPreferencias(), historial.cargar()]);
       if (!vivo) return;
       const c = DEMO ? { aemet: "demo", waqi: "demo", euskalmetEmail: "demo", euskalmetPem: "demo" } : guardadas;
-      if (DEMO) rellenarDemo(historial);
+      if (DEMO) {
+        rellenarDemo(historial);
+        if (!p.paradas.length) p.paradas = [{ operador: "tuvisa", id: "b0", nombre: "Dato" }, { operador: "euskotren", id: "p9", nombre: "Angulema" }];
+      }
       ref.current = { claves: c, preferencias: p };
       setClaves(c);
       setPreferencias(p);

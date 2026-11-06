@@ -36,6 +36,10 @@ export const INTERVALOS_MIN: Record<string, number> = {
   hidro: 30,
   generacion: 360,
   trafico: 10,
+  prevision: 120,
+  avisos: 30,
+  gasolina: 360,
+  aireoficial: 60,
 };
 
 export const RADIO_TRAFICO_KM = 25;

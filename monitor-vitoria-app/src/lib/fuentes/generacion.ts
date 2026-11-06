@@ -12,6 +12,29 @@ const ZONAS: Record<string, Record<string, string>> = {
   peninsula: {},
 };
 
+const RENOVABLES = /hidr[aá]ulica|e[oó]lica|solar|otras renovables|residuos renovables|hidroe[oó]lica|biomasa|biog/i;
+
+/**
+ * Parte renovable de cada día: suma de los porcentajes (sobre el total) de las tecnologías
+ * renovables. Usa la misma respuesta que la hidráulica, sin pedir nada más.
+ */
+export function parsearRenovable(datos: any, zona: string): Lectura[] {
+  const porDia = new Map<number, number>();
+  for (const b of datos?.included ?? []) {
+    const nombre = String(b?.attributes?.title ?? b?.type ?? "");
+    const tipo = String(b?.attributes?.type ?? "");
+    if (/total/i.test(nombre)) continue;
+    const renovable = /^renovable/i.test(tipo) || (!/no.?renovable/i.test(tipo) && RENOVABLES.test(nombre));
+    if (!renovable) continue;
+    for (const v of b.attributes?.values ?? []) {
+      if (v?.percentage == null) continue;
+      const t = Date.parse(v.datetime);
+      porDia.set(t, (porDia.get(t) ?? 0) + v.percentage);
+    }
+  }
+  return [...porDia.entries()].map(([t, p]) => lectura("generacion", `renovable_${zona}_pct`, t, redondear(Math.min(1, p) * 100, 1), "%"));
+}
+
 export function parsearGeneracion(datos: any, zona: string): Lectura[] {
   for (const b of datos?.included ?? []) {
     if (String(b?.type ?? "").toLowerCase().startsWith("hidr")) {
@@ -40,7 +63,8 @@ export async function recogerGeneracion(descargar: Descargar, ahora = Date.now()
       const url = URL + query({
         start_date: `${fechaMadrid(desde)}T00:00`, end_date: `${fechaMadrid(ayer)}T23:59`, time_trunc: "day", ...extra,
       });
-      lecturas.push(...parsearGeneracion(await bajarJson(descargar, url), zona));
+      const datos = await bajarJson(descargar, url);
+      lecturas.push(...parsearGeneracion(datos, zona), ...parsearRenovable(datos, zona));
     } catch (e) {
       errores.push(`${zona}: ${(e as Error).message}`);
     }

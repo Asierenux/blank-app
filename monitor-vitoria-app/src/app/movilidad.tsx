@@ -11,12 +11,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Aviso, Etiqueta, Fila, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
-import { enMinutos, hace, hora } from "../lib/formato";
+import { enMinutos, hace, hora, num } from "../lib/formato";
+import { ListaGasolineras } from "../componentes/novedades";
 import { interpolar, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
 import type { Camara } from "../lib/fuentes/trafico";
 import { colorNivel, useColores } from "../lib/tema";
 
-type Modo = "bus" | "tranvia" | "trafico";
+type Modo = "bus" | "tranvia" | "trafico" | "gasolina";
 
 const REGION = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.07, longitudeDelta: 0.07 };
 const REGION_TRAFICO = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.45, longitudeDelta: 0.45 };
@@ -74,6 +75,16 @@ export default function Movilidad() {
   const [recorridos, setRecorridos] = useState<Recorrido[]>([]);
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
+  const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
+  const { historial } = useDatos();
+  const gasolineras = panel?.gasolineras?.lista ?? [];
+  const historialGasolina = historial.ejecuciones.gasolina;
+  const precios = gasolineras.map(g => g[carburante]).filter((x): x is number => x != null);
+  const colorPrecio = (v: number | null) => {
+    if (v == null || !precios.length) return c.tenue;
+    const min = Math.min(...precios), max = Math.max(...precios), tercio = (max - min) / 3;
+    return v <= min + tercio ? c.ok : v >= max - tercio ? c.critico : c.aviso;
+  };
   const [ahora, setAhora] = useState(Date.now());
   const mapa = useRef<MapView>(null);
 
@@ -106,11 +117,11 @@ export default function Movilidad() {
 
   useEffect(() => {
     setLinea(null);
-    mapa.current?.animateToRegion(modo === "trafico" ? REGION_TRAFICO : REGION, 400);
+    mapa.current?.animateToRegion(modo === "trafico" || modo === "gasolina" ? REGION_TRAFICO : REGION, 400);
   }, [modo]);
 
   const vehiculos = useMemo(() => {
-    if (!estado || modo === "trafico") return [];
+    if (!estado || modo === "trafico" || modo === "gasolina") return [];
     return estado.vehiculos
       .filter(v => v.tipo === modo && (!linea || v.linea === linea))
       .map(v => {
@@ -138,6 +149,7 @@ export default function Movilidad() {
           { valor: "bus", texto: `Bus${estado ? ` · ${estado.buses}` : ""}` },
           { valor: "tranvia", texto: `Tranvía${estado ? ` · ${estado.tranvias}` : ""}` },
           { valor: "trafico", texto: `Tráfico${trafico ? ` · ${trafico.activas.length}` : ""}` },
+          { valor: "gasolina", texto: "Gasolina" },
         ]} />
       </View>
 
@@ -171,13 +183,32 @@ export default function Movilidad() {
             <Text style={{ fontSize: 16 }}>📷</Text>
           </Marker>
         ))}
+        {modo === "gasolina" && gasolineras.map(g => (
+          <Marker key={"g" + g.id} coordinate={{ latitude: g.lat, longitude: g.lon }} anchor={{ x: 0.5, y: 0.5 }}
+            title={g.nombre} description={`${g[carburante] != null ? `${num(g[carburante], 3)} €/l · ` : ""}${g.direccion}`} tracksViewChanges={false}>
+            <View style={{ backgroundColor: colorPrecio(g[carburante]), borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2, borderWidth: 1.5, borderColor: "#fff" }}>
+              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{g[carburante] != null ? num(g[carburante], 3) : "—"}</Text>
+            </View>
+          </Marker>
+        ))}
       </MapView>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} contentInsetAdjustmentBehavior="automatic">
-        {estado?.errores.filter(e => modo === "trafico" ? false : e.includes(modo === "bus" ? "Tuvisa" : "Tranvía"))
+        {modo === "gasolina" && (
+          <>
+            <Segmentos<"gasoleo" | "gasolina95"> valor={carburante} cambiar={setCarburante}
+              opciones={[{ valor: "gasoleo", texto: "Diésel" }, { valor: "gasolina95", texto: "Gasolina 95" }]} />
+            {gasolineras.length ? (
+              <Tarjeta><ListaGasolineras lista={gasolineras} carburante={carburante} /></Tarjeta>
+            ) : (
+              <Aviso nivel="info" texto={historialGasolina?.ok === false ? `Gasolineras: ${historialGasolina.error}` : "Cargando precios…"} />
+            )}
+          </>
+        )}
+        {estado?.errores.filter(e => modo === "trafico" || modo === "gasolina" ? false : e.includes(modo === "bus" ? "Tuvisa" : "Tranvía"))
           .map(e => <Aviso key={e} nivel="aviso" texto={e} />)}
 
-        {modo !== "trafico" && (
+        {(modo === "bus" || modo === "tranvia") && (
           <>
             {lineas.length > 0 && (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>

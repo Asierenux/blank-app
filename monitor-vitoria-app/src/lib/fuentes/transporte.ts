@@ -304,6 +304,7 @@ export interface EstadoTransporte {
   tranvias: number;
   errores: string[];
 }
+export interface ParadaElegible extends Parada { operador: Operador; tipo: TipoVehiculo }
 export interface Recorrido { tipo: TipoVehiculo; linea: string; color: string | null; formas: [number, number][][] }
 
 const ordenLinea = (a: string, b: string) => {
@@ -348,6 +349,38 @@ export class Transporte {
       }
       throw e;
     }
+  }
+
+  /** Todas las paradas (para buscar la tuya): las de Tuvisa y las del tranvía de Vitoria. */
+  async todasLasParadas(): Promise<ParadaElegible[]> {
+    const salida: ParadaElegible[] = [];
+    for (const op of Object.keys(OPERADORES) as Operador[]) {
+      try {
+        const h = await this.horario(op);
+        for (const p of Object.values(h.paradas)) salida.push({ operador: op, tipo: OPERADORES[op].tipo, ...p });
+      } catch {
+        // si un operador falla, se ofrecen las paradas del otro
+      }
+    }
+    return salida.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  }
+
+  private ultimoFeed: Partial<Record<Operador, { t: number; feed: Feed }>> = {};
+
+  /** Próximas llegadas a las paradas elegidas. Clave del resultado: "operador:idParada". */
+  async proximas(favoritas: { operador: Operador; id: string }[], ahora = Date.now()): Promise<Record<string, Llegada[]>> {
+    const salida: Record<string, Llegada[]> = {};
+    for (const op of [...new Set(favoritas.map(f => f.operador))]) {
+      const url = OPERADORES[op].llegadas;
+      if (!url) continue;
+      const h = await this.horario(op, ahora);
+      const guardado = this.ultimoFeed[op];
+      const feed = guardado && ahora - guardado.t < 20000 ? guardado.feed : leerFeed(await bajarBytes(this.descargar, url));
+      this.ultimoFeed[op] = { t: guardado && ahora - guardado.t < 20000 ? guardado.t : ahora, feed };
+      const r = llegadas(feed, h, op, ahora / 1000, op === "euskotren" ? lineasTranviaVitoria(h) : undefined);
+      for (const f of favoritas.filter(x => x.operador === op)) salida[`${op}:${f.id}`] = (r.porParada[f.id] ?? []).slice(0, 5);
+    }
+    return salida;
   }
 
   async recorridos(): Promise<{ recorridos: Recorrido[]; errores: string[] }> {

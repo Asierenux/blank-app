@@ -9,6 +9,9 @@ import { fechaMadrid, inicioDiaMadrid } from "./formato";
 import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
 import { activa, ventanaMs } from "./fuentes/trafico";
 import type { Historial, Punto } from "./historial";
+import type { Prevision } from "./fuentes/prevision";
+import type { Aviso as AvisoMeteo } from "./fuentes/avisos";
+import type { Gasolineras } from "./fuentes/gasolina";
 import type { Nivel } from "./tipos";
 
 const H = 3600e3;
@@ -374,6 +377,10 @@ export function construirTrafico(h: Historial, ahora: number) {
 
 export const NOMBRES_FUENTES: Record<string, string> = {
   aemet: "AEMET · Vitoria aeropuerto",
+  prevision: "AEMET · previsión de Vitoria",
+  avisos: "AEMET · avisos oficiales (Álava)",
+  aireoficial: "Aire · estaciones del Gobierno Vasco",
+  gasolina: "Gasolineras (Ministerio)",
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
@@ -423,7 +430,11 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
     peor(...indicadores.filter(i => ids.includes(i.id) && i.nivel !== "sin_datos" && i.nivel !== "info").map(i => i.nivel));
 
   // El precio de la luz y el tráfico NO cuentan: que la luz esté cara no es una emergencia
+  // Avisos oficiales vigentes: amarillo/naranja = atención, rojo = crítico
+  const nivelesAvisos = (h.extra<AvisoMeteo[]>("avisos") ?? []).filter(a => a.fin == null || a.fin > ahora)
+    .map((a): Nivel => (a.nivel === "rojo" ? "critico" : "aviso"));
   const global = peor(
+    ...nivelesAvisos,
     ...indicadores.filter(i => i.cuentaGlobal && i.nivel !== "sin_datos").map(i => i.nivel),
     ...indicadores.filter(i => i.antiguo).map((): Nivel => "aviso"),
     ...estadosAgua,
@@ -456,11 +467,37 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
       inicio: global,
       agua: peor(...estadosAgua),
       movilidad: trafico.nivel,
-      clima: nivelDe(["aemet.temperatura", "aemet.racha", "aemet.precipitacion", "waqi.aqi", "waqi.pm25", "waqi.no2"]),
+      clima: peor(nivelDe(["aemet.temperatura", "aemet.racha", "aemet.precipitacion", "waqi.aqi", "waqi.pm25", "waqi.no2"]), ...nivelesAvisos),
       ajustes: peor(...fuentes.filter(f => f.nivel !== "sin_datos").map(f => f.nivel)),
     },
     estacionAire: h.extra<string>("estacionAire") ?? null,
+    prevision: h.extra<Prevision>("prevision") ?? null,
+    avisos: (h.extra<AvisoMeteo[]>("avisos") ?? []).filter(a => a.fin == null || a.fin > ahora),
+    gasolineras: h.extra<Gasolineras>("gasolineras") ?? null,
+    aireOficial: construirAireOficial(h, ahora),
+    renovable: {
+      pv: h.ultimo("generacion.renovable_pv_pct", ahora),
+      peninsula: h.ultimo("generacion.renovable_peninsula_pct", ahora),
+      serie: h.serie("generacion.renovable_peninsula_pct", ahora - 31 * 24 * H, ahora),
+    },
   };
 }
 
 export type Panel = ReturnType<typeof construirPanel>;
+
+/** Último valor de cada contaminante en cada estación oficial de Vitoria (de las últimas 6 h). */
+function construirAireOficial(h: Historial, ahora: number) {
+  const estaciones = h.extra<{ estaciones: { id: string; nombre: string }[] }>("estacionesAire")?.estaciones ?? [];
+  const LIMITES: Record<string, number> = { no2: 200, pm10: 50, pm25: 25, o3: 180, so2: 350 };   // µg/m³: umbrales de referencia
+  return estaciones.map(e => {
+    const valores = ["no2", "pm10", "pm25", "o3", "so2", "co"].map(c => {
+      const p = h.ultimo(`aireoficial.${e.id}.${c}`, ahora);
+      if (!p || ahora - p[0] > 6 * H) return null;
+      const lim = LIMITES[c];
+      const nivel: Nivel = lim == null ? "info" : p[1] > lim ? "critico" : p[1] > lim / 2 ? "aviso" : "ok";
+      return { contaminante: c, valor: p[1], t: p[0], unidad: c === "co" ? "mg/m³" : "µg/m³", nivel,
+        serie: h.serie(`aireoficial.${e.id}.${c}`, ahora - 48 * H, ahora) };
+    }).filter((x): x is NonNullable<typeof x> => !!x);
+    return { id: e.id, nombre: e.nombre, valores };
+  }).filter(e => e.valores.length);
+}

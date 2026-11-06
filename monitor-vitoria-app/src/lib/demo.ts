@@ -3,7 +3,7 @@
  * para ver cómo responden el embalse y el río) y autobuses/tranvías de ejemplo.
  * Se activa compilando con EXPO_PUBLIC_DEMO=1. Sirve para enseñar la app sin claves ni internet.
  */
-import type { Recorrido, EstadoTransporte, Vehiculo, ParadaTranvia } from "./fuentes/transporte";
+import type { Recorrido, EstadoTransporte, Vehiculo, ParadaTranvia, ParadaElegible } from "./fuentes/transporte";
 import type { Incidencia } from "./fuentes/trafico";
 import type { Historial } from "./historial";
 import { inicioDiaMadrid } from "./formato";
@@ -113,7 +113,53 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
     add("generacion", "hidraulica_pv_pct", t, 7 + 2 * Math.sin(d / 5) + r(), "%");
   }
 
+  // Renovables (30 días) y precios de carburantes
+  for (let d = 30; d >= 1; d--) {
+    const t = hoy - d * 24 * H;
+    add("generacion", "renovable_peninsula_pct", t, 48 + 12 * Math.sin(d / 4) + r() * 5, "%");
+    add("generacion", "renovable_pv_pct", t, 18 + 6 * Math.sin(d / 4) + r() * 3, "%");
+  }
+  // Aire oficial (estaciones del Gobierno Vasco), cada hora 48 h
+  for (let i = 48; i >= 0; i--) {
+    const t = horaActual - i * H;
+    const horaDia = new Date(t).getUTCHours() + 1;
+    const punta = horaDia === 8 || horaDia === 9 || horaDia === 19 ? 18 : 0;
+    add("aireoficial", "48.no2", t, 14 + punta + r() * 6, "µg/m³");
+    add("aireoficial", "48.pm10", t, 11 + r() * 5, "µg/m³");
+    add("aireoficial", "48.pm25", t, 6 + r() * 3, "µg/m³");
+    add("aireoficial", "50.no2", t, 10 + punta * 0.7 + r() * 5, "µg/m³");
+    add("aireoficial", "50.o3", t, 35 + 20 * Math.sin(((horaDia - 9) / 24) * 2 * Math.PI) + r() * 5, "µg/m³");
+  }
   h.guardar(l);
+  h.ponerExtra("estacionesAire", { t: ahora, estaciones: [{ id: "48", nombre: "Avenida Gasteiz" }, { id: "50", nombre: "Farmacia" }] });
+  // Previsión: 36 horas y 7 días
+  const cielos = ["11", "12", "13", "14", "15", "43", "46", "24", "13", "12"];
+  const horas = Array.from({ length: 36 }, (_, i) => {
+    const t = horaActual + i * H;
+    const horaDia = new Date(t).getUTCHours() + 1;
+    const ciclo = Math.sin(((horaDia - 9) / 24) * 2 * Math.PI);
+    const noche = horaDia < 8 || horaDia > 18;
+    const cod = cielos[Math.floor(i / 4) % cielos.length];
+    return { t, temp: Math.round(9 + 5 * ciclo), cielo: cod + (noche ? "n" : ""), desc: ["Despejado", "Poco nuboso", "Intervalos nubosos", "Nuboso", "Muy nuboso",
+      "Lluvia escasa", "Cubierto con lluvia escasa", "Nuboso con lluvia", "Intervalos nubosos", "Poco nuboso"][Math.floor(i / 4) % cielos.length],
+      lluvia: i >= 20 && i < 28 ? 0.6 : 0, probLluvia: i >= 18 && i < 30 ? 65 : 10, viento: 12, racha: i >= 20 && i < 26 ? 55 : 25, dir: "SO" };
+  });
+  const dias = Array.from({ length: 7 }, (_, d) => ({
+    fecha: new Date(hoy + d * 24 * H + 12 * H).toISOString().slice(0, 10),
+    max: [14, 11, 9, 12, 15, 16, 13][d], min: [5, 6, 3, 1, 4, 6, 5][d], cielo: ["13", "24", "46", "12", "11", "12", "15"][d],
+    desc: "", probLluvia: [20, 80, 60, 10, 0, 5, 30][d], uv: [2, 1, 1, 2, 3, 3, 2][d], racha: [30, 60, 45, 20, 15, 15, 25][d],
+  }));
+  h.ponerExtra("prevision", { t: ahora, horas, dias });
+  h.ponerExtra("avisos", [{ id: "demo-aviso", nivel: "amarillo", fenomeno: "Vientos", zona: "Llanada alavesa",
+    inicio: horaActual + 20 * H, fin: horaActual + 28 * H, titular: "Aviso amarillo por vientos",
+    descripcion: "Rachas máximas del suroeste de 70 km/h, más probables en zonas altas." }]);
+  h.ponerExtra("gasolineras", { t: ahora, fecha: "", lista: [
+    ["BALLENOIL", "C/ Portal de Foronda 46", 1.399, 1.519, 2.1], ["PETROPRIX", "Polígono Júndiz", 1.389, 1.509, 5.4],
+    ["REPSOL", "Avenida Gasteiz 87", 1.479, 1.599, 0.9], ["CEPSA", "C/ Zadorra 2", 1.459, 1.579, 1.8],
+    ["BP", "Carretera de Logroño", 1.449, 1.569, 3.2], ["EROSKI", "Avenida Zabalgana", 1.409, 1.529, 3.0],
+  ].map(([nombre, direccion, gasoleo, gasolina95, km], i) => ({ id: `g${i}`, nombre: String(nombre), direccion: String(direccion),
+    municipio: "Vitoria-Gasteiz", horario: "L-D 24H", lat: 42.85 + Math.sin(i * 2) * 0.02, lon: -2.67 + Math.cos(i * 2) * 0.03,
+    km: Number(km), gasoleo: Number(gasoleo), gasolina95: Number(gasolina95) })) });
   const incidencias: Incidencia[] = [
     { id: "d1", tipo: "obras", nombre: "Obras · corte de carril", causa: "Mantenimiento", nivel: "Amarillo", carretera: "N-622",
       pkInicio: 4.2, pkFin: 5.1, sentido: "Vitoria", municipio: "Vitoria-Gasteiz", provincia: "Araba", lat: 42.872, lon: -2.705,
@@ -130,7 +176,8 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
   h.ponerExtra("estacionesSaih", [{ id: "SAIH-A315", nombre: "Zadorra en Mendivil" }]);
   h.ponerExtra("estacionesHidro", { t: ahora, estaciones: [
     { id: "DEMO1", nombre: "Zadorra en Abetxuko", medidas: [] }, { id: "DEMO2", nombre: "Zadorra en Arce", medidas: [] }] });
-  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "saih", "hidro", "embalses", "generacion", "trafico"]) {
+  for (const f of ["aemet", "waqi", "pvpc", "euskalmet", "saih", "hidro", "embalses", "generacion", "trafico",
+    "prevision", "avisos", "gasolina", "aireoficial"]) {
     h.apuntarEjecucion(f, true, null, 1, ahora - (f === "generacion" ? 3 * H : 4 * 60000));
   }
 }
@@ -172,6 +219,18 @@ export const transporteDemo = {
           formas: [[...TRANVIA.slice(0, 10), ...TRANVIA.slice(11)].map(([, a, b]) => [a, b] as [number, number])] },
       ],
     };
+  },
+  async todasLasParadas(): Promise<ParadaElegible[]> {
+    const tranvia: ParadaElegible[] = TRANVIA.map(([nombre, lat, lon], i) => ({ operador: "euskotren", tipo: "tranvia", id: `p${i}`, nombre, lat, lon }));
+    const bus: ParadaElegible[] = [{ operador: "tuvisa", tipo: "bus", id: "b0", nombre: "Dato", lat: 42.8466, lon: -2.6731 },
+      { operador: "tuvisa", tipo: "bus", id: "b1", nombre: "Florida (bus)", lat: 42.8432, lon: -2.6680 }];
+    return [...tranvia, ...bus];
+  },
+  async proximas(favoritas: { operador: string; id: string }[]) {
+    return Object.fromEntries(favoritas.map((f, k) => [`${f.operador}:${f.id}`, [
+      { linea: f.operador === "tuvisa" ? "2" : "TG1", color: f.operador === "tuvisa" ? "#0072BC" : "#5FA830", destino: "Centro", enS: 180 + k * 60, retrasoS: 0 },
+      { linea: f.operador === "tuvisa" ? "5" : "TG2", color: f.operador === "tuvisa" ? "#F7941D" : "#2E8B57", destino: "Periferia", enS: 660 + k * 60, retrasoS: 60 },
+    ]]));
   },
   async estado(ahora = Date.now()): Promise<EstadoTransporte> {
     const s = ahora / 1000;

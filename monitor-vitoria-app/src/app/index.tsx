@@ -4,6 +4,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 
 import { Barra, GraficaPvpc } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Tarjeta } from "../componentes/ui";
+import { MejorGasolina, MisParadas, ResumenHoy, TarjetasAvisos } from "../componentes/novedades";
 import { useDatos } from "../datos";
 import { fechaMadrid, hora, num } from "../lib/formato";
 import type { Indicador } from "../lib/panel";
@@ -45,6 +46,18 @@ export default function Inicio() {
         </Text>
       </Tarjeta>
 
+      <TarjetasAvisos avisos={panel.avisos} />
+
+      {panel.prevision && (
+        <Seccion titulo="Hoy en Vitoria">
+          <Tarjeta onPress={() => router.navigate("/clima")}>
+            <ResumenHoy prevision={panel.prevision} />
+          </Tarjeta>
+        </Seccion>
+      )}
+
+      <MisParadas />
+
       {sinConfigurar.length > 0 && (
         <Tarjeta onPress={() => router.navigate("/ajustes")}>
           <Text style={{ color: c.texto, fontWeight: "700", fontSize: 16 }}>Completa la configuración</Text>
@@ -71,6 +84,12 @@ export default function Inicio() {
               )}
             </>
           ) : <Etiqueta>Aún no hay precios. Desliza hacia abajo para actualizar.</Etiqueta>}
+          {panel.renovable.peninsula && (
+            <Etiqueta>
+              🌱 Renovable ayer: {num(panel.renovable.peninsula[1], 0)} % en la península
+              {panel.renovable.pv ? ` · ${num(panel.renovable.pv[1], 0)} % en Euskadi` : ""}
+            </Etiqueta>
+          )}
         </Tarjeta>
       </Seccion>
 
@@ -113,6 +132,14 @@ export default function Inicio() {
           ))}
         </Tarjeta>
       </Seccion>
+
+      {panel.gasolineras && (
+        <Seccion titulo="Gasolina">
+          <Tarjeta onPress={() => router.navigate("/movilidad")}>
+            <MejorGasolina panel={panel} />
+          </Tarjeta>
+        </Seccion>
+      )}
 
       {conProblemas.length > 0 && (
         <Aviso nivel="aviso" texto={`Con problemas: ${conProblemas.map(f => `${f.descripcion} (${f.texto.toLowerCase()})`).join(", ")}. Detalles en Ajustes.`} />

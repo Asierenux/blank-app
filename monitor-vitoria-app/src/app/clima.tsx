@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 
 import { GraficaLinea } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Segmentos, Tarjeta } from "../componentes/ui";
+import { AireOficial, PrevisionDias, PrevisionHoras, TarjetasAvisos } from "../componentes/novedades";
 import { useDatos } from "../datos";
 import { hace, num } from "../lib/formato";
 import { textoAqi, type Indicador } from "../lib/panel";
@@ -42,7 +43,24 @@ export default function Clima() {
       <Segmentos<Periodo> valor={periodo} cambiar={setPeriodo}
         opciones={[{ valor: "24", texto: "24 h" }, { valor: "72", texto: "3 días" }, { valor: "168", texto: "7 días" }]} />
 
-      <Seccion titulo="Vitoria · aeropuerto">
+      <TarjetasAvisos avisos={panel.avisos} />
+
+      {panel.prevision ? (
+        <Seccion titulo="Previsión">
+          <Tarjeta>
+            <Etiqueta>Próximas horas</Etiqueta>
+            <PrevisionHoras prevision={panel.prevision} horas={36} />
+          </Tarjeta>
+          <Tarjeta>
+            <Etiqueta>Próximos días</Etiqueta>
+            <PrevisionDias prevision={panel.prevision} />
+          </Tarjeta>
+        </Seccion>
+      ) : historial.ejecuciones.prevision?.ok === false ? (
+        <Aviso nivel="aviso" texto={`Previsión: ${historial.ejecuciones.prevision.error}`} />
+      ) : null}
+
+      <Seccion titulo="Ahora · Vitoria aeropuerto">
         <Tarjeta>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
             <View>
@@ -87,6 +105,10 @@ export default function Clima() {
       </Seccion>
 
       <Seccion titulo="Calidad del aire">
+        <AireOficial panel={panel} />
+        {historial.ejecuciones.aireoficial?.ok === false && (
+          <Aviso nivel="info" texto={`Estaciones oficiales: ${historial.ejecuciones.aireoficial.error}`} />
+        )}
         <Tarjeta>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
             <View>
