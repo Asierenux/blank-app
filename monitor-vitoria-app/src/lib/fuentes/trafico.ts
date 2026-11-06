@@ -211,7 +211,9 @@ export async function recogerTrafico(
   // (las guardadas por versiones anteriores, sin "recibidas", se vuelven a bajar)
   const espera = camaras?.lista.length && camaras.recibidas != null ? 86400e3 : 3600e3;
   if (camaras && camaras.v !== VERSION_CAMARAS && !camaras.error) camaras = undefined;
-  if (!camaras || ahora - camaras.t > espera) {
+  // Cámaras desactivadas: ninguna fuente pública de fotos funciona (nov. 2026). Poner a true para volver a probar.
+  const CAMARAS_ACTIVAS = false;
+  if (CAMARAS_ACTIVAS && (!camaras || ahora - camaras.t > espera)) {
     try {
       camaras = await bajarCamaras(descargar, ahora);
     } catch (e) {

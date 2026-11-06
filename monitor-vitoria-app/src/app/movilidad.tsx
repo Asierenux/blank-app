@@ -4,7 +4,7 @@
  */
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Image, Linking, Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -14,7 +14,6 @@ import { VITORIA } from "../lib/config";
 import { enMinutos, hace, hora, num } from "../lib/formato";
 import { ListaGasolineras } from "../componentes/novedades";
 import { interpolar, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
-import type { Camara } from "../lib/fuentes/trafico";
 import { colorNivel, useColores } from "../lib/tema";
 
 type Modo = "bus" | "tranvia" | "trafico" | "gasolina";
@@ -38,27 +37,6 @@ function Chapa({ v, c }: { v: Vehiculo; c: ReturnType<typeof useColores> }) {
   );
 }
 
-function ImagenCamara({ cam, alFallar }: { cam: Camara; alFallar: (id: string) => void }) {
-  const c = useColores();
-  const [i, setI] = useState(0);
-  const url = cam.candidatas[i];
-  const fallida = !url;
-  useEffect(() => { if (fallida) alFallar(cam.id); }, [fallida, cam.id, alFallar]);
-  if (fallida) return null;          // sin foto disponible: no se enseña
-  return (
-    <Pressable style={{ width: 260, gap: 6 }} onPress={() => Linking.openURL(cam.imagen).catch(e =>
-      Alert.alert("No se puede abrir", `${cam.imagen}\n\n${(e as Error).message}`))}>
-      <Image
-        // sin "?t=…" (estropeaba algunas direcciones); "reload" evita ver una foto antigua guardada
-        source={{ uri: url, cache: "reload" }}
-        onError={() => setI(x => x + 1)}
-        style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta }}
-      />
-      <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{cam.municipal ? "📍 " : ""}{cam.nombre}</Text>
-    </Pressable>
-  );
-}
-
 export default function Movilidad() {
   const c = useColores();
   const ins = useSafeAreaInsets();
@@ -70,8 +48,6 @@ export default function Movilidad() {
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
   const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
-  const [fallidas, setFallidas] = useState<Set<string>>(new Set());
-  const alFallar = useCallback((id: string) => setFallidas(f => (f.has(id) ? f : new Set(f).add(id))), []);
   const { historial } = useDatos();
   const gasolineras = panel?.gasolineras?.lista ?? [];
   const historialGasolina = historial.ejecuciones.gasolina;
@@ -172,12 +148,6 @@ export default function Movilidad() {
         {modo === "trafico" && trafico?.activas.filter(i => i.lat && i.lon).map(i => (
           <Marker key={i.id} coordinate={{ latitude: i.lat!, longitude: i.lon! }} pinColor={colorNivel(c, i.nivelEstado)}
             title={i.nombre} description={[i.carretera, i.municipio, i.causa].filter(Boolean).join(" · ")} />
-        ))}
-        {modo === "trafico" && trafico?.camaras.map(cam => (
-          <Marker key={"cam" + cam.id} coordinate={{ latitude: cam.lat, longitude: cam.lon }} title={cam.nombre}
-            anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
-            <Text style={{ fontSize: 16 }}>📷</Text>
-          </Marker>
         ))}
         {modo === "gasolina" && gasolineras.map(g => (
           <Marker key={"g" + g.id} coordinate={{ latitude: g.lat, longitude: g.lon }} anchor={{ x: 0.5, y: 0.5 }}
@@ -288,34 +258,10 @@ export default function Movilidad() {
                 </Tarjeta>
               </>
             )}
-            <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras</Text>
-            <Pressable
-              onPress={() => {
-                const url = "https://apps.trafikoa.euskadi.eus/lfr/es/web/trafikoa/camaras-trafiko";
-                Linking.openURL(url).catch(e => Alert.alert("No se pudo abrir Safari", `${url}\n\n${(e as Error).message}`));
-              }}
-              style={({ pressed }) => ({ backgroundColor: c.acento, opacity: pressed ? 0.7 : 1, borderRadius: 12, paddingVertical: 11, alignItems: "center" })}>
-              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>📷 Ver cámaras en Trafikoa ↗</Text>
-            </Pressable>
-            {trafico.camaras.length > 0 ? (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                {trafico.camaras.slice(0, 20).map(cam => <ImagenCamara key={cam.id} cam={cam} alFallar={alFallar} />)}
-              </ScrollView>
-            ) : null}
-            {fallidas.size > 0 && (
-              <Etiqueta>
-                {fallidas.size >= Math.min(trafico.camaras.length, 20)
-                  ? "Ninguna cámara cercana tiene foto disponible ahora mismo (las de carreteras del Gobierno Vasco publican direcciones que ya no existen)."
-                  : `${fallidas.size} cámaras sin foto disponible no se muestran.`}
-              </Etiqueta>
-            )}
-            {trafico.camaras.length > 0 ? null : (
-              <Aviso nivel="aviso" texto={
-                !trafico.infoCamaras ? "Aún no se ha descargado la lista de cámaras."
-                  : trafico.infoCamaras.error ? `No se pudo bajar la lista de cámaras: ${trafico.infoCamaras.error}`
-                  : `La web dio ${trafico.infoCamaras.recibidas ?? 0} cámaras, pero ninguna con foto y posición cerca de Vitoria. Formato recibido: ${trafico.infoCamaras.muestra ?? "—"}`
-              } />
-            )}
+            <Etiqueta>
+              Cámaras: ninguna fuente pública funciona ahora mismo (las direcciones de las fotos del Gobierno Vasco ya no existen
+              y las del Ayuntamiento no emiten), así que no se muestran.
+            </Etiqueta>
           </>
         )}
       </ScrollView>
