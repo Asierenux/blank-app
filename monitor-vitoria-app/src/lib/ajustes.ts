@@ -41,6 +41,8 @@ export interface Preferencias {
   umbrales: Umbrales;
   alertas: boolean;
   paradas: ParadaFavorita[];
+  resumenDiario: boolean;
+  avisoPrecios: boolean;
 }
 
 const PREFS = "mv1:preferencias";
@@ -49,9 +51,10 @@ export async function leerPreferencias(): Promise<Preferencias> {
   try {
     const txt = await AsyncStorage.getItem(PREFS);
     const p = txt ? JSON.parse(txt) : {};
-    return { umbrales: { ...UMBRALES_DEFECTO, ...(p.umbrales ?? {}) }, alertas: p.alertas ?? true, paradas: p.paradas ?? [] };
+    return { umbrales: { ...UMBRALES_DEFECTO, ...(p.umbrales ?? {}) }, alertas: p.alertas ?? true, paradas: p.paradas ?? [],
+      resumenDiario: p.resumenDiario ?? true, avisoPrecios: p.avisoPrecios ?? true };
   } catch {
-    return { umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [] };
+    return { umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [], resumenDiario: true, avisoPrecios: true };
   }
 }
 

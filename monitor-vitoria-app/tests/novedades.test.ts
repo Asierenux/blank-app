@@ -192,9 +192,9 @@ test("Motor: avisa una vez de cada aviso oficial y programa la luz barata", asyn
   await m.actualizar(true, ["avisos", "pvpc"]);
   await m.actualizar(true, ["avisos"]);
   assert.deepEqual(avisados.filter(t => t.includes("Aviso")), ["🟠 Aviso naranja por vientos"]);
-  assert.equal(programados.length, 1);
-  assert.equal(programados[0][0], "luz-barata");
-  assert.equal(programados[0][1], base + 5 * H - 5 * 60000);          // 5 min antes de la franja barata
+  const luz = programados.filter(([id]) => id === "luz-barata");
+  assert.equal(luz.length, 1);
+  assert.equal(luz[0][1], base + 5 * H - 5 * 60000);                  // 5 min antes de la franja barata
 });
 
 test("Datos reales: aire oficial de Avenida Gasteiz y estaciones de Vitoria", async () => {
@@ -268,4 +268,37 @@ test("Datos reales: agenda cultural, solo Vitoria, sin HTML y ordenada", async (
   assert.equal(textoPlano("<p>Contin&uacute;a &laquo;firme&raquo;</p>"), "Continúa «firme»");
   const claves = ev.map(e => `${e.desde < "2026-11-06" ? "2026-11-06" : e.desde} ${e.hora ?? "99"}`);
   assert.deepEqual(claves, [...claves].sort());
+});
+
+test("Resumen de la mañana y aviso de precios de mañana", async () => {
+  const { proximas730, resumenDelDia, avisoPreciosManana } = await import("../src/lib/resumen");
+  const { construirPanel } = await import("../src/lib/panel");
+  const { fechaMadrid, fechaSinZonaMadrid } = await import("../src/lib/formato");
+  const H = 3600e3;
+  const ahora = Date.UTC(2026, 10, 6, 19, 0);                         // 20:00 en Vitoria
+  assert.equal(iso(proximas730(ahora)), "2026-11-07T06:30:00.000Z");  // mañana a las 7:30
+  assert.equal(iso(proximas730(Date.UTC(2026, 10, 6, 5, 0))), "2026-11-06T06:30:00.000Z");
+  const manana = "2026-11-07";
+  const h = new Historial(almacenEnMemoria());
+  const inicio = fechaSinZonaMadrid(`${manana}T00:00`)!;
+  const hoy0 = fechaSinZonaMadrid("2026-11-06T00:00")!;
+  h.guardar([...Array.from({ length: 24 }, (_, i) => ({ fuente: "pvpc", metrica: "precio", t: hoy0 + i * H, valor: 0.15, unidad: "€/kWh" })),
+    ...Array.from({ length: 24 }, (_, i) => ({ fuente: "pvpc", metrica: "precio", t: inicio + i * H, valor: i >= 13 && i < 16 ? 0.05 : 0.12, unidad: "€/kWh" }))]);
+  h.ponerExtra("prevision", { t: ahora, horas: [
+    { t: fechaSinZonaMadrid(`${manana}T17:00`)!, temp: 9, cielo: "46", desc: "", lluvia: 1, probLluvia: 70, viento: 20, racha: 60, dir: "O" }],
+    dias: [{ fecha: manana, max: 11, min: -1, cielo: "24", desc: "Nuboso con lluvia", probLluvia: 80, uv: 1, racha: 60 }] });
+  h.ponerExtra("agenda", { t: ahora, eventos: [{ id: "1", tipo: "Concierto", nombre: "Gansos Rosas", desde: manana, hasta: manana, hora: "21:00",
+    lugar: "Helldorado", precio: null, url: null, entradas: null, imagen: null, descripcion: "" }] });
+  const panel = construirPanel(h, U, {}, ahora);
+  const r = resumenDelDia(panel, manana)!;
+  assert.equal(r.titulo, "☀️ Buenos días · sáb 7");
+  assert.match(r.cuerpo, /Nuboso con lluvia · -1° a 11°/);
+  assert.match(r.cuerpo, /🧊 Helada/);
+  assert.match(r.cuerpo, /paraguas: lluvia probable desde las 17h/);
+  assert.match(r.cuerpo, /💨 Rachas de hasta 60 km\/h/);
+  assert.match(r.cuerpo, /💡 Luz más barata de 13:00 a 16:00/);
+  assert.match(r.cuerpo, /🎭 Plan: Gansos Rosas \(21:00\)/);
+  const p = avisoPreciosManana(panel, ahora)!;
+  assert.equal(p.dia, fechaMadrid(ahora + 86400e3));
+  assert.match(p.cuerpo, /de 13:00 a 16:00 .* más barata que hoy/);
 });

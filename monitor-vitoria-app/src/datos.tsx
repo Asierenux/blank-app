@@ -71,7 +71,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   const [listo, setListo] = useState(false);
   const [actualizando, setActualizando] = useState(false);
   const [claves, setClaves] = useState<Claves>({});
-  const [preferencias, setPreferencias] = useState<Preferencias>({ umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [] });
+  const [preferencias, setPreferencias] = useState<Preferencias>({ umbrales: UMBRALES_DEFECTO, alertas: true, paradas: [], resumenDiario: true, avisoPrecios: true });
   const ref = useRef({ claves, preferencias });
   ref.current = { claves, preferencias };
 
@@ -85,6 +85,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
     claves: async () => ref.current.claves,
     umbrales: () => ref.current.preferencias.umbrales,
     alertasActivas: () => ref.current.preferencias.alertas,
+    diarios: () => ({ resumen: ref.current.preferencias.resumenDiario, precios: ref.current.preferencias.avisoPrecios }),
     notificar: async a => {
       await Notifications.scheduleNotificationAsync({ content: { title: a.titulo, body: a.cuerpo }, trigger: null });
     },

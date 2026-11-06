@@ -22,7 +22,9 @@ import { recogerAvisos, type Aviso as AvisoMeteo } from "./fuentes/avisos";
 import { recogerGasolina } from "./fuentes/gasolina";
 import { recogerAgenda } from "./fuentes/agenda";
 import { recogerAireOficial, type EstacionAire } from "./fuentes/aireOficial";
-import { construirPvpc } from "./panel";
+import { construirPanel, construirPvpc } from "./panel";
+import { avisoPreciosManana, proximas730, resumenDelDia } from "./resumen";
+import { fechaMadrid } from "./formato";
 import { hora, num } from "./formato";
 import type { Historial } from "./historial";
 import type { Claves, Descargar, ErrorFuente } from "./tipos";
@@ -49,6 +51,8 @@ export interface Opciones {
   claves: () => Promise<Claves>;
   umbrales: () => Umbrales;
   alertasActivas: () => boolean;
+  /** Resumen de las 7:30 y aviso de precios de mañana (por defecto, activados) */
+  diarios?: () => { resumen: boolean; precios: boolean };
   notificar: (a: Aviso) => Promise<void>;
   /** Programa una notificación para una hora futura (sustituye a otra con el mismo id). */
   programar?: (id: string, cuando: number, titulo: string, cuerpo: string) => Promise<void>;
@@ -94,6 +98,7 @@ export class Motor {
         this.h.apuntarEjecucion(f, false, (e as Error)?.message ?? String(e), 0);
       }
     }));
+    await this.diarios(ahora).catch(() => undefined);
     await this.h.escribir();
     return hechas;
   }
@@ -151,6 +156,31 @@ export class Motor {
       }
     }
     this.limpiar(ahora);
+  }
+
+  /**
+   * Notificaciones diarias:
+   *  - deja programado el resumen de las próximas 7:30 con los datos más recientes
+   *    (se reprograma en cada actualización: llega aunque la app esté cerrada);
+   *  - avisa una vez cuando aparecen los precios de la luz de mañana.
+   */
+  private async diarios(ahora: number) {
+    if (!this.o.alertasActivas()) return;
+    const quiere = this.o.diarios?.() ?? { resumen: true, precios: true };
+    const panel = construirPanel(this.h, this.o.umbrales(), {}, ahora);
+    if (quiere.resumen && this.o.programar) {
+      const cuando = proximas730(ahora);
+      const r = resumenDelDia(panel, fechaMadrid(cuando));
+      if (r) await this.o.programar("resumen-manana", cuando, r.titulo, r.cuerpo);
+    }
+    if (quiere.precios) {
+      const p = avisoPreciosManana(panel, ahora);
+      const clave = p ? `precios@${p.dia}` : "";
+      if (p && !(clave in this.h.alertasEnviadas)) {
+        this.h.apuntarAlerta(clave, ahora);
+        await this.o.notificar({ regla: "precios_manana", titulo: p.titulo, cuerpo: p.cuerpo, claves: [clave] });
+      }
+    }
   }
 
   /** Avisos oficiales nuevos de AEMET → notificación (una vez por aviso). */

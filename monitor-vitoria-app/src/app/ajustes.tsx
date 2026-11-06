@@ -123,6 +123,12 @@ export default function Ajustes() {
         <Tarjeta>
           <Fila izquierda="Notificaciones" detalle="Solo mientras la app se usa: iOS no deja a las apps vigilar sin parar."
             derecha={<Switch value={preferencias.alertas} onValueChange={v => ponerPreferencias({ ...preferencias, alertas: v })} />} />
+          <Fila izquierda="☀️ Resumen de las 7:30" detalle="Tiempo, paraguas, luz barata, avisos y agenda. Llega aunque no abras la app."
+            derecha={<Switch value={preferencias.resumenDiario} disabled={!preferencias.alertas}
+              onValueChange={v => ponerPreferencias({ ...preferencias, resumenDiario: v })} />} />
+          <Fila izquierda="💡 Precios de mañana" detalle="Aviso con las mejores horas en cuanto la app ve los precios (desde ~20:15)."
+            derecha={<Switch value={preferencias.avisoPrecios} disabled={!preferencias.alertas}
+              onValueChange={v => ponerPreferencias({ ...preferencias, avisoPrecios: v })} />} />
           {CAMPOS_UMBRAL.map(([campo, titulo, unidad]) => (
             <CampoUmbral key={campo + String(preferencias.umbrales[campo])} campo={campo} titulo={titulo} unidad={unidad} />
           ))}
