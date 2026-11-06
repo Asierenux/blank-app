@@ -334,3 +334,21 @@ test("Datos reales del Ayuntamiento: cámaras, sensores de tráfico y obras", as
     { data: { stations: [{ station_id: "1", num_bikes_available: 3, num_docks_available: 9, is_renting: true, is_installed: true }] } });
   assert.deepEqual([bicis[0].nombre, bicis[0].bicis, bicis[0].anclajes, bicis[0].activa], ["Plaza de la Virgen Blanca", 3, 9, true]);
 });
+
+test("Incidencias repetidas en la misma carretera se juntan en una fila", async () => {
+  const { agruparIncidencias, esImportante } = await import("../src/lib/agrupar");
+  const base = { carretera: "AP-1", municipio: null, sentido: null, pkInicio: null, causa: null, lat: null, lon: null,
+    estimadoHasta: 0, finEstimado: true };
+  const lista = [
+    { ...base, id: "1", tipo: "meteo", nombre: "Vialidad invernal tramos", inicio: 1, nivelEstado: "aviso" as const, municipio: "Arlaban" },
+    { ...base, id: "2", tipo: "meteo", nombre: "Vialidad invernal tramos", inicio: 2, nivelEstado: "aviso" as const, municipio: "Arlaban" },
+    { ...base, id: "3", tipo: "meteo", nombre: "Vialidad invernal tramos", inicio: 3, nivelEstado: "aviso" as const, municipio: "Etxabarri" },
+    { ...base, id: "4", tipo: "obras", nombre: "Obras", inicio: 4, nivelEstado: "info" as const },
+    { ...base, id: "5", tipo: "corte", nombre: "Corte total", carretera: "N-622", inicio: 0, nivelEstado: "critico" as const },
+  ];
+  const g = agruparIncidencias(lista);
+  assert.deepEqual(g.map(x => x.todas.length), [1, 3, 1]);           // el corte primero; las 3 de meteo en una
+  assert.equal(g[1].principal.id, "3");                                // la más reciente
+  assert.deepEqual(g[1].municipios, ["Etxabarri", "Arlaban"]);
+  assert.equal(lista.filter(esImportante).length, 4);
+});
