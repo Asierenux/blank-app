@@ -14,11 +14,11 @@ import { recogerEuskalmet, type CacheMedidas } from "./fuentes/euskalmet";
 import { recogerGeneracion } from "./fuentes/generacion";
 import { recogerPvpc } from "./fuentes/pvpc";
 import { recogerEmbalses } from "./fuentes/embalses";
-import { recogerHidro, type CacheHidro } from "./fuentes/hidro";
+import { recogerHidro, type CacheHidro, type Exploracion } from "./fuentes/hidro";
 import { recogerTrafico, type CamarasGuardadas, type Incidencia } from "./fuentes/trafico";
 import { recogerWaqi } from "./fuentes/waqi";
 import type { Historial } from "./historial";
-import type { Claves, Descargar } from "./tipos";
+import type { Claves, Descargar, ErrorFuente } from "./tipos";
 
 export const FUENTES = ["aemet", "waqi", "pvpc", "euskalmet", "hidro", "embalses", "generacion", "trafico"] as const;
 // "saih" (relevo, ver fuentes/saihRelevo.ts) queda desactivada: el SAIH no responde fuera de España
@@ -78,6 +78,7 @@ export class Motor {
         hechas.push(f);
         await this.alertas(r, ahora);
       } catch (e) {
+        for (const [k, v] of Object.entries((e as ErrorFuente)?.extra ?? {})) this.guardarExtra(k, v, ahora);
         this.h.apuntarEjecucion(f, false, (e as Error)?.message ?? String(e), 0);
       }
     }));
@@ -94,7 +95,8 @@ export class Motor {
       case "euskalmet":
         return recogerEuskalmet(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheMedidas>("euskalmetMedidas"), ahora);
       case "hidro":
-        return recogerHidro(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheHidro>("estacionesHidro"), ahora);
+        return recogerHidro(d, c.euskalmetEmail, c.euskalmetPem, this.h.extra<CacheHidro>("estacionesHidro"), ahora,
+          this.h.extra<Exploracion>("hidroExploracion") ?? undefined);
       case "embalses": return recogerEmbalses(d, ahora);
       case "generacion": return recogerGeneracion(d, ahora);
       case "trafico": return recogerTrafico(d, this.h.extra<CamarasGuardadas>("camaras"), ahora);

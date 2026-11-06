@@ -21,4 +21,9 @@ export interface Claves {
   euskalmetPem?: string;
 }
 
-export class ErrorFuente extends Error {}
+export class ErrorFuente extends Error {
+  /** Datos que conviene guardar aunque haya fallo (p. ej. por dónde va una búsqueda larga). */
+  constructor(mensaje: string, public extra?: Record<string, unknown>) {
+    super(mensaje);
+  }
+}

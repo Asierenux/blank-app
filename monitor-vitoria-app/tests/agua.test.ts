@@ -117,3 +117,41 @@ test("Relevo del SAIH: embalses y ríos con todos sus datos, y la salida de Ull�
   assert.equal(p.agua.rios[0].nombre, "Zadorra en Mendivil");
   assert.throws(() => parsearRelevo({ estaciones: {}, errores: ["timeout"] }), /sin datos: timeout/);
 });
+
+test("Ríos: lista solo con códigos → revisa las fichas por tandas y guarda por dónde va", async () => {
+  const { fichasMasRecientes, evaluarFicha, recogerHidro } = await import("../src/lib/fuentes/hidro");
+  const { ErrorFuente } = await import("../src/lib/tipos");
+  const lista = [
+    { key: "euskalmet/stations/B090/20031006", stationId: "B090", snapshotDate: "2003-10-05T22:00:00Z" },
+    { key: "euskalmet/stations/B090/20190101", stationId: "B090", snapshotDate: "2018-12-31T23:00:00Z" },
+    ...Array.from({ length: 200 }, (_, i) => ({ key: `euskalmet/stations/X${i}/20200101`, stationId: `X${i}`, snapshotDate: "2020" })),
+  ];
+  assert.equal(fichasMasRecientes(lista)[0], "/euskalmet/stations/B090/20190101");
+  // Posición en UTM (metros) cerca de Vitoria, y otra lejos
+  assert.ok(evaluarFicha({ stationId: "B090", name: "Estación", position: { x: 530000, y: 4748000 } }, ""));
+  assert.equal(evaluarFicha({ stationId: "Z1", name: "Lejos", position: { x: 580000, y: 4790000 } }, ""), null);
+
+  const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const d = internetFalsa({
+    "/euskalmet/stations/B090/current": () => Response.json({ sensors: [{ sensorKey: "H1" }] }),
+    "/euskalmet/stations/B090/20190101": () => Response.json({ stationId: "B090", name: { SPANISH: "Zadorra (Abetxuko)" } }),
+    "/euskalmet/stations/X": () => Response.json({ name: "Otra", position: { x: 580000, y: 4790000 } }),
+    "/euskalmet/stations": () => Response.json(lista),
+    "/sensors/H1": () => Response.json({ meteors: [{ measureType: "measuresForWater", measureId: "flow" }] }),
+    "/readings/": () => Response.json({ values: [6.2] }),
+  });
+  const ahora = Date.UTC(2026, 10, 6, 6, 0);
+  let progreso: any;
+  try {
+    await recogerHidro(d, "yo@x.eus", pem, undefined, ahora);
+    assert.fail("debería seguir buscando");
+  } catch (e) {
+    assert.ok(e instanceof ErrorFuente);
+    assert.match((e as Error).message, /revisadas 150 de 201 \(1 cerca de Vitoria\)/);
+    progreso = (e as InstanceType<typeof ErrorFuente>).extra!.hidroExploracion;
+  }
+  const r = await recogerHidro(d, "yo@x.eus", pem, undefined, ahora + 300e3, progreso);
+  assert.deepEqual([...new Set(r.lecturas.map(l => l.metrica))], ["B090.caudal"]);
+  assert.equal((r.extra!.estacionesHidro as any).estaciones[0].nombre, "Zadorra (Abetxuko)");
+});
