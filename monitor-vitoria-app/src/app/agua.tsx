@@ -143,39 +143,6 @@ export default function Agua() {
         </Text>
       </Seccion>
 
-      {panel.aguaGrifo?.calificaciones[0] && (() => {
-        const g = panel.aguaGrifo!, u = g.calificaciones[0];
-        const nivel = /satisfact/i.test(u.valor) ? "ok" : /tolerable/i.test(u.valor) ? "aviso" : "critico";
-        return (
-          <Seccion titulo="Agua del grifo">
-            <Tarjeta>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700" }}>Red general de Vitoria</Text>
-                  <Etiqueta>Calificación sanitaria {u.anio} · {num(u.poblacion, 0)} habitantes</Etiqueta>
-                </View>
-                <Insignia nivel={nivel} texto={u.valor} />
-              </View>
-              <Etiqueta>
-                {num(u.analisis, 0)} análisis en el año, {u.noAptos ?? 0} no aptos
-                {u.analisis ? ` (${num(100 - ((u.noAptos ?? 0) / u.analisis) * 100, 2)} % correctos)` : ""}
-                {g.fluorada != null ? ` · ${g.fluorada ? "fluorada" : "sin fluorar"}` : ""}.
-              </Etiqueta>
-              <View style={{ flexDirection: "row", gap: 4 }}>
-                {g.calificaciones.slice(0, 10).reverse().map(x => (
-                  <View key={x.anio} style={{ flex: 1, alignItems: "center", gap: 2 }}>
-                    <View style={{ width: "100%", height: 8, borderRadius: 4,
-                      backgroundColor: /satisfact/i.test(x.valor) ? c.ok : /tolerable/i.test(x.valor) ? c.aviso : c.critico }} />
-                    <Text style={{ color: c.tenue, fontSize: 9 }}>{String(x.anio).slice(2)}</Text>
-                  </View>
-                ))}
-              </View>
-              <Etiqueta>Datos oficiales del Gobierno Vasco; se publican con varios años de retraso.</Etiqueta>
-            </Tarjeta>
-          </Seccion>
-        );
-      })()}
-
       <Seccion titulo="Energía hidráulica">
         <Tarjeta>
           {panel.energia.pv.ultimo ? (

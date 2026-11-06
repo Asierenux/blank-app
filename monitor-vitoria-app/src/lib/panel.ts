@@ -14,7 +14,6 @@ import type { Prevision } from "./fuentes/prevision";
 import type { Aviso as AvisoMeteo } from "./fuentes/avisos";
 import type { Gasolineras } from "./fuentes/gasolina";
 import type { Evento } from "./fuentes/agenda";
-import type { AguaGrifo } from "./fuentes/aguaGrifo";
 import type { Nivel } from "./tipos";
 
 const H = 3600e3;
@@ -413,7 +412,6 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   aireoficial: "Aire · estaciones del Gobierno Vasco",
   gasolina: "Gasolineras (Ministerio)",
   agenda: "Agenda cultural de Vitoria",
-  aguagrifo: "Agua del grifo (Gobierno Vasco)",
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
@@ -507,7 +505,6 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
     prevision: h.extra<Prevision>("prevision") ?? null,
     avisos: (h.extra<AvisoMeteo[]>("avisos") ?? []).filter(a => a.fin == null || a.fin > ahora),
     gasolineras: h.extra<Gasolineras>("gasolineras") ?? null,
-    aguaGrifo: h.extra<AguaGrifo>("aguaGrifo") ?? null,
     agenda: (h.extra<{ eventos: Evento[] }>("agenda")?.eventos ?? []).filter(e => e.hasta >= fechaMadrid(ahora)),
     aireOficial: construirAireOficial(h, ahora),
     renovable: {
