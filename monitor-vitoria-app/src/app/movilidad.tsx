@@ -5,7 +5,7 @@
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View, useWindowDimensions } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Circle, Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Aviso, Etiqueta, Fila, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
@@ -13,10 +13,12 @@ import { useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
 import { enMinutos, hace, hora, num } from "../lib/formato";
 import { ListaGasolineras } from "../componentes/novedades";
+import { colorBicis, colorVia, CuadriculaCamaras, ListaMugibike, ListaObras, TarjetaTraficoCiudad, VerCamara } from "../componentes/ciudad";
+import type { Camara } from "../lib/fuentes/trafico";
 import { interpolar, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
 import { colorNivel, useColores } from "../lib/tema";
 
-type Modo = "bus" | "tranvia" | "trafico" | "gasolina";
+type Modo = "bus" | "tranvia" | "trafico" | "bici" | "gasolina";
 
 const REGION = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.07, longitudeDelta: 0.07 };
 const REGION_TRAFICO = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.45, longitudeDelta: 0.45 };
@@ -48,6 +50,7 @@ export default function Movilidad() {
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
   const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
+  const [camaraVista, setCamaraVista] = useState<Camara | null>(null);
   const { historial } = useDatos();
   const gasolineras = panel?.gasolineras?.lista ?? [];
   const historialGasolina = historial.ejecuciones.gasolina;
@@ -89,11 +92,11 @@ export default function Movilidad() {
 
   useEffect(() => {
     setLinea(null);
-    mapa.current?.animateToRegion(modo === "trafico" || modo === "gasolina" ? REGION_TRAFICO : REGION, 400);
+    mapa.current?.animateToRegion(modo === "gasolina" ? REGION_TRAFICO : REGION, 400);
   }, [modo]);
 
   const vehiculos = useMemo(() => {
-    if (!estado || modo === "trafico" || modo === "gasolina") return [];
+    if (!estado || modo !== "bus" && modo !== "tranvia") return [];
     return estado.vehiculos
       .filter(v => v.tipo === modo && (!linea || v.linea === linea))
       .map(v => {
@@ -118,10 +121,11 @@ export default function Movilidad() {
           </Text>
         </View>
         <Segmentos<Modo> valor={modo} cambiar={setModo} opciones={[
-          { valor: "bus", texto: `Bus${estado ? ` · ${estado.buses}` : ""}` },
-          { valor: "tranvia", texto: `Tranvía${estado ? ` · ${estado.tranvias}` : ""}` },
-          { valor: "trafico", texto: `Tráfico${trafico ? ` · ${trafico.activas.length}` : ""}` },
-          { valor: "gasolina", texto: "Gasolina" },
+          { valor: "bus", texto: `🚌${estado ? ` ${estado.buses}` : ""}` },
+          { valor: "tranvia", texto: `🚋${estado ? ` ${estado.tranvias}` : ""}` },
+          { valor: "trafico", texto: "🚦" },
+          { valor: "bici", texto: "🚲" },
+          { valor: "gasolina", texto: "⛽" },
         ]} />
       </View>
 
@@ -149,6 +153,31 @@ export default function Movilidad() {
           <Marker key={i.id} coordinate={{ latitude: i.lat!, longitude: i.lon! }} pinColor={colorNivel(c, i.nivelEstado)}
             title={i.nombre} description={[i.carretera, i.municipio, i.causa].filter(Boolean).join(" · ")} />
         ))}
+        {modo === "trafico" && panel?.traficoCiudad?.sensores.filter(x => x.estado !== "sin_datos").map(x => (
+          <Circle key={"s" + x.id} center={{ latitude: x.lat, longitude: x.lon }} radius={45}
+            fillColor={colorVia(c, x.estado) + "cc"} strokeColor="#ffffff" strokeWidth={1} />
+        ))}
+        {modo === "trafico" && panel?.obras.filter(o => o.lat && o.lon).map(o => (
+          <Marker key={"o" + o.id} coordinate={{ latitude: o.lat!, longitude: o.lon! }} title="Obras" description={o.nombre}
+            anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={false}>
+            <Text style={{ fontSize: 18 }}>🚧</Text>
+          </Marker>
+        ))}
+        {modo === "trafico" && trafico?.camaras.filter(cam => cam.municipal).map(cam => (
+          <Marker key={"cam" + cam.id} coordinate={{ latitude: cam.lat, longitude: cam.lon }} anchor={{ x: 0.5, y: 0.5 }}
+            onPress={() => setCamaraVista(cam)} tracksViewChanges={false}>
+            <Text style={{ fontSize: 18 }}>📷</Text>
+          </Marker>
+        ))}
+        {modo === "bici" && panel?.mugibike?.estaciones.map(e => (
+          <Marker key={"b" + e.id} coordinate={{ latitude: e.lat, longitude: e.lon }} anchor={{ x: 0.5, y: 0.5 }}
+            title={e.nombre} description={`${e.bicis} bicis · ${e.anclajes} anclajes libres`} tracksViewChanges={false}>
+            <View style={{ backgroundColor: colorBicis(c, e), borderRadius: 11, minWidth: 22, height: 22, paddingHorizontal: 4,
+              alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#fff" }}>
+              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{e.bicis}</Text>
+            </View>
+          </Marker>
+        ))}
         {modo === "gasolina" && gasolineras.map(g => (
           <Marker key={"g" + g.id} coordinate={{ latitude: g.lat, longitude: g.lon }} anchor={{ x: 0.5, y: 0.5 }}
             title={g.nombre} description={`${g[carburante] != null ? `${num(g[carburante], 3)} €/l · ` : ""}${g.direccion}`} tracksViewChanges={false}>
@@ -160,6 +189,13 @@ export default function Movilidad() {
       </MapView>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} contentInsetAdjustmentBehavior="automatic">
+        {modo === "bici" && (panel?.mugibike ? (
+          <ListaMugibike estaciones={panel.mugibike.estaciones} t={panel.mugibike.t} />
+        ) : (
+          <Aviso nivel="info" texto={historial.ejecuciones.mugibike?.ok === false
+            ? `Mugibike: ${historial.ejecuciones.mugibike.error}` : "Cargando las estaciones de Mugibike…"} />
+        ))}
+        {modo === "trafico" && panel?.traficoCiudad && <TarjetaTraficoCiudad t={panel.traficoCiudad} serie={panel.congestion} />}
         {modo === "gasolina" && (
           <>
             <Segmentos<"gasoleo" | "gasolina95"> valor={carburante} cambiar={setCarburante}
@@ -171,7 +207,7 @@ export default function Movilidad() {
             )}
           </>
         )}
-        {estado?.errores.filter(e => modo === "trafico" || modo === "gasolina" ? false : e.includes(modo === "bus" ? "Tuvisa" : "Tranvía"))
+        {estado?.errores.filter(e => (modo === "bus" && e.includes("Tuvisa")) || (modo === "tranvia" && e.includes("Tranvía")))
           .map(e => <Aviso key={e} nivel="aviso" texto={e} />)}
 
         {(modo === "bus" || modo === "tranvia") && (
@@ -258,13 +294,16 @@ export default function Movilidad() {
                 </Tarjeta>
               </>
             )}
-            <Etiqueta>
-              Cámaras: ninguna fuente pública funciona ahora mismo (las direcciones de las fotos del Gobierno Vasco ya no existen
-              y las del Ayuntamiento no emiten), así que no se muestran.
-            </Etiqueta>
+            <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Obras en las calles</Text>
+            <ListaObras obras={panel?.obras ?? []} />
+            <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras del Ayuntamiento</Text>
+            {trafico.camaras.some(cam => cam.municipal) ? (
+              <CuadriculaCamaras camaras={trafico.camaras.filter(cam => cam.municipal)} abrir={setCamaraVista} />
+            ) : <Etiqueta>Cargando la lista de cámaras…</Etiqueta>}
           </>
         )}
       </ScrollView>
+      <VerCamara camara={camaraVista} cerrar={() => setCamaraVista(null)} />
     </View>
   );
 }

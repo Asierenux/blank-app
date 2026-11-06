@@ -303,3 +303,34 @@ test("Resumen de la mañana y aviso de precios de mañana", async () => {
   assert.match(p.cuerpo, /de 13:00 a 16:00 .* más barata que hoy/);
 });
 
+
+test("Datos reales del Ayuntamiento: cámaras, sensores de tráfico y obras", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearCamaras, parsearTrafico, parsearObras, estadoVia, parsearMugibike, urlFoto } = await import("../src/lib/fuentes/vitoria");
+  const leer = (n: string) => JSON.parse(readFileSync(new URL(`./datos/${n}`, import.meta.url), "utf-8"));
+  const cams = parsearCamaras(leer("vitoria_camaras.json"));
+  assert.equal(cams.length, 6);
+  const c0 = cams.find(c => c.nombre.startsWith("Aguirrelanda"))!;
+  assert.equal(c0.nombre, "Aguirrelanda-Portal de Arriaga");                 // sin la parte en euskera
+  assert.equal(c0.id, "CM06_ROI_4");
+  assert.ok(c0.municipal && c0.conectada);
+  assert.match(urlFoto(c0, 120000), /id=CM06_ROI_4&t=2$/);
+  const { trafico, lecturas } = parsearTrafico(leer("vitoria_trafico.json"), Date.UTC(2026, 10, 6, 14, 5));
+  assert.equal(trafico.sensores.length, 40);
+  assert.equal(new Date(trafico.medido!).toISOString(), "2026-11-06T14:00:00.000Z");   // 15:00 en Vitoria
+  assert.equal(Object.values(trafico.resumen).reduce((a, b) => a + b, 0), 40);
+  assert.deepEqual(lecturas.map(l => l.metrica), ["congestion_pct", "vehiculos_15min"]);
+  assert.equal(estadoVia(0, 100), "sin_datos");
+  assert.equal(estadoVia(120, 10), "fluido");
+  assert.equal(estadoVia(120, 20), "denso");
+  assert.equal(estadoVia(60, 45), "retenciones");
+  const obras = parsearObras(leer("vitoria_obras.json"), Date.UTC(2026, 10, 6, 12));
+  assert.ok(obras.length >= 1);
+  const armentia = obras.find(o => /Alto de Armentia/.test(o.nombre))!;
+  assert.equal(armentia.direccion, "ARMENTIA, ALTO DE");
+  assert.equal(new Date(armentia.hasta!).toISOString(), "2026-12-24T22:59:00.000Z");
+  const bicis = parsearMugibike(
+    { data: { stations: [{ station_id: "1", name: "Plaza de la Virgen Blanca", lat: 42.846, lon: -2.672 }] } },
+    { data: { stations: [{ station_id: "1", num_bikes_available: 3, num_docks_available: 9, is_renting: true, is_installed: true }] } });
+  assert.deepEqual([bicis[0].nombre, bicis[0].bicis, bicis[0].anclajes, bicis[0].activa], ["Plaza de la Virgen Blanca", 3, 9, true]);
+});

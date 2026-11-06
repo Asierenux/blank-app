@@ -1,0 +1,300 @@
+{
+ "capa": {
+  "numele": "25",
+  "tipo": "c",
+  "aplicacion": "J16",
+  "id": "704",
+  "nombre": "Incidencias de tráfico por obras y trabajos"
+ },
+ "elementos": [
+  {
+   "descripcion": null,
+   "fechadesde": "24/08/2026 00:00",
+   "tipo": "1",
+   "latitud": 42.837162,
+   "fie": "24/08/2026 00:00",
+   "ffe": "24/12/2026 23:59",
+   "fechahasta": "24/12/2026 23:59",
+   "lugar": null,
+   "direccion": "ARMENTIA, ALTO DE",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carril derecho sentido este en c/ Alto de Armentia entre Camino de Armentia y rotonda de La Antonia",
+   "linkRelacionadoLabel": "",
+   "uid": "u1aff2929_1a01389da23__4874",
+   "longitud": -2.699084,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": "https://www.vitoria-gasteiz.org/wb021/was/contenidoAction.do?uid=u1aff2929_1a01389da23__4874",
+   "id": "40312",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "18/09/2026 08:00",
+   "tipo": "1",
+   "latitud": 42.83998,
+   "fie": "18/09/2026 08:00",
+   "ffe": "17/11/2026 20:00",
+   "fechahasta": "17/11/2026 20:00",
+   "lugar": null,
+   "direccion": "LAS TRIANAS",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carril y desvío por aparcamiento y carril bici a la altura del número 15, entre las calles Raimundo Olabide y José María Iparragirre",
+   "linkRelacionadoLabel": "",
+   "uid": "u26b9fb2d_1a0ace0ecc5__464",
+   "longitud": -2.663008,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": "https://www.vitoria-gasteiz.org/wb021/was/contenidoAction.do?uid=u26b9fb2d_1a0ace0ecc5__464",
+   "id": "40426",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "08/10/2026 08:00",
+   "tipo": "1",
+   "latitud": 42.873947,
+   "fie": "08/10/2026 08:00",
+   "ffe": "31/12/2026 20:00",
+   "fechahasta": "31/12/2026 20:00",
+   "lugar": null,
+   "direccion": "GAMARRA, PLAZA DE",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carriles de circulación y carril bici en Plaza de Gamarra y en Portal de Gamarra en su cruce con Plaza de Gamarra, en ambos sentidos y en horario continuo",
+   "linkRelacionadoLabel": "",
+   "uid": "u54d36039_1a114902ac4__272f",
+   "longitud": -2.657629,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": "https://www.vitoria-gasteiz.org/wb021/was/contenidoAction.do?uid=u54d36039_1a114902ac4__272f",
+   "id": "40640",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "13/10/2026 08:00",
+   "tipo": "1",
+   "latitud": 42.853853,
+   "fie": "13/10/2026 08:00",
+   "ffe": "19/03/2027 20:00",
+   "fechahasta": "19/03/2027 20:00",
+   "lugar": null,
+   "direccion": "BRUNO VILLARREAL",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Corte total en Bruno Villarreal entre las calles Gorbea y Beethoven, en horario continuo",
+   "linkRelacionadoLabel": "",
+   "uid": "u54d36039_1a11d7fcafe_2bba",
+   "longitud": -2.678247,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": "https://www.vitoria-gasteiz.org/wb021/was/contenidoAction.do?uid=u54d36039_1a11d7fcafe_2bba",
+   "id": "40679",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "15/06/2026 06:00",
+   "tipo": "1",
+   "latitud": 42.8643,
+   "fie": "15/06/2026 09:30",
+   "ffe": "19/06/2026 15:00",
+   "fechahasta": "19/06/2026 15:00",
+   "lugar": null,
+   "direccion": "BAIONA",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carriles anexos a la mediana, en ambos sentidos, en c/ Baiona",
+   "linkRelacionadoLabel": "",
+   "uid": "u3f1aeded_19eb8aa1c25__140d",
+   "longitud": -2.693451,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": null,
+   "id": "39860",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "21/02/2026 22:00",
+   "tipo": "1",
+   "latitud": 42.859585,
+   "fie": "23/02/2026 08:00",
+   "ffe": "23/06/2026 20:00",
+   "fechahasta": "23/06/2026 20:00",
+   "lugar": null,
+   "direccion": "PUERTO DE BARAZAR",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Corte total de la c/ Puerto de Barazar entre c/ Reyes de Navarra y la plaza de la iglesia del Buen Pastor",
+   "linkRelacionadoLabel": "",
+   "uid": "u_7b50e084_19c73a32233__3648",
+   "longitud": -2.67129,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": null,
+   "id": "39184",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "08/05/2026 11:21",
+   "tipo": "1",
+   "latitud": 42.873978,
+   "fie": "08/05/2026 11:30",
+   "ffe": "30/06/2026 20:00",
+   "fechahasta": "30/06/2026 20:00",
+   "lugar": "Plaza de Gamarra",
+   "direccion": "GAMARRA, PLAZA DE",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carriles de circulación en Plaza de Gamarra, en ambos sentidos y en horario continuo",
+   "linkRelacionadoLabel": "",
+   "uid": "u3edfcde9_19e046e4602_d89",
+   "longitud": -2.657372,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": null,
+   "id": "39673",
+   "publico": "true"
+  },
+  {
+   "descripcion": null,
+   "fechadesde": "19/10/2026 08:00",
+   "tipo": "1",
+   "latitud": 42.838796,
+   "fie": "19/10/2026 08:00",
+   "ffe": "19/11/2026 19:00",
+   "fechahasta": "19/11/2026 19:00",
+   "lugar": null,
+   "direccion": "LAS TRIANAS, 13",
+   "aplicacion": "J16",
+   "iconos": {
+    "0": "704_cal_0.png",
+    "7": "704_cal_7.png",
+    "30": "704_cal_30.png",
+    "15": "704_cal_15.png"
+   },
+   "nombre": "Ocupación de carril y desvío por aparcamiento y carril bici en c/ Las Trianas 13, entre c/ Raimundo Olabide y c/ José María Iparragirre",
+   "linkRelacionadoLabel": "",
+   "uid": "u5ae0bc6b_1a1418e2439_1853",
+   "longitud": -2.662605,
+   "etiquetas": [],
+   "calendarios": [
+    {
+     "id": 704,
+     "nombre": {
+      "es": "Incidencias de tráfico por obras y trabajos"
+     }
+    }
+   ],
+   "distancia": 0.0,
+   "fechaeliminado": "",
+   "linkRelacionadoUrl": "https://www.vitoria-gasteiz.org/wb021/was/contenidoAction.do?uid=u5ae0bc6b_1a1418e2439_1853",
+   "id": "40702",
+   "publico": "true"
+  }
+ ],
+ "listaElementosCompleta": true
+}

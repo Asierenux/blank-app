@@ -1,0 +1,964 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "07010",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69568511,
+     42.83818895
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 50.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 100.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07010",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07012",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69808837,
+     42.83743369
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 50.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 100.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07012",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01059",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67663069,
+     42.86090527
+    ]
+   },
+   "properties": {
+    "volume": 263.0,
+    "load": 28.667,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 6.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01059",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01056",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67568656,
+     42.86115692
+    ]
+   },
+   "properties": {
+    "volume": 90.0,
+    "load": 8.667,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 2.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01056",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "06191",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.62573309,
+     42.82264139
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 0.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "06191",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "05060",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.68770285,
+     42.85499102
+    ]
+   },
+   "properties": {
+    "volume": 127.0,
+    "load": 56.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 13.667,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "05060",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "06192",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65843459,
+     42.84498584
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 0.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "06192",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01194",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67705985,
+     42.86033903
+    ]
+   },
+   "properties": {
+    "volume": 370.0,
+    "load": 24.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 4.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01194",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01193",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67851897,
+     42.86027612
+    ]
+   },
+   "properties": {
+    "volume": 387.0,
+    "load": 32.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 23.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01193",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07041",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69946166,
+     42.84139869
+    ]
+   },
+   "properties": {
+    "volume": 64.0,
+    "load": 6.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 2.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07041",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01192",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67989226,
+     42.8690207
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 0.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01192",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07042",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69920416,
+     42.84165042
+    ]
+   },
+   "properties": {
+    "volume": 100.0,
+    "load": 9.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 3.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07042",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01191",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67542906,
+     42.86914652
+    ]
+   },
+   "properties": {
+    "volume": 60.0,
+    "load": 15.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 9.667,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01191",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07043",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69989081,
+     42.84209096
+    ]
+   },
+   "properties": {
+    "volume": 22.0,
+    "load": 1.667,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07043",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01051",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67233916,
+     42.86228937
+    ]
+   },
+   "properties": {
+    "volume": 197.0,
+    "load": 12.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 7.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01051",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07044",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70006247,
+     42.84246856
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 50.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 100.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07044",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01050",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67225333,
+     42.86184898
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 49.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 100.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01050",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07045",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70049162,
+     42.84183922
+    ]
+   },
+   "properties": {
+    "volume": 83.0,
+    "load": 8.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 2.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07045",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07046",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70083495,
+     42.84171336
+    ]
+   },
+   "properties": {
+    "volume": 7.0,
+    "load": 25.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 50.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07046",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01055",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67534323,
+     42.86228937
+    ]
+   },
+   "properties": {
+    "volume": 245.0,
+    "load": 21.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 19.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01055",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07047",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70040579,
+     42.84127282
+    ]
+   },
+   "properties": {
+    "volume": 23.0,
+    "load": 2.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07047",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "02304",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67345496,
+     42.85807405
+    ]
+   },
+   "properties": {
+    "volume": 151.0,
+    "load": 37.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 53.667,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "02304",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "07048",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70023413,
+     42.84102108
+    ]
+   },
+   "properties": {
+    "volume": 15.0,
+    "load": 0.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "07048",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "05206",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69740172,
+     42.8590178
+    ]
+   },
+   "properties": {
+    "volume": 192.0,
+    "load": 31.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 43.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "05206",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01052",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67113753,
+     42.86228937
+    ]
+   },
+   "properties": {
+    "volume": 237.0,
+    "load": 23.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 5.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01052",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "06013",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65560217,
+     42.85121567
+    ]
+   },
+   "properties": {
+    "volume": 23.0,
+    "load": 11.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 24.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "06013",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01045",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67070838,
+     42.86247811
+    ]
+   },
+   "properties": {
+    "volume": 14.0,
+    "load": 3.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01045",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01046",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.66521521,
+     42.8555573
+    ]
+   },
+   "properties": {
+    "volume": 46.0,
+    "load": 18.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 0.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01046",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "02029",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.68006392,
+     42.84385308
+    ]
+   },
+   "properties": {
+    "volume": 215.0,
+    "load": 98.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 23.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "02029",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "01049",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.6732833,
+     42.86140858
+    ]
+   },
+   "properties": {
+    "volume": 206.0,
+    "load": 21.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 5.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "01049",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "06011",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65611716,
+     42.85127859
+    ]
+   },
+   "properties": {
+    "volume": 130.0,
+    "load": 14.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 5.667,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "06011",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "06012",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65448638,
+     42.85115275
+    ]
+   },
+   "properties": {
+    "volume": 149.0,
+    "load": 9.667,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 4.667,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "06012",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "05072",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69448348,
+     42.85020887
+    ]
+   },
+   "properties": {
+    "volume": 178.0,
+    "load": 18.0,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 5.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "05072",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "05071",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69431181,
+     42.85209661
+    ]
+   },
+   "properties": {
+    "volume": 234.0,
+    "load": 23.667,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 8.0,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "05071",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "04152",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.66693183,
+     42.83466434
+    ]
+   },
+   "properties": {
+    "volume": 182.0,
+    "load": 44.333,
+    "tipo_inventario": "MS",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 18.333,
+    "proveedor": "OPTIMUS",
+    "type": "MS",
+    "nombre": "04152",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "1_8610072_0",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -2.65786409,
+      42.8739624
+     ],
+     [
+      -2.65783286,
+      42.87385559
+     ],
+     [
+      -2.6580379,
+      42.8732605
+     ],
+     [
+      -2.65886593,
+      42.87085342
+     ],
+     [
+      -2.65918088,
+      42.86987305
+     ],
+     [
+      -2.65920877,
+      42.86979675
+     ]
+    ]
+   },
+   "properties": {
+    "volume": 249.0,
+    "load": 25.333,
+    "tipo_inventario": "LK",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 26.667,
+    "levelOfService": 25.478,
+    "proveedor": "System",
+    "type": "LK",
+    "nombre": "Gamarrako atea",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "1_23726183_1",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -2.68152928,
+      42.85835266
+     ],
+     [
+      -2.68142891,
+      42.8581543
+     ],
+     [
+      -2.68135023,
+      42.85800171
+     ],
+     [
+      -2.6813345,
+      42.85797501
+     ]
+    ]
+   },
+   "properties": {
+    "volume": 80.0,
+    "load": 20.0,
+    "tipo_inventario": "LK",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 42.667,
+    "levelOfService": 17.962,
+    "proveedor": "System",
+    "type": "LK",
+    "nombre": "Honduras kalea/Calle Honduras",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "1_23731780_0",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -2.67658854,
+      42.8427887
+     ],
+     [
+      -2.67655492,
+      42.84269714
+     ],
+     [
+      -2.67644215,
+      42.84266663
+     ],
+     [
+      -2.67458487,
+      42.84246826
+     ],
+     [
+      -2.67449141,
+      42.84246826
+     ]
+    ]
+   },
+   "properties": {
+    "volume": 133.0,
+    "load": 47.333,
+    "tipo_inventario": "LK",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 60.0,
+    "levelOfService": 47.729,
+    "proveedor": "System",
+    "type": "LK",
+    "nombre": "Manuel Iradier kalea/Calle Manuel Iradier",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "1_23731780_2",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -2.67384481,
+      42.84239197
+     ],
+     [
+      -2.67265606,
+      42.8422699
+     ],
+     [
+      -2.6725831,
+      42.84225464
+     ]
+    ]
+   },
+   "properties": {
+    "volume": 0.0,
+    "load": 49.0,
+    "tipo_inventario": "LK",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 100.0,
+    "levelOfService": 0.0,
+    "proveedor": "System",
+    "type": "LK",
+    "nombre": "Manuel Iradier kalea/Calle Manuel Iradier",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "1_23731780_5",
+   "geometry": {
+    "type": "LineString",
+    "coordinates": [
+     [
+      -2.66865969,
+      42.84182739
+     ],
+     [
+      -2.66824841,
+      42.84178162
+     ],
+     [
+      -2.66819501,
+      42.84176254
+     ]
+    ]
+   },
+   "properties": {
+    "volume": 135.0,
+    "load": 61.0,
+    "tipo_inventario": "LK",
+    "endDate": "2026-11-06T15:00:00",
+    "occupancy": 3.333,
+    "levelOfService": 61.415,
+    "proveedor": "System",
+    "type": "LK",
+    "nombre": "Manuel Iradier kalea/Calle Manuel Iradier",
+    "startDate": "2026-11-06T14:45:00"
+   }
+  }
+ ]
+}

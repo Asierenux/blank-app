@@ -41,6 +41,10 @@ export const INTERVALOS_MIN: Record<string, number> = {
   gasolina: 360,
   aireoficial: 60,
   agenda: 360,
+  camaras: 1440,
+  traficociudad: 15,
+  obras: 60,
+  mugibike: 10,
 };
 
 export const RADIO_TRAFICO_KM = 25;

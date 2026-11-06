@@ -1,0 +1,107 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "id": "CM06_ROI_4",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.67493,
+     42.8616
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM06_ROI_4",
+    "nombre": "Aguirrelanda-Portal de Arriaga#Agirrelanda - Arriagako Atea"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CM04_ROI_3",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.69736,
+     42.8377
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM04_ROI_3",
+    "nombre": "Alto de Armentia – La Antonia#Armentiagana – Antonia"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CM05_ROI_3",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70683,
+     42.8553
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM05_ROI_3",
+    "nombre": "Av. De los Huetos – Mercedes#Oto hiribidea – Mercedes"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CM05_ROI_1",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.70582,
+     42.8551
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM05_ROI_1",
+    "nombre": "Av. de los Huetos – Sansomendi#Oto hiribidea – Sansomendi"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CM11_ROI_3",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65,
+     42.8503
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM11_ROI_3",
+    "nombre": "Avenida de Bruselas – Aeródromo#Bruselako Atea – Aeródromo"
+   }
+  },
+  {
+   "type": "Feature",
+   "id": "CM11_ROI_1",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     -2.65137,
+     42.8506
+    ]
+   },
+   "properties": {
+    "operStatusCode": "Desconocido",
+    "commStatusCode": "Conectado",
+    "imagen": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CM11_ROI_1",
+    "nombre": "Avenida de Bruselas – Joaquín Collar#Bruselako hiribidea – Joaquín Collar"
+   }
+  }
+ ]
+}

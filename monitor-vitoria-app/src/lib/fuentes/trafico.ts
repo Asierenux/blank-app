@@ -37,6 +37,8 @@ export interface Camara {
   id: string;
   /** Cámara del Ayuntamiento de Vitoria (las de carreteras del Gobierno Vasco tienen fotos rotas) */
   municipal?: boolean;
+  /** Estado de la conexión que da el Ayuntamiento */
+  conectada?: boolean;
   nombre: string;
   carretera: string | null;
   lat: number;

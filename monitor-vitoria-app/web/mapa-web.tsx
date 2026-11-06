@@ -77,3 +77,11 @@ export function Marker({ coordinate, children, pinColor }: { coordinate: { latit
     </View>
   );
 }
+
+export function Circle({ center, fillColor }: { center: { latitude: number; longitude: number }; fillColor?: string; [k: string]: unknown }) {
+  const c = useContext(Ctx);
+  if (!c) return null;
+  const { x, y } = proyectar(c, center.latitude, center.longitude);
+  if (x < 0 || y < 0 || x > c.ancho || y > c.alto) return null;
+  return <View pointerEvents="none" style={{ position: "absolute", left: x - 5, top: y - 5, width: 10, height: 10, borderRadius: 5, backgroundColor: fillColor, borderWidth: 1, borderColor: "#fff" }} />;
+}

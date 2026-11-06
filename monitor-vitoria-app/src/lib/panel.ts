@@ -14,6 +14,7 @@ import type { Prevision } from "./fuentes/prevision";
 import type { Aviso as AvisoMeteo } from "./fuentes/avisos";
 import type { Gasolineras } from "./fuentes/gasolina";
 import type { Evento } from "./fuentes/agenda";
+import type { EstacionBici, Obra, TraficoCiudad } from "./fuentes/vitoria";
 import type { Nivel } from "./tipos";
 
 const H = 3600e3;
@@ -370,7 +371,7 @@ export function construirTrafico(h: Historial, ahora: number) {
   const porTipo: Partial<Record<TipoIncidencia, number>> = {};
   for (const i of activas) porTipo[i.tipo] = (porTipo[i.tipo] ?? 0) + 1;
   const nivel: Nivel = activas.some(i => i.nivelEstado !== "info") ? "aviso" : "ok";
-  const guardadas = h.extra<CamarasGuardadas>("camaras");
+  const guardadas = h.extra<CamarasGuardadas>("camarasVitoria") ?? h.extra<CamarasGuardadas>("camaras");
   // Primero las del Ayuntamiento de Vitoria; después, las más cercanas
   const camaras = [...(guardadas?.lista ?? [])].sort((x, y) =>
     Number(!!y.municipal) - Number(!!x.municipal) || distanciaKm(VITORIA.lat, VITORIA.lon, x.lat, x.lon) - distanciaKm(VITORIA.lat, VITORIA.lon, y.lat, y.lon));
@@ -412,6 +413,10 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   aireoficial: "Aire · estaciones del Gobierno Vasco",
   gasolina: "Gasolineras (Ministerio)",
   agenda: "Agenda cultural de Vitoria",
+  camaras: "Cámaras del Ayuntamiento",
+  traficociudad: "Tráfico en la ciudad (sensores)",
+  obras: "Obras en las calles (Ayuntamiento)",
+  mugibike: "Mugibike · bicis municipales",
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
@@ -505,6 +510,16 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
     prevision: h.extra<Prevision>("prevision") ?? null,
     avisos: (h.extra<AvisoMeteo[]>("avisos") ?? []).filter(a => a.fin == null || a.fin > ahora),
     gasolineras: h.extra<Gasolineras>("gasolineras") ?? null,
+    traficoCiudad: (() => {
+      const t = h.extra<TraficoCiudad>("traficoCiudad");
+      return t && ahora - (t.medido ?? t.t) < 2 * H ? t : null;          // un dato de hace horas ya no dice nada
+    })(),
+    obras: h.extra<{ lista: Obra[] }>("obrasCiudad")?.lista.filter(o => (o.hasta == null || o.hasta >= ahora) && (o.desde == null || o.desde <= ahora)) ?? [],
+    mugibike: (() => {
+      const m = h.extra<{ t: number; estaciones: EstacionBici[] }>("mugibike");
+      return m && ahora - m.t < H ? m : null;
+    })(),
+    congestion: h.serie("ciudad.congestion_pct", ahora - 24 * H, ahora),
     agenda: (h.extra<{ eventos: Evento[] }>("agenda")?.eventos ?? []).filter(e => e.hasta >= fechaMadrid(ahora)),
     aireOficial: construirAireOficial(h, ahora),
     renovable: {
