@@ -13,12 +13,12 @@ import { useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
 import { enMinutos, hace, hora, num } from "../lib/formato";
 import { ListaGasolineras } from "../componentes/novedades";
-import { colorBicis, colorVia, CuadriculaCamaras, ListaMugibike, ListaObras, TarjetaTraficoCiudad, VerCamara } from "../componentes/ciudad";
+import { colorVia, CuadriculaCamaras, ListaObras, TarjetaTraficoCiudad, VerCamara } from "../componentes/ciudad";
 import type { Camara } from "../lib/fuentes/trafico";
 import { interpolar, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
 import { colorNivel, useColores } from "../lib/tema";
 
-type Modo = "bus" | "tranvia" | "trafico" | "bici" | "gasolina";
+type Modo = "bus" | "tranvia" | "trafico" | "gasolina";
 
 const REGION = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.07, longitudeDelta: 0.07 };
 const REGION_TRAFICO = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.45, longitudeDelta: 0.45 };
@@ -124,7 +124,6 @@ export default function Movilidad() {
           { valor: "bus", texto: `🚌${estado ? ` ${estado.buses}` : ""}` },
           { valor: "tranvia", texto: `🚋${estado ? ` ${estado.tranvias}` : ""}` },
           { valor: "trafico", texto: "🚦" },
-          { valor: "bici", texto: "🚲" },
           { valor: "gasolina", texto: "⛽" },
         ]} />
       </View>
@@ -169,15 +168,6 @@ export default function Movilidad() {
             <Text style={{ fontSize: 18 }}>📷</Text>
           </Marker>
         ))}
-        {modo === "bici" && panel?.mugibike?.estaciones.map(e => (
-          <Marker key={"b" + e.id} coordinate={{ latitude: e.lat, longitude: e.lon }} anchor={{ x: 0.5, y: 0.5 }}
-            title={e.nombre} description={`${e.bicis} bicis · ${e.anclajes} anclajes libres`} tracksViewChanges={false}>
-            <View style={{ backgroundColor: colorBicis(c, e), borderRadius: 11, minWidth: 22, height: 22, paddingHorizontal: 4,
-              alignItems: "center", justifyContent: "center", borderWidth: 1.5, borderColor: "#fff" }}>
-              <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{e.bicis}</Text>
-            </View>
-          </Marker>
-        ))}
         {modo === "gasolina" && gasolineras.map(g => (
           <Marker key={"g" + g.id} coordinate={{ latitude: g.lat, longitude: g.lon }} anchor={{ x: 0.5, y: 0.5 }}
             title={g.nombre} description={`${g[carburante] != null ? `${num(g[carburante], 3)} €/l · ` : ""}${g.direccion}`} tracksViewChanges={false}>
@@ -189,12 +179,6 @@ export default function Movilidad() {
       </MapView>
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} contentInsetAdjustmentBehavior="automatic">
-        {modo === "bici" && (panel?.mugibike ? (
-          <ListaMugibike estaciones={panel.mugibike.estaciones} t={panel.mugibike.t} />
-        ) : (
-          <Aviso nivel="info" texto={historial.ejecuciones.mugibike?.ok === false
-            ? `Mugibike: ${historial.ejecuciones.mugibike.error}` : "Cargando las estaciones de Mugibike…"} />
-        ))}
         {modo === "trafico" && panel?.traficoCiudad && <TarjetaTraficoCiudad t={panel.traficoCiudad} serie={panel.congestion} />}
         {modo === "gasolina" && (
           <>

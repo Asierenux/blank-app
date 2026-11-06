@@ -22,6 +22,13 @@ function etiquetaDia(d: string, hoy: string, manana: string): string {
   return `${DIAS[f.getUTCDay()]} ${f.getUTCDate()}`;
 }
 
+/** "00:00 - 23:59" (o parecido) = abierto todo el día */
+const horario = (e: Evento) => {
+  if (!e.hora) return "";
+  return /^0?0\s*:\s*00\s*-\s*23\s*:\s*59/.test(e.hora) ? " · todo el día" : ` · ${e.hora.replace(/\s*:\s*/g, ":")}`;
+};
+const diaCorto = (d: string) => { const f = new Date(`${d}T12:00:00Z`); return `${f.getUTCDate()}/${f.getUTCMonth() + 1}`; };
+
 function abrir(e: Evento) {
   const opciones = [e.entradas && "Comprar entradas", e.url && "Ver información"].filter(Boolean) as string[];
   const ir = (texto: string) => {
@@ -53,7 +60,7 @@ function FilaEvento({ e, dia }: { e: Evento; dia: string }) {
           {icono(e.tipo)} {e.tipo}{e.lugar ? ` · ${e.lugar}` : ""}
         </Text>
         <Text numberOfLines={1} style={{ color: c.acento, fontSize: 13, fontWeight: "600" }}>
-          {dia}{e.hora ? ` · ${e.hora}` : ""}{e.desde !== e.hasta ? " · varios días" : ""}{e.precio ? ` · ${e.precio}` : ""}
+          {dia}{horario(e)}{e.desde !== e.hasta ? ` · hasta el ${diaCorto(e.hasta)}` : ""}{e.precio ? ` · ${e.precio}` : ""}
         </Text>
       </View>
     </Pressable>
@@ -81,11 +88,16 @@ function AgendaCompleta({ eventos, visible, cerrar }: { eventos: Evento[]; visib
     return dias;
   }, [ahora]);
   const tipos = useMemo(() => [...new Set(eventos.map(e => e.tipo))].sort(), [eventos]);
+  // Día que se muestra en cada evento según el filtro elegido
+  const diaDe = (e: Evento) => filtro === "hoy" ? hoy : filtro === "manana" ? manana
+    : filtro === "finde" ? finde.find(d => ocurreEl(e, d)) ?? e.desde : e.desde < hoy ? hoy : e.desde;
   const lista = useMemo(() => eventos.filter(e =>
     (!tipo || e.tipo === tipo) &&
     (filtro === "todo" || (filtro === "hoy" && ocurreEl(e, hoy)) || (filtro === "manana" && ocurreEl(e, manana))
-      || (filtro === "finde" && finde.some(d => ocurreEl(e, d))))), [eventos, filtro, tipo, hoy, manana, finde]);
-  const chip = (activo: boolean) => ({ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 99, backgroundColor: activo ? c.texto : c.tarjeta });
+      || (filtro === "finde" && finde.some(d => ocurreEl(e, d)))))
+    // primero los de un solo día (conciertos, teatro…) y después las exposiciones de varios días
+    .sort((a, b) => Number(a.desde !== a.hasta) - Number(b.desde !== b.hasta)), [eventos, filtro, tipo, hoy, manana, finde]);
+  const chip = (activo: boolean) => ({ paddingHorizontal: 14, height: 36, justifyContent: "center" as const, borderRadius: 99, backgroundColor: activo ? c.texto : c.tarjeta });
   const textoChip = (activo: boolean) => ({ color: activo ? c.fondo : c.texto, fontWeight: "700" as const });
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={cerrar}>
@@ -94,12 +106,12 @@ function AgendaCompleta({ eventos, visible, cerrar }: { eventos: Evento[]; visib
           <Text style={{ color: c.texto, fontSize: 24, fontWeight: "800" }}>Agenda de Vitoria</Text>
           <Pressable onPress={cerrar}><Text style={{ color: c.acento, fontSize: 17 }}>Cerrar</Text></Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0, flexShrink: 0, height: 40 }}>
           {([["todo", "Todo"], ["hoy", "Hoy"], ["manana", "Mañana"], ["finde", "Fin de semana"]] as const).map(([f, t]) => (
             <Pressable key={f} onPress={() => setFiltro(f)} style={chip(filtro === f)}><Text style={textoChip(filtro === f)}>{t}</Text></Pressable>
           ))}
         </ScrollView>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0, flexShrink: 0, height: 40 }}>
           <Pressable onPress={() => setTipo(null)} style={chip(!tipo)}><Text style={textoChip(!tipo)}>Todos</Text></Pressable>
           {tipos.map(t => (
             <Pressable key={t} onPress={() => setTipo(tipo === t ? null : t)} style={chip(tipo === t)}>
@@ -109,7 +121,7 @@ function AgendaCompleta({ eventos, visible, cerrar }: { eventos: Evento[]; visib
         </ScrollView>
         <FlatList data={lista} keyExtractor={e => e.id}
           ListEmptyComponent={<Etiqueta>No hay eventos con esos filtros.</Etiqueta>}
-          renderItem={({ item: e }) => <FilaEvento e={e} dia={etiquetaDia(e.desde < hoy ? hoy : e.desde, hoy, manana)} />} />
+          renderItem={({ item: e }) => <FilaEvento e={e} dia={etiquetaDia(diaDe(e), hoy, manana)} />} />
         <Etiqueta>Fuente: agenda cultural de Euskadi (Open Data Euskadi). Toca un evento para ver información o entradas.</Etiqueta>
       </View>
     </Modal>

@@ -416,7 +416,6 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   camaras: "Cámaras del Ayuntamiento",
   traficociudad: "Tráfico en la ciudad (sensores)",
   obras: "Obras en las calles (Ayuntamiento)",
-  mugibike: "Mugibike · bicis municipales",
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
