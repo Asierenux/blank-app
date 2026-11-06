@@ -20,6 +20,7 @@ import { recogerWaqi } from "./fuentes/waqi";
 import { recogerPrevision } from "./fuentes/prevision";
 import { recogerAvisos, type Aviso as AvisoMeteo } from "./fuentes/avisos";
 import { recogerGasolina } from "./fuentes/gasolina";
+import { recogerAgenda } from "./fuentes/agenda";
 import { recogerAireOficial, type EstacionAire } from "./fuentes/aireOficial";
 import { construirPvpc } from "./panel";
 import { hora, num } from "./formato";
@@ -27,7 +28,7 @@ import type { Historial } from "./historial";
 import type { Claves, Descargar, ErrorFuente } from "./tipos";
 
 export const FUENTES = ["aemet", "prevision", "avisos", "waqi", "aireoficial", "pvpc", "euskalmet", "hidro", "embalses",
-  "generacion", "trafico", "gasolina"] as const;
+  "generacion", "trafico", "gasolina", "agenda"] as const;
 // "saih" (relevo, ver fuentes/saihRelevo.ts) queda desactivada: el SAIH no responde fuera de España
 export type Fuente = (typeof FUENTES)[number];
 
@@ -114,6 +115,7 @@ export class Motor {
       case "prevision": return recogerPrevision(d, c.aemet, ahora);
       case "avisos": return recogerAvisos(d, c.aemet, ahora);
       case "gasolina": return recogerGasolina(d, ahora);
+      case "agenda": return recogerAgenda(d, ahora);
       case "aireoficial":
         return recogerAireOficial(d, this.h.extra<{ t: number; estaciones: EstacionAire[] }>("estacionesAire"), ahora);
     }

@@ -5,6 +5,7 @@ import { ActivityIndicator, Text, View } from "react-native";
 import { Barra, GraficaPvpc } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Tarjeta } from "../componentes/ui";
 import { MejorGasolina, MisParadas, ResumenHoy, TarjetasAvisos } from "../componentes/novedades";
+import { TarjetaAgenda } from "../componentes/agenda";
 import { useDatos } from "../datos";
 import { fechaMadrid, hora, num } from "../lib/formato";
 import type { Indicador } from "../lib/panel";
@@ -58,6 +59,8 @@ export default function Inicio() {
       )}
 
       <MisParadas />
+
+      <TarjetaAgenda eventos={panel.agenda} />
 
       {sinConfigurar.length > 0 && (
         <Tarjeta onPress={() => router.navigate("/ajustes")}>

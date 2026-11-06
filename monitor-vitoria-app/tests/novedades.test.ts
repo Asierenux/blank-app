@@ -252,3 +252,20 @@ test("Datos reales: las horas aún sin medir (ceros, sin calificación) se desca
   const cal = l.filter(x => x.metrica === "75.calidad").sort((a, b) => a.t - b.t).at(-1)!;
   assert.equal(cal.valor, 2);                                          // "Buena"
 });
+
+test("Datos reales: agenda cultural, solo Vitoria, sin HTML y ordenada", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearAgenda, textoPlano, ocurreEl, cuandoEmpieza } = await import("../src/lib/fuentes/agenda");
+  const d = JSON.parse(readFileSync(new URL("./datos/agenda_euskadi.json", import.meta.url), "utf-8"));
+  const ev = parsearAgenda([d], Date.UTC(2026, 10, 6, 12));
+  assert.ok(ev.length >= 10);
+  const maldita = ev.find(e => e.nombre.startsWith("Maldita Nerea"))!;
+  assert.deepEqual([maldita.tipo, maldita.lugar, maldita.hora, maldita.precio], ["Concierto", "Sala Jimmy Jazz", "22:00", "27 / 32 €"]);
+  assert.match(maldita.imagen!, /^https:\/\/opendata\.euskadi\.eus\//);
+  assert.ok(!/[<&]/.test(maldita.descripcion));
+  assert.equal(new Date(cuandoEmpieza(maldita)!).toISOString(), "2026-11-06T21:00:00.000Z");
+  assert.ok(ocurreEl(maldita, "2026-11-06"));
+  assert.equal(textoPlano("<p>Contin&uacute;a &laquo;firme&raquo;</p>"), "Continúa «firme»");
+  const claves = ev.map(e => `${e.desde < "2026-11-06" ? "2026-11-06" : e.desde} ${e.hora ?? "99"}`);
+  assert.deepEqual(claves, [...claves].sort());
+});
