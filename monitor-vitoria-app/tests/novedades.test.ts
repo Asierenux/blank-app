@@ -302,3 +302,13 @@ test("Resumen de la mañana y aviso de precios de mañana", async () => {
   assert.equal(p.dia, fechaMadrid(ahora + 86400e3));
   assert.match(p.cuerpo, /de 13:00 a 16:00 .* más barata que hoy/);
 });
+
+test("Datos reales: calidad del agua del grifo de Vitoria", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearAguaGrifo } = await import("../src/lib/fuentes/aguaGrifo");
+  const zonas = JSON.parse(readFileSync(new URL("./datos/agua_zonas.json", import.meta.url), "utf-8"));
+  const g = parsearAguaGrifo(zonas);
+  assert.equal(g.zona, "RED GENERAL DE VITORIA");
+  assert.deepEqual([g.calificaciones[0].anio, g.calificaciones[0].valor, g.calificaciones[0].analisis, g.calificaciones[0].noAptos], [2022, "Satisfactoria", 1487, 2]);
+  assert.throws(() => parsearAguaGrifo([{ name: "OTRA" }]), /no aparece la zona/);
+});

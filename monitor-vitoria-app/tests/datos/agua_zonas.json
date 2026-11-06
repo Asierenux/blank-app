@@ -1,0 +1,2702 @@
+[
+ {
+  "id": "119",
+  "ekuisCodeZone": "01010",
+  "name": "RED GENERAL DE VITORIA",
+  "sanitaryQualifications": [
+   {
+    "year": 2022,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1487,
+    "unfitAnalyzes": 2
+   },
+   {
+    "year": 2021,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1558,
+    "unfitAnalyzes": 2
+   },
+   {
+    "year": 2020,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1505,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2019,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1513,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2018,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1251,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2017,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1165,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2016,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1317,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2015,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1271,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2014,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1239,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2013,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1154,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2012,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1137,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2011,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1180,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2010,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1171,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2009,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1302,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2008,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1162,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2007,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1220,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2006,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1320,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2005,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1320,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2004,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 715,
+    "unfitAnalyzes": 3
+   }
+  ],
+  "isFluorinated": true,
+  "suppliedLocalities": [
+   {
+    "locality": "Asteguieta",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Betolaza",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Luko",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arriaga",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Mendibil",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Askartza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Elorriaga",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Urbina",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "BetoÃ±o",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamarra Menor",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gobeo",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Junguitu/Jungitu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Martioda",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Matauko",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "MiÃ±ao/MiÃ±ano Mayor",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arkauti/Arcaute",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Crispijana/KrispiÃ±ana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zerio",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Estarrona",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lopidana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arechavaleta",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Aberasturi",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ehari/Ali",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Amarita",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "ArgandoÃ±a",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "AriÃ±iz/AriÃ±ez",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ilarratza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ullibarri-ViÃ±a/Uribarri DibiÃ±a",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Vitoria-Gasteiz",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Yurre/Ihurre",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Andollu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Bolivar",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zurbano/Zurbao",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ziriano",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "Abetxuko",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arkaia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamiz",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gardelegi",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Margarita",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Otazu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ullibarri-Arrazua",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zumelzu/Zumeltzu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamarra Mayor/Gamarra Nagusia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Durana",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Armentia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arroiabe",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Urrunaga",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "Castillo/Gaztelu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "MiÃ±ano Menor/MiÃ±ao Gutxia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lasarte",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lermanda",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lubiano",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Mendoza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Retana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Villafranca",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   }
+  ],
+  "_links": {
+   "self": {
+    "name": "RED GENERAL DE VITORIA",
+    "href": "https://api.euskadi.eus/water-quality/supply-zones/119?lang=SPANISH"
+   },
+   "samplingPoints": [
+    {
+     "name": "DEPOSITO ARAKA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059000"
+    },
+    {
+     "name": "GARDELEGUI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059001"
+    },
+    {
+     "name": "LOPIDANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059068"
+    },
+    {
+     "name": "MARITURRI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059122"
+    },
+    {
+     "name": "MENDOZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059039"
+    },
+    {
+     "name": "LASARTE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059029"
+    },
+    {
+     "name": "JUNGUITU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059043"
+    },
+    {
+     "name": "ELORRIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059063"
+    },
+    {
+     "name": "GOBEO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059066"
+    },
+    {
+     "name": "FUENTE PUBLICA DE URRUNAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058000"
+    },
+    {
+     "name": "FUENTE PUBLICA DE BETOLAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008018"
+    },
+    {
+     "name": "SALBURUA_1",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059113"
+    },
+    {
+     "name": "MARTIODA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059038"
+    },
+    {
+     "name": "PUENTE_ALTO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059128"
+    },
+    {
+     "name": "LARREIN",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059137"
+    },
+    {
+     "name": "VRG-BLANCA (Pza Virgen Blanca)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059013"
+    },
+    {
+     "name": "ULLIBARRI VIÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059078"
+    },
+    {
+     "name": "GOIAIN",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058021"
+    },
+    {
+     "name": "DEPOSITO NUEVO DE BETOLAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008017"
+    },
+    {
+     "name": "CERIO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059040"
+    },
+    {
+     "name": "BOLIBAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059067"
+    },
+    {
+     "name": "AMARITA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059045"
+    },
+    {
+     "name": "RED DE DISTRIBUCION ZUAZO DE VITORIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059126"
+    },
+    {
+     "name": "CASA PARTICULAR ARGANDOÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059206"
+    },
+    {
+     "name": "Andollu",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059220"
+    },
+    {
+     "name": "AMBULATORIO OLAGUIBEL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059091"
+    },
+    {
+     "name": "MENDIZORRO (C/ Salvatierrabide 60)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059008"
+    },
+    {
+     "name": "ASCARZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059071"
+    },
+    {
+     "name": "ZARAMAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059119"
+    },
+    {
+     "name": "P_ANDAGOYA (Pza Andagoya)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059060"
+    },
+    {
+     "name": "FUENTE PUBLICA DE MENDIBIL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008003"
+    },
+    {
+     "name": "FRANCIA (Pza Guardias)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059115"
+    },
+    {
+     "name": "OTAZU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059031"
+    },
+    {
+     "name": "ARANA (C/Santiago 32)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059056"
+    },
+    {
+     "name": "MIÑANO MENOR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059055"
+    },
+    {
+     "name": "LUKO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008016"
+    },
+    {
+     "name": "FUENTE PUBLICA DE SUBIJANA DE ALAVA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059134"
+    },
+    {
+     "name": "Empresa Olatek",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058024"
+    },
+    {
+     "name": "RED DISTRIBUCION ANDOLLU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059209"
+    },
+    {
+     "name": "CASA PARTICULAR DE URRUNAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058006"
+    },
+    {
+     "name": "C.C. ARRIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059102"
+    },
+    {
+     "name": "C.C. EL BOULEVARD",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059103"
+    },
+    {
+     "name": "CASA PARTICULAR ARROIABE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008009"
+    },
+    {
+     "name": "C.C. IPARRALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059085"
+    },
+    {
+     "name": "ARIZNAVARR C/ ARIZNAVARRA 17",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059009"
+    },
+    {
+     "name": "SAN_MARTIN (Pza San Martín de Abendaño)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059018"
+    },
+    {
+     "name": "CRISPIJANA (Laboratorio EDAR)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059002"
+    },
+    {
+     "name": "SANT_LUCIA (C/ Vicente Aleixandre,1)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059020"
+    },
+    {
+     "name": "ARIÑEZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059033"
+    },
+    {
+     "name": "ILARRAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059041"
+    },
+    {
+     "name": "ARKAIATE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059138"
+    },
+    {
+     "name": "C.C. LAKUA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059087"
+    },
+    {
+     "name": "FUENTE PUBLICA DE DURANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008002"
+    },
+    {
+     "name": "FUENTE PÚBLICA DE CASTILLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059125"
+    },
+    {
+     "name": "ARKAUTE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059070"
+    },
+    {
+     "name": "FACULTAD FARMACIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059092"
+    },
+    {
+     "name": "C.C. HEGOALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059084"
+    },
+    {
+     "name": "C.C. EUROPA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059086"
+    },
+    {
+     "name": "HOTEL LAKUA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059093"
+    },
+    {
+     "name": "SECTOR ARETXABALETA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059130"
+    },
+    {
+     "name": "ASTEGUIETA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059062"
+    },
+    {
+     "name": "RETANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059064"
+    },
+    {
+     "name": "GAMIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059030"
+    },
+    {
+     "name": "C.C. EL PILAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059100"
+    },
+    {
+     "name": "ABENDAÑO C/ Abendaño 29",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059028"
+    },
+    {
+     "name": "U_ARRAZUA (Ullibarri Arrazua)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059052"
+    },
+    {
+     "name": "ARMENTIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059010"
+    },
+    {
+     "name": "SALBURUA_2",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059123"
+    },
+    {
+     "name": "MARGARITA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059037"
+    },
+    {
+     "name": "INS. MENDIZORROZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059088"
+    },
+    {
+     "name": "LUBIANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059042"
+    },
+    {
+     "name": "CASA PARTICULAR Nº 5 DE ZIRIANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008007"
+    },
+    {
+     "name": "FUENTE PUBLICA ZURBANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008006"
+    },
+    {
+     "name": "SECTOR 19 SALIDA DEPOSITO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059131"
+    },
+    {
+     "name": "ABERASTURI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059210"
+    },
+    {
+     "name": "Residencia Ajuria",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059094"
+    },
+    {
+     "name": "Restaurante Estibaliz",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059101"
+    },
+    {
+     "name": "Ikastola Olabide",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059107"
+    },
+    {
+     "name": "DATO (Pza. Arka)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059116"
+    },
+    {
+     "name": "LAKUA_4 (Donosti 54)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059117"
+    },
+    {
+     "name": "CASC_VIEJO (Pza Santa María)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059012"
+    },
+    {
+     "name": "JUNDIZ_2",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059141"
+    },
+    {
+     "name": "LEIZAOLA Pza.",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059025"
+    },
+    {
+     "name": "JUNDIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059118"
+    },
+    {
+     "name": "LAKUA_2 (C/ Sierra Andia)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059058"
+    },
+    {
+     "name": "CATEDRAL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059121"
+    },
+    {
+     "name": "TXIRULA (C/ Txirula)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059007"
+    },
+    {
+     "name": "LAKUA_1 (C/ Alfonso XI) ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059019"
+    },
+    {
+     "name": "SALIDA DEPOSITO CASTILLO/GASTELU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059139"
+    },
+    {
+     "name": "BAR URIBE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008008"
+    },
+    {
+     "name": "Argandoña",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059221"
+    },
+    {
+     "name": "ITURRITXU (C/Iturritxu)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059027"
+    },
+    {
+     "name": "ARANBIZKAR (Pza Gregorio Altube)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059022"
+    },
+    {
+     "name": "BETOÑO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059120"
+    },
+    {
+     "name": "ZABALGANA_1",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059114"
+    },
+    {
+     "name": "GAMARRA MENOR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059077"
+    },
+    {
+     "name": "RED ARGANDOÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059207"
+    },
+    {
+     "name": "FUENTE PUBLICA URBINA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058003"
+    },
+    {
+     "name": "CASA PARTICULAR DE ZUAZO DE VITORIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059127"
+    },
+    {
+     "name": "ABETXUKO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059006"
+    },
+    {
+     "name": "LAKUA_3 (Alfonso XI 44)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059112"
+    },
+    {
+     "name": "GAMARRA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059053"
+    },
+    {
+     "name": "BORINBIZKARRA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059135"
+    },
+    {
+     "name": "ALDAIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059136"
+    },
+    {
+     "name": "ZUMELZU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059054"
+    },
+    {
+     "name": "EL_PILAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059057"
+    },
+    {
+     "name": "SANSOMENDI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059059"
+    },
+    {
+     "name": "VILLAFRANCA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059044"
+    },
+    {
+     "name": "YURRE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059061"
+    },
+    {
+     "name": "ARCAYA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059069"
+    },
+    {
+     "name": "MATAUCO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059072"
+    },
+    {
+     "name": "LERMANDA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059065"
+    },
+    {
+     "name": "FUENTE PUBLICA ARROIABE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008004"
+    },
+    {
+     "name": "CASA PARTICULAR DE ARZUBIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008005"
+    },
+    {
+     "name": "CASA PARTICULAR DE URBINA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058005"
+    },
+    {
+     "name": "ESTIBALIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059212"
+    },
+    {
+     "name": "CASA PARTICULAR DE CASTILLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059124"
+    },
+    {
+     "name": "ESTARRONA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059036"
+    },
+    {
+     "name": "ABERASTURI DEPOSITO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059211"
+    },
+    {
+     "name": "MATADERO MAFRIALSA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059003"
+    }
+   ]
+  }
+ },
+ {
+  "id": "496",
+  "ekuisCodeZone": "01538",
+  "name": "ULLIBARRI-GAMBOA",
+  "sanitaryQualifications": [
+   {
+    "year": 2022,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 11,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2021,
+    "value": "Tolerable",
+    "populationSupplied": 81,
+    "analyzesPerformed": 11,
+    "unfitAnalyzes": 9
+   },
+   {
+    "year": 2020,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 9,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2019,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 11,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2018,
+    "value": "Tolerable",
+    "populationSupplied": 81,
+    "analyzesPerformed": 10,
+    "unfitAnalyzes": 10
+   },
+   {
+    "year": 2017,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 9,
+    "unfitAnalyzes": 11
+   },
+   {
+    "year": 2016,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 8,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2015,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 9,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2014,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 8,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2013,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 9,
+    "unfitAnalyzes": 11
+   },
+   {
+    "year": 2012,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 8,
+    "unfitAnalyzes": 25
+   },
+   {
+    "year": 2011,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 3,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2010,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 6,
+    "unfitAnalyzes": 16
+   },
+   {
+    "year": 2009,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 5,
+    "unfitAnalyzes": 40
+   },
+   {
+    "year": 2008,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 4,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2007,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 8,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2006,
+    "value": "Deficiente",
+    "populationSupplied": 81,
+    "analyzesPerformed": 5,
+    "unfitAnalyzes": 20
+   },
+   {
+    "year": 2005,
+    "value": "Satisfactoria",
+    "populationSupplied": 81,
+    "analyzesPerformed": 2,
+    "unfitAnalyzes": 0
+   }
+  ],
+  "isFluorinated": false,
+  "suppliedLocalities": [
+   {
+    "locality": "UllÃ­barri-Gamboa",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   }
+  ],
+  "_links": {
+   "self": {
+    "name": "ULLIBARRI-GAMBOA",
+    "href": "https://api.euskadi.eus/water-quality/supply-zones/496?lang=SPANISH"
+   },
+   "samplingPoints": [
+    {
+     "name": "CASA PARTICULAR DE ULLIB.-GAMBOA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008007"
+    },
+    {
+     "name": "CASA PARTICULAR Bº SANTIAGOLARRA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008008"
+    },
+    {
+     "name": "DEPOSITO DE ULLIBARRI-GAMBOA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008001"
+    },
+    {
+     "name": "DEPOSITO DE CONTACTO DE SANTIAGOLARRA (ZA UG)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008009"
+    },
+    {
+     "name": "ARQUETA PCI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008004"
+    },
+    {
+     "name": "FUENTE PÚBLICA DE ULLIBARRI-GAMBOA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1538008000"
+    }
+   ]
+  }
+ },
+ {
+  "id": "296",
+  "ekuisCodeZone": "48191",
+  "name": "ETAP GERNIKA",
+  "sanitaryQualifications": [
+   {
+    "year": 2022,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 315,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2021,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 302,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2020,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 200,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2019,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 197,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2018,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 213,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2017,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 227,
+    "unfitAnalyzes": 3
+   },
+   {
+    "year": 2016,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 211,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2015,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 203,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2014,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 201,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2013,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 223,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2012,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 220,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2011,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 228,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2010,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 227,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2009,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 222,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2008,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 205,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2007,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 225,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2006,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 211,
+    "unfitAnalyzes": 3
+   },
+   {
+    "year": 2005,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 216,
+    "unfitAnalyzes": 4
+   },
+   {
+    "year": 2004,
+    "value": "Satisfactoria",
+    "populationSupplied": 15931,
+    "analyzesPerformed": 146,
+    "unfitAnalyzes": 1
+   }
+  ],
+  "isFluorinated": false,
+  "suppliedLocalities": [
+   {
+    "locality": "Zelaieta",
+    "municipality": "GAUTEGUIZ DE ARTEAGA",
+    "county": "BIZKAIA",
+    "municipalityId": "041",
+    "countyId": "48"
+   },
+   {
+    "locality": "Akorda",
+    "municipality": "IBARRANGELU",
+    "county": "BIZKAIA",
+    "municipalityId": "048",
+    "countyId": "48"
+   },
+   {
+    "locality": "Ugarte",
+    "municipality": "MUXIKA",
+    "county": "BIZKAIA",
+    "municipalityId": "067",
+    "countyId": "48"
+   },
+   {
+    "locality": "Arana",
+    "municipality": "GERNIKA-LUMO",
+    "county": "BIZKAIA",
+    "municipalityId": "046",
+    "countyId": "48"
+   },
+   {
+    "locality": "Zallo",
+    "municipality": "SUKARRIETA",
+    "county": "BIZKAIA",
+    "municipalityId": "911",
+    "countyId": "48"
+   },
+   {
+    "locality": "Errenteria",
+    "municipality": "GERNIKA-LUMO",
+    "county": "BIZKAIA",
+    "municipalityId": "046",
+    "countyId": "48"
+   },
+   {
+    "locality": "Elantxobe",
+    "municipality": "ELANTXOBEKO ELIZATEA",
+    "county": "BIZKAIA",
+    "municipalityId": "031",
+    "countyId": "48"
+   },
+   {
+    "locality": "Natxitua",
+    "municipality": "EA",
+    "county": "BIZKAIA",
+    "municipalityId": "028",
+    "countyId": "48"
+   },
+   {
+    "locality": "Gernika-Lumo",
+    "municipality": "GERNIKA-LUMO",
+    "county": "BIZKAIA",
+    "municipalityId": "046",
+    "countyId": "48"
+   },
+   {
+    "locality": "Elexalde",
+    "municipality": "IBARRANGELU",
+    "county": "BIZKAIA",
+    "municipalityId": "048",
+    "countyId": "48"
+   }
+  ],
+  "_links": {
+   "self": {
+    "name": "ETAP GERNIKA",
+    "href": "https://api.euskadi.eus/water-quality/supply-zones/296?lang=SPANISH"
+   },
+   "samplingPoints": [
+    {
+     "name": "FUENTE PUERTO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191031001"
+    },
+    {
+     "name": "MUXIKAKO UDALETXEKO ITURRIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067009"
+    },
+    {
+     "name": "ELEXALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911001"
+    },
+    {
+     "name": "DEPOSITO REKALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041003"
+    },
+    {
+     "name": "Fuente Laga",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048003"
+    },
+    {
+     "name": "DEPOSITO CAMPING ARKETAS",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041019"
+    },
+    {
+     "name": "DEPOSITO ELGEZABAL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067006"
+    },
+    {
+     "name": "FUENTE ATXELIPE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067012"
+    },
+    {
+     "name": "DEPOSITO UDALETXE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191031003"
+    },
+    {
+     "name": "FUENTE URETXINDORRA ESKOLA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067010"
+    },
+    {
+     "name": "DEP ANTZORAS (Nuevo)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048008"
+    },
+    {
+     "name": "SALIDA TRATAMIENTO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911003"
+    },
+    {
+     "name": "DEP. GANE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907004"
+    },
+    {
+     "name": "FUENTE BARRIO ELEXALSE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041008"
+    },
+    {
+     "name": "DEPOSITO AIXERROTA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046004"
+    },
+    {
+     "name": "ESCUELAS  ALLENDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046007"
+    },
+    {
+     "name": "KANPANTXU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911002"
+    },
+    {
+     "name": "DEPOSITO AMILLA ARRIBALTZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046029"
+    },
+    {
+     "name": "CAMPING (LAVABOS) (Nuevo)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048004"
+    },
+    {
+     "name": "DEP GAMETXO (Nuevo)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048009"
+    },
+    {
+     "name": "Fuente placita junto a Bidekale 12",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191031000"
+    },
+    {
+     "name": "DEPOSITO BURGOA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911004"
+    },
+    {
+     "name": "UDALETXEA KORTEZUBI    ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907001"
+    },
+    {
+     "name": "DEPOSITO TRAMA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046014"
+    },
+    {
+     "name": "DEPOSITO KANPANTXU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911013"
+    },
+    {
+     "name": "DEPOSITO KANALA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041016"
+    },
+    {
+     "name": "Fuente Playa Laida",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048011"
+    },
+    {
+     "name": "FUENTE TRAS HOSPITAL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046024"
+    },
+    {
+     "name": "DEPOSITO CAMPING ARKETAS (Nuevo)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048005"
+    },
+    {
+     "name": "Dep. San Antolin",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041005"
+    },
+    {
+     "name": "ESCUELAS / UDALETXEA ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041004"
+    },
+    {
+     "name": "FUENTE AKORDA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048000"
+    },
+    {
+     "name": "DEPOSITO ZENDOKIZ ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041001"
+    },
+    {
+     "name": "DEPOSITO BESANGIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067005"
+    },
+    {
+     "name": "FUENTE BARRIO ARANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046019"
+    },
+    {
+     "name": "DEPOSITO ZALLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046003"
+    },
+    {
+     "name": "DEPOSITO GARTEIZ AKORDA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048015"
+    },
+    {
+     "name": "sal. dep. Arnoburu (udaletxea)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067007"
+    },
+    {
+     "name": "ELORRIAGA 1 (GRIFO EXTERIOR EN CASERIO)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907007"
+    },
+    {
+     "name": "ZALLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046011"
+    },
+    {
+     "name": "DEPOSITO CEMENTERIO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191031002"
+    },
+    {
+     "name": "Fuente cruce Ibinaga auzoa",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048001"
+    },
+    {
+     "name": "ESCUELAS BARRUTIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046006"
+    },
+    {
+     "name": "MENDIETA 2",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911011"
+    },
+    {
+     "name": "ISLA FUENTE PUBLICA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041012"
+    },
+    {
+     "name": "DEPOSITO ORDORIKA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067016"
+    },
+    {
+     "name": "FUENTE FRONTON",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041014"
+    },
+    {
+     "name": "DEPOSITO IBINAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048017"
+    },
+    {
+     "name": "DEPOSITO APRAIZ III",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048016"
+    },
+    {
+     "name": "Fuente junto plaza reloj solar",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067003"
+    },
+    {
+     "name": "ESCUELAS STA.LUCIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046008"
+    },
+    {
+     "name": "LUMO (CASERIO Nº5)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046009"
+    },
+    {
+     "name": "NATXITUA (CASERIO Nº12)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191028000"
+    },
+    {
+     "name": "FUENTE SANTIMAMIÑE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907006"
+    },
+    {
+     "name": "DEP. TERLEGIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907003"
+    },
+    {
+     "name": "Laboratorio Labaqua",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046013"
+    },
+    {
+     "name": "Fuente junto a Asador",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907005"
+    },
+    {
+     "name": "Fuente debajo Iglesia Santa María de Legendika",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191041002"
+    },
+    {
+     "name": "DEPOSITO ZIGERTATXU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046015"
+    },
+    {
+     "name": "FUENTE BARRIO ERRENTERIA1 (PARQUE)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046022"
+    },
+    {
+     "name": "DEP LAIDA (Nuevo)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048010"
+    },
+    {
+     "name": "INSTITUTO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191046012"
+    },
+    {
+     "name": "DEPOSITO AJANGIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911008"
+    },
+    {
+     "name": "SANTIMAMIÑE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191907000"
+    },
+    {
+     "name": "FUENTE SAN ROMAN",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067004"
+    },
+    {
+     "name": "Deposito Burgoa Gane",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191911006"
+    },
+    {
+     "name": "Dep. Apraiz I",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191048002"
+    },
+    {
+     "name": "DEPOSITO USPARITZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/48191067015"
+    }
+   ]
+  }
+ },
+ {
+  "id": "119",
+  "ekuisCodeZone": "01010",
+  "name": "RED GENERAL DE VITORIA",
+  "sanitaryQualifications": [
+   {
+    "year": 2022,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1487,
+    "unfitAnalyzes": 2
+   },
+   {
+    "year": 2021,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1558,
+    "unfitAnalyzes": 2
+   },
+   {
+    "year": 2020,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1505,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2019,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1513,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2018,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1251,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2017,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1165,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2016,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1317,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2015,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1271,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2014,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1239,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2013,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1154,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2012,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1137,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2011,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1180,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2010,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1171,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2009,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1302,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2008,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1162,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2007,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1220,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2006,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1320,
+    "unfitAnalyzes": 0
+   },
+   {
+    "year": 2005,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 1320,
+    "unfitAnalyzes": 1
+   },
+   {
+    "year": 2004,
+    "value": "Satisfactoria",
+    "populationSupplied": 216123,
+    "analyzesPerformed": 715,
+    "unfitAnalyzes": 3
+   }
+  ],
+  "isFluorinated": true,
+  "suppliedLocalities": [
+   {
+    "locality": "Asteguieta",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Betolaza",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Luko",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arriaga",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Mendibil",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Askartza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Elorriaga",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Urbina",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "BetoÃ±o",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamarra Menor",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gobeo",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Junguitu/Jungitu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Martioda",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Matauko",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "MiÃ±ao/MiÃ±ano Mayor",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arkauti/Arcaute",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Crispijana/KrispiÃ±ana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zerio",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Estarrona",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lopidana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arechavaleta",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Aberasturi",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ehari/Ali",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Amarita",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "ArgandoÃ±a",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "AriÃ±iz/AriÃ±ez",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ilarratza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ullibarri-ViÃ±a/Uribarri DibiÃ±a",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Vitoria-Gasteiz",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Yurre/Ihurre",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Andollu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Bolivar",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zurbano/Zurbao",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ziriano",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "Abetxuko",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arkaia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamiz",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gardelegi",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Margarita",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Otazu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Ullibarri-Arrazua",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Zumelzu/Zumeltzu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Gamarra Mayor/Gamarra Nagusia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Durana",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Armentia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Arroiabe",
+    "municipality": "ARRAZUA-UBARRUNDIA",
+    "county": "ARABA",
+    "municipalityId": "008",
+    "countyId": "01"
+   },
+   {
+    "locality": "Urrunaga",
+    "municipality": "LEGUTIANO",
+    "county": "ARABA",
+    "municipalityId": "058",
+    "countyId": "01"
+   },
+   {
+    "locality": "Castillo/Gaztelu",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "MiÃ±ano Menor/MiÃ±ao Gutxia",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lasarte",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lermanda",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Lubiano",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Mendoza",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Retana",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   },
+   {
+    "locality": "Villafranca",
+    "municipality": "VITORIA-GASTEIZ",
+    "county": "ARABA",
+    "municipalityId": "059",
+    "countyId": "01"
+   }
+  ],
+  "_links": {
+   "self": {
+    "name": "RED GENERAL DE VITORIA",
+    "href": "https://api.euskadi.eus/water-quality/supply-zones/119?lang=SPANISH"
+   },
+   "samplingPoints": [
+    {
+     "name": "DEPOSITO ARAKA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059000"
+    },
+    {
+     "name": "GARDELEGUI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059001"
+    },
+    {
+     "name": "LOPIDANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059068"
+    },
+    {
+     "name": "MARITURRI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059122"
+    },
+    {
+     "name": "MENDOZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059039"
+    },
+    {
+     "name": "LASARTE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059029"
+    },
+    {
+     "name": "JUNGUITU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059043"
+    },
+    {
+     "name": "ELORRIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059063"
+    },
+    {
+     "name": "GOBEO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059066"
+    },
+    {
+     "name": "FUENTE PUBLICA DE URRUNAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058000"
+    },
+    {
+     "name": "FUENTE PUBLICA DE BETOLAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008018"
+    },
+    {
+     "name": "SALBURUA_1",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059113"
+    },
+    {
+     "name": "MARTIODA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059038"
+    },
+    {
+     "name": "PUENTE_ALTO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059128"
+    },
+    {
+     "name": "LARREIN",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059137"
+    },
+    {
+     "name": "VRG-BLANCA (Pza Virgen Blanca)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059013"
+    },
+    {
+     "name": "ULLIBARRI VIÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059078"
+    },
+    {
+     "name": "GOIAIN",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058021"
+    },
+    {
+     "name": "DEPOSITO NUEVO DE BETOLAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008017"
+    },
+    {
+     "name": "CERIO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059040"
+    },
+    {
+     "name": "BOLIBAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059067"
+    },
+    {
+     "name": "AMARITA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059045"
+    },
+    {
+     "name": "RED DE DISTRIBUCION ZUAZO DE VITORIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059126"
+    },
+    {
+     "name": "CASA PARTICULAR ARGANDOÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059206"
+    },
+    {
+     "name": "Andollu",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059220"
+    },
+    {
+     "name": "AMBULATORIO OLAGUIBEL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059091"
+    },
+    {
+     "name": "MENDIZORRO (C/ Salvatierrabide 60)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059008"
+    },
+    {
+     "name": "ASCARZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059071"
+    },
+    {
+     "name": "ZARAMAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059119"
+    },
+    {
+     "name": "P_ANDAGOYA (Pza Andagoya)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059060"
+    },
+    {
+     "name": "FUENTE PUBLICA DE MENDIBIL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008003"
+    },
+    {
+     "name": "FRANCIA (Pza Guardias)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059115"
+    },
+    {
+     "name": "OTAZU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059031"
+    },
+    {
+     "name": "ARANA (C/Santiago 32)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059056"
+    },
+    {
+     "name": "MIÑANO MENOR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059055"
+    },
+    {
+     "name": "LUKO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008016"
+    },
+    {
+     "name": "FUENTE PUBLICA DE SUBIJANA DE ALAVA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059134"
+    },
+    {
+     "name": "Empresa Olatek",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058024"
+    },
+    {
+     "name": "RED DISTRIBUCION ANDOLLU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059209"
+    },
+    {
+     "name": "CASA PARTICULAR DE URRUNAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058006"
+    },
+    {
+     "name": "C.C. ARRIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059102"
+    },
+    {
+     "name": "C.C. EL BOULEVARD",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059103"
+    },
+    {
+     "name": "CASA PARTICULAR ARROIABE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008009"
+    },
+    {
+     "name": "C.C. IPARRALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059085"
+    },
+    {
+     "name": "ARIZNAVARR C/ ARIZNAVARRA 17",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059009"
+    },
+    {
+     "name": "SAN_MARTIN (Pza San Martín de Abendaño)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059018"
+    },
+    {
+     "name": "CRISPIJANA (Laboratorio EDAR)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059002"
+    },
+    {
+     "name": "SANT_LUCIA (C/ Vicente Aleixandre,1)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059020"
+    },
+    {
+     "name": "ARIÑEZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059033"
+    },
+    {
+     "name": "ILARRAZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059041"
+    },
+    {
+     "name": "ARKAIATE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059138"
+    },
+    {
+     "name": "C.C. LAKUA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059087"
+    },
+    {
+     "name": "FUENTE PUBLICA DE DURANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008002"
+    },
+    {
+     "name": "FUENTE PÚBLICA DE CASTILLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059125"
+    },
+    {
+     "name": "ARKAUTE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059070"
+    },
+    {
+     "name": "FACULTAD FARMACIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059092"
+    },
+    {
+     "name": "C.C. HEGOALDE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059084"
+    },
+    {
+     "name": "C.C. EUROPA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059086"
+    },
+    {
+     "name": "HOTEL LAKUA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059093"
+    },
+    {
+     "name": "SECTOR ARETXABALETA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059130"
+    },
+    {
+     "name": "ASTEGUIETA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059062"
+    },
+    {
+     "name": "RETANA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059064"
+    },
+    {
+     "name": "GAMIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059030"
+    },
+    {
+     "name": "C.C. EL PILAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059100"
+    },
+    {
+     "name": "ABENDAÑO C/ Abendaño 29",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059028"
+    },
+    {
+     "name": "U_ARRAZUA (Ullibarri Arrazua)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059052"
+    },
+    {
+     "name": "ARMENTIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059010"
+    },
+    {
+     "name": "SALBURUA_2",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059123"
+    },
+    {
+     "name": "MARGARITA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059037"
+    },
+    {
+     "name": "INS. MENDIZORROZA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059088"
+    },
+    {
+     "name": "LUBIANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059042"
+    },
+    {
+     "name": "CASA PARTICULAR Nº 5 DE ZIRIANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008007"
+    },
+    {
+     "name": "FUENTE PUBLICA ZURBANO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008006"
+    },
+    {
+     "name": "SECTOR 19 SALIDA DEPOSITO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059131"
+    },
+    {
+     "name": "ABERASTURI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059210"
+    },
+    {
+     "name": "Residencia Ajuria",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059094"
+    },
+    {
+     "name": "Restaurante Estibaliz",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059101"
+    },
+    {
+     "name": "Ikastola Olabide",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059107"
+    },
+    {
+     "name": "DATO (Pza. Arka)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059116"
+    },
+    {
+     "name": "LAKUA_4 (Donosti 54)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059117"
+    },
+    {
+     "name": "CASC_VIEJO (Pza Santa María)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059012"
+    },
+    {
+     "name": "JUNDIZ_2",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059141"
+    },
+    {
+     "name": "LEIZAOLA Pza.",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059025"
+    },
+    {
+     "name": "JUNDIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059118"
+    },
+    {
+     "name": "LAKUA_2 (C/ Sierra Andia)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059058"
+    },
+    {
+     "name": "CATEDRAL",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059121"
+    },
+    {
+     "name": "TXIRULA (C/ Txirula)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059007"
+    },
+    {
+     "name": "LAKUA_1 (C/ Alfonso XI) ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059019"
+    },
+    {
+     "name": "SALIDA DEPOSITO CASTILLO/GASTELU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059139"
+    },
+    {
+     "name": "BAR URIBE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008008"
+    },
+    {
+     "name": "Argandoña",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059221"
+    },
+    {
+     "name": "ITURRITXU (C/Iturritxu)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059027"
+    },
+    {
+     "name": "ARANBIZKAR (Pza Gregorio Altube)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059022"
+    },
+    {
+     "name": "BETOÑO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059120"
+    },
+    {
+     "name": "ZABALGANA_1",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059114"
+    },
+    {
+     "name": "GAMARRA MENOR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059077"
+    },
+    {
+     "name": "RED ARGANDOÑA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059207"
+    },
+    {
+     "name": "FUENTE PUBLICA URBINA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058003"
+    },
+    {
+     "name": "CASA PARTICULAR DE ZUAZO DE VITORIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059127"
+    },
+    {
+     "name": "ABETXUKO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059006"
+    },
+    {
+     "name": "LAKUA_3 (Alfonso XI 44)",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059112"
+    },
+    {
+     "name": "GAMARRA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059053"
+    },
+    {
+     "name": "BORINBIZKARRA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059135"
+    },
+    {
+     "name": "ALDAIA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059136"
+    },
+    {
+     "name": "ZUMELZU",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059054"
+    },
+    {
+     "name": "EL_PILAR",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059057"
+    },
+    {
+     "name": "SANSOMENDI",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059059"
+    },
+    {
+     "name": "VILLAFRANCA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059044"
+    },
+    {
+     "name": "YURRE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059061"
+    },
+    {
+     "name": "ARCAYA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059069"
+    },
+    {
+     "name": "MATAUCO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059072"
+    },
+    {
+     "name": "LERMANDA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059065"
+    },
+    {
+     "name": "FUENTE PUBLICA ARROIABE",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008004"
+    },
+    {
+     "name": "CASA PARTICULAR DE ARZUBIAGA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010008005"
+    },
+    {
+     "name": "CASA PARTICULAR DE URBINA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010058005"
+    },
+    {
+     "name": "ESTIBALIZ",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059212"
+    },
+    {
+     "name": "CASA PARTICULAR DE CASTILLO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059124"
+    },
+    {
+     "name": "ESTARRONA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059036"
+    },
+    {
+     "name": "ABERASTURI DEPOSITO",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059211"
+    },
+    {
+     "name": "MATADERO MAFRIALSA",
+     "href": "https://api.euskadi.eus/water-quality/sampling-points/1010059003"
+    }
+   ]
+  }
+ }
+]
