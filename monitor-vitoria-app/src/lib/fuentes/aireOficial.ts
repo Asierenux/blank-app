@@ -42,13 +42,18 @@ export interface EstacionAire { id: string; nombre: string }
 
 export function estacionesDeVitoria(d: any): EstacionAire[] {
   const salida: EstacionAire[] = [];
-  for (const x of lista(d)) {
+  for (const bruto of lista(d)) {
+    // Puede venir como GeoJSON: {"type":"Feature","geometry":{"coordinates":[lon,lat]},"properties":{id,name,location…}}
+    const x = bruto?.properties ? { ...bruto.properties } : bruto;
     const id = texto(x?.id) ?? texto(x?.stationId) ?? texto(x?.key)?.split("/").pop();
     const nombre = texto(x?.name) ?? texto(x?.stationName) ?? texto(x?.nameByLang) ?? id;
     if (!id || !nombre) continue;
-    const lat = numero(x?.latitude ?? x?.lat ?? x?.position?.latitude), lon = numero(x?.longitude ?? x?.lon ?? x?.position?.longitude);
+    const coords = Array.isArray(bruto?.geometry?.coordinates) ? bruto.geometry.coordinates : null;
+    const lat = numero(coords ? coords[1] : x?.latitude ?? x?.lat ?? x?.position?.latitude);
+    const lon = numero(coords ? coords[0] : x?.longitude ?? x?.lon ?? x?.position?.longitude);
     const cerca = lat != null && lon != null && distanciaKm(VITORIA.lat, VITORIA.lon, lat, lon) <= 6;
-    if (cerca || NOMBRES_VITORIA.test(`${nombre} ${JSON.stringify(x?.town ?? x?.municipality ?? "")}`)) salida.push({ id, nombre });
+    const municipio = JSON.stringify(x?.location ?? x?.town ?? x?.municipality ?? "");
+    if (cerca || NOMBRES_VITORIA.test(`${nombre} ${municipio}`)) salida.push({ id, nombre });
   }
   return salida;
 }

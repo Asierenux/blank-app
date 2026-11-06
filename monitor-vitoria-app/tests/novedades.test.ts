@@ -139,6 +139,15 @@ test("Aire oficial: estaciones de Vitoria y mediciones en formatos distintos", (
   assert.equal(contaminante("Ozono"), "o3");
   const est = estacionesDeVitoria({ stations: [{ id: "48", name: "AV. GASTEIZ" }, { id: "12", name: "MAZARREDO (Bilbao)" }, { id: "50", name: "FARMACIA" }] });
   assert.deepEqual(est.map(e => e.id), ["48", "50"]);
+  // Formato real (GeoJSON) visto en el iPhone
+  const geo = estacionesDeVitoria({ type: "FeatureCollection", features: [
+    { type: "Feature", geometry: { type: "Point", coordinates: [-2.6194, 42.5182] },
+      properties: { id: "83", name: "ELCIEGO", address: "C/ Gabriel Celaya, 8", location: { municipality: "Elciego", county: "Araba/Álava" } } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [-2.6789, 42.8498] },
+      properties: { id: "57", name: "3 DE MARZO", location: { municipality: "Vitoria-Gasteiz", county: "Araba/Álava" } } },
+    { type: "Feature", geometry: { type: "Point", coordinates: [-2.70, 42.80] }, properties: { id: "99", name: "OTRA", location: { municipality: "Vitoria-Gasteiz" } } },
+  ] });
+  assert.deepEqual(geo.map(e => [e.id, e.nombre]), [["57", "3 DE MARZO"], ["99", "OTRA"]]);
   const l = extraerMediciones([{ date: "2026-11-06T08:00", measurements: [{ name: "NO2", value: "23" }, { name: "PM10", value: 14.5 }, { name: "Temperatura", value: 9 }] }],
     "48", Date.UTC(2026, 10, 6, 10));
   assert.deepEqual(l.map(x => [x.metrica, x.valor]), [["48.no2", 23], ["48.pm10", 14.5]]);

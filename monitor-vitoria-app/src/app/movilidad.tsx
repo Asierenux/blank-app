@@ -280,6 +280,9 @@ export default function Movilidad() {
               ))}
             </Tarjeta>
             <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras</Text>
+            <Text onPress={() => Linking.openURL("https://trafikoa.euskadi.eus/")} style={{ color: c.acento, fontSize: 14 }}>
+              Ver las cámaras en la web oficial de Trafikoa ↗
+            </Text>
             {trafico.camaras.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {trafico.camaras.slice(0, 15).map(cam => <ImagenCamara key={cam.id} cam={cam} />)}
