@@ -14,7 +14,8 @@ import type { Llegada, ParadaElegible } from "../lib/fuentes/transporte";
 import type { Panel } from "../lib/panel";
 import { alfa, colorNivel, useColores } from "../lib/tema";
 import { GraficaLinea } from "./graficas";
-import { Aviso, Cifra, Etiqueta, Fila, Tarjeta } from "./ui";
+import { Aviso, Cifra, Etiqueta, Fila, Insignia, Tarjeta } from "./ui";
+import { TEXTO_CALIFICACION } from "../lib/fuentes/aireOficial";
 
 // --------------------------------------------------------------------------
 // Avisos oficiales
@@ -301,7 +302,10 @@ export function AireOficial({ panel }: { panel: Panel }) {
     <View style={{ gap: 10 }}>
       {panel.aireOficial.map(e => (
         <Tarjeta key={e.id}>
-          <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700" }}>{e.nombre}</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+            <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700", flex: 1 }}>{e.nombre}</Text>
+            {e.calidad != null && <Insignia nivel={e.nivelCalidad} texto={TEXTO_CALIFICACION[e.calidad]} />}
+          </View>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {e.valores.map(v => (
               <View key={v.contaminante} style={{ flexBasis: "30%", flexGrow: 1, backgroundColor: c.tarjetaAlta, borderRadius: 12, padding: 10, gap: 2 }}>

@@ -204,8 +204,8 @@ test("Datos reales: aire oficial de Avenida Gasteiz y estaciones de Vitoria", as
   assert.deepEqual(est.map(e => e.nombre).sort(), ["3 DE MARZO", "AV. GASTEIZ", "FARMACIA", "LOS HERRAN"]);
   const l = extraerMediciones(leer("aire_euskadi_78.json"), "78", Date.UTC(2026, 10, 7));
   const metricas = new Set(l.map(x => x.metrica));
-  assert.deepEqual([...metricas].sort(), ["78.co", "78.no2", "78.pm10", "78.pm25"]);   // sin "NO", "NOX" ni "CO 8h"
-  assert.ok(l.every(x => x.unidad === (x.metrica.endsWith("co") ? "mg/m³" : "µg/m³")));
+  assert.deepEqual([...metricas].sort(), ["78.calidad", "78.co", "78.no2", "78.pm10", "78.pm25"]);   // sin "NO", "NOX" ni "CO 8h"
+  assert.ok(l.filter(x => !x.metrica.endsWith("calidad")).every(x => x.unidad === (x.metrica.endsWith("co") ? "mg/m³" : "µg/m³")));
 });
 
 test("Datos reales: cámaras del Ayuntamiento primero y coordenadas UTM convertidas", async () => {
@@ -238,4 +238,17 @@ test("Datos reales: los puertos de montaña son un estado, no incidencias", asyn
   assert.ok(t.puertos.length >= 2);
   assert.equal(t.puertos[0].nivelEstado, "aviso");                         // el de precaución, el primero
   assert.ok(t.activas.every(i => i.tipo !== "puerto"));                     // no inflan las incidencias
+});
+
+test("Datos reales: las horas aún sin medir (ceros, sin calificación) se descartan", async () => {
+  const { readFileSync } = await import("node:fs");
+  const d = JSON.parse(readFileSync(new URL("./datos/aire_euskadi_75.json", import.meta.url), "utf-8"));
+  const ahora = Date.UTC(2026, 10, 6, 6, 41);
+  const l = extraerMediciones(d, "75", ahora);
+  const no2 = l.filter(x => x.metrica === "75.no2").sort((a, b) => a.t - b.t);
+  assert.equal(iso(no2.at(-1)!.t), "2026-11-06T04:00:00.000Z");      // el último medido, no las 05:00 en adelante
+  assert.equal(no2.at(-1)!.valor, 23);
+  assert.ok(l.every(x => x.metrica.endsWith(".calidad") || x.valor >= 0));
+  const cal = l.filter(x => x.metrica === "75.calidad").sort((a, b) => a.t - b.t).at(-1)!;
+  assert.equal(cal.valor, 2);                                          // "Buena"
 });

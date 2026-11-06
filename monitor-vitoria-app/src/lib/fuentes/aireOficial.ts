@@ -40,6 +40,12 @@ const lista = (d: any): any[] => (Array.isArray(d) ? d : (Object.values(d ?? {})
 
 export interface EstacionAire { id: string; nombre: string }
 
+/** Calificación oficial del Gobierno Vasco → número (para guardarla como serie). */
+export const CALIFICACION: Record<string, number> = {
+  "muy buena": 1, "buena": 2, "regular": 3, "mejorable": 3, "mala": 4, "muy mala": 5, "extremadamente mala": 6,
+};
+export const TEXTO_CALIFICACION = ["", "Muy buena", "Buena", "Mejorable", "Mala", "Muy mala", "Extremadamente mala"];
+
 export function estacionesDeVitoria(d: any): EstacionAire[] {
   const salida: EstacionAire[] = [];
   for (const bruto of lista(d)) {
@@ -64,6 +70,14 @@ export function extraerMediciones(d: any, estacion: string, ahora = Date.now()):
   const visitar = (o: any, fechaPadre: number | null) => {
     if (Array.isArray(o)) { o.forEach(x => visitar(x, fechaPadre)); return; }
     if (!o || typeof o !== "object") return;
+    // Horas aún sin medir: la API las rellena con ceros y sin calificación ("airQualityStation")
+    if (Array.isArray(o.measurements)) {
+      const valores = o.measurements.map((m: any) => numero(m?.value));
+      if (("airQualityStation" in o && !o.airQualityStation) || valores.every((v: number | null) => !v)) return;
+      const t = fechaPadre;
+      const indice = CALIFICACION[String(o.airQualityStation ?? "").toLowerCase()];
+      if (indice != null && t != null) salida.push(lectura("aireoficial", `${estacion}.calidad`, t, indice, ""));
+    }
     const f = texto(o.date) ?? texto(o.dateTime) ?? texto(o.datetime) ?? texto(o.time) ?? texto(o.hour);
     const t = f ? (fechaSinZonaMadrid(f.replace(" ", "T")) ?? (Date.parse(f) || null)) : fechaPadre;
     const nombre = texto(o.name) ?? texto(o.measurementName) ?? texto(o.contaminant) ?? texto(o.pollutant) ?? texto(o.parameter);

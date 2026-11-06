@@ -289,9 +289,14 @@ export default function Movilidad() {
               </>
             )}
             <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras</Text>
-            <Text onPress={() => Linking.openURL("https://trafikoa.euskadi.eus/")} style={{ color: c.acento, fontSize: 14 }}>
-              Ver las cámaras en la web oficial de Trafikoa ↗
-            </Text>
+            <Pressable
+              onPress={() => {
+                const url = "https://apps.trafikoa.euskadi.eus/lfr/es/web/trafikoa/camaras-trafiko";
+                Linking.openURL(url).catch(e => Alert.alert("No se pudo abrir Safari", `${url}\n\n${(e as Error).message}`));
+              }}
+              style={({ pressed }) => ({ backgroundColor: c.acento, opacity: pressed ? 0.7 : 1, borderRadius: 12, paddingVertical: 11, alignItems: "center" })}>
+              <Text style={{ color: "#fff", fontWeight: "700", fontSize: 15 }}>📷 Ver cámaras en Trafikoa ↗</Text>
+            </Pressable>
             {trafico.camaras.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
                 {trafico.camaras.slice(0, 20).map(cam => <ImagenCamara key={cam.id} cam={cam} alFallar={alFallar} />)}

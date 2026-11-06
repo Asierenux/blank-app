@@ -519,14 +519,23 @@ function construirAireOficial(h: Historial, ahora: number) {
   const estaciones = h.extra<{ estaciones: { id: string; nombre: string }[] }>("estacionesAire")?.estaciones ?? [];
   const LIMITES: Record<string, number> = { no2: 200, pm10: 50, pm25: 25, o3: 180, so2: 350 };   // µg/m³: umbrales de referencia
   return estaciones.map(e => {
+    // Horas en las que TODOS los contaminantes valen 0: eran huecos sin medir
+    const porHora = new Map<number, number>();
+    for (const c of ["no2", "pm10", "pm25", "o3", "so2", "co"]) {
+      for (const [t, v] of h.serie(`aireoficial.${e.id}.${c}`, ahora - 48 * H, ahora)) porHora.set(t, (porHora.get(t) ?? 0) + Math.abs(v));
+    }
+    const sinMedir = new Set([...porHora].filter(([, suma]) => suma === 0).map(([t]) => t));
     const valores = ["no2", "pm10", "pm25", "o3", "so2", "co"].map(c => {
-      const p = h.ultimo(`aireoficial.${e.id}.${c}`, ahora);
+      const serie = h.serie(`aireoficial.${e.id}.${c}`, ahora - 48 * H, ahora).filter(([t]) => !sinMedir.has(t));
+      const p = serie.at(-1);
       if (!p || ahora - p[0] > 6 * H) return null;
       const lim = LIMITES[c];
       const nivel: Nivel = lim == null ? "info" : p[1] > lim ? "critico" : p[1] > lim / 2 ? "aviso" : "ok";
-      return { contaminante: c, valor: p[1], t: p[0], unidad: c === "co" ? "mg/m³" : "µg/m³", nivel,
-        serie: h.serie(`aireoficial.${e.id}.${c}`, ahora - 48 * H, ahora) };
+      return { contaminante: c, valor: p[1], t: p[0], unidad: c === "co" ? "mg/m³" : "µg/m³", nivel, serie };
     }).filter((x): x is NonNullable<typeof x> => !!x);
-    return { id: e.id, nombre: e.nombre, valores };
+    const cal = h.ultimo(`aireoficial.${e.id}.calidad`, ahora);
+    const calidad = cal && ahora - cal[0] < 6 * H ? cal[1] : null;
+    const nivelCalidad: Nivel = calidad == null ? "sin_datos" : calidad <= 2 ? "ok" : calidad === 3 ? "aviso" : "critico";
+    return { id: e.id, nombre: e.nombre, valores, calidad, nivelCalidad };
   }).filter(e => e.valores.length);
 }
