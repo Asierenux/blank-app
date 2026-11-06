@@ -196,3 +196,46 @@ test("Motor: avisa una vez de cada aviso oficial y programa la luz barata", asyn
   assert.equal(programados[0][0], "luz-barata");
   assert.equal(programados[0][1], base + 5 * H - 5 * 60000);          // 5 min antes de la franja barata
 });
+
+test("Datos reales: aire oficial de Avenida Gasteiz y estaciones de Vitoria", async () => {
+  const { readFileSync } = await import("node:fs");
+  const leer = (n: string) => JSON.parse(readFileSync(new URL(`./datos/${n}`, import.meta.url), "utf-8"));
+  const est = estacionesDeVitoria(leer("aire_euskadi_estaciones.json"));
+  assert.deepEqual(est.map(e => e.nombre).sort(), ["3 DE MARZO", "AV. GASTEIZ", "FARMACIA", "LOS HERRAN"]);
+  const l = extraerMediciones(leer("aire_euskadi_78.json"), "78", Date.UTC(2026, 10, 7));
+  const metricas = new Set(l.map(x => x.metrica));
+  assert.deepEqual([...metricas].sort(), ["78.co", "78.no2", "78.pm10", "78.pm25"]);   // sin "NO", "NOX" ni "CO 8h"
+  assert.ok(l.every(x => x.unidad === (x.metrica.endsWith("co") ? "mg/m³" : "µg/m³")));
+});
+
+test("Datos reales: cámaras del Ayuntamiento primero y coordenadas UTM convertidas", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { convertirCamara, utmAGrados } = await import("../src/lib/fuentes/trafico");
+  const datos = JSON.parse(readFileSync(new URL("./datos/camaras_euskadi.json", import.meta.url), "utf-8"));
+  const camaras = datos.cameras.map(convertirCamara).filter(Boolean);
+  const municipal = camaras.find((c: any) => c.municipal)!;
+  assert.match(municipal.imagen, /vitoria-gasteiz\.org/);
+  assert.ok(Math.abs(municipal.lat - 42.84) < 0.05);
+  const [lat, lon] = utmAGrados(526800, 4743900);
+  assert.ok(Math.abs(lat - 42.8467) < 0.002 && Math.abs(lon + 2.6716) < 0.002);     // centro de Vitoria
+  for (const c of camaras) assert.ok(c.lat > 42 && c.lat < 44 && c.lon > -4 && c.lon < -1, `${c.nombre}: ${c.lat}, ${c.lon}`);
+});
+
+test("Datos reales: los puertos de montaña son un estado, no incidencias", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { convertirIncidencia, categoria } = await import("../src/lib/fuentes/trafico");
+  const { construirPanel, nivelPuerto } = await import("../src/lib/panel");
+  assert.equal(categoria("Puertos de montaña"), "puerto");
+  assert.equal(nivelPuerto("T: Abierto C: Abierto A: Abierto"), "ok");
+  assert.equal(nivelPuerto("T: Precaución C: Precaución A: Precaución"), "aviso");
+  assert.equal(nivelPuerto("T: Abierto C: Cerrado A: Cerrado"), "critico");
+  const datos = JSON.parse(readFileSync(new URL("./datos/incidencias_euskadi.json", import.meta.url), "utf-8"));
+  const inc = datos.incidences.map(convertirIncidencia).filter(Boolean);
+  const h = new Historial(almacenEnMemoria());
+  h.ponerExtra("incidencias", inc);
+  const ahora = Date.UTC(2026, 10, 6, 8);
+  const t = construirPanel(h, U, {}, ahora).trafico;
+  assert.ok(t.puertos.length >= 2);
+  assert.equal(t.puertos[0].nivelEstado, "aviso");                         // el de precaución, el primero
+  assert.ok(t.activas.every(i => i.tipo !== "puerto"));                     // no inflan las incidencias
+});

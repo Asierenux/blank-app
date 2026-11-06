@@ -4,10 +4,11 @@
  *
  * Niveles: "ok" (verde), "aviso" (ámbar), "critico" (rojo), "info" (neutro), "sin_datos" (gris).
  */
-import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
+import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, VITORIA, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
 import { fechaMadrid, inicioDiaMadrid } from "./formato";
 import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
 import { activa, ventanaMs } from "./fuentes/trafico";
+import { distanciaKm } from "./fuentes/comun";
 import type { Historial, Punto } from "./historial";
 import type { Prevision } from "./fuentes/prevision";
 import type { Aviso as AvisoMeteo } from "./fuentes/avisos";
@@ -355,7 +356,8 @@ export interface IncidenciaActiva extends Incidencia { nivelEstado: Nivel; estim
 
 export function construirTrafico(h: Historial, ahora: number) {
   const todas = h.extra<Incidencia[]>("incidencias") ?? [];
-  const activas: IncidenciaActiva[] = todas.filter(i => activa(i, ahora)).map(i => ({
+  const puertos = construirPuertos(todas.filter(i => i.tipo === "puerto" && activa(i, ahora)));
+  const activas: IncidenciaActiva[] = todas.filter(i => i.tipo !== "puerto" && activa(i, ahora)).map(i => ({
     ...i,
     nivelEstado: i.tipo === "corte" || /cerrad/i.test(i.nivel ?? "") ? "critico"
       : ["accidente", "retencion", "meteo"].includes(i.tipo) ? "aviso" : "info",
@@ -368,7 +370,34 @@ export function construirTrafico(h: Historial, ahora: number) {
   for (const i of activas) porTipo[i.tipo] = (porTipo[i.tipo] ?? 0) + 1;
   const nivel: Nivel = activas.some(i => i.nivelEstado !== "info") ? "aviso" : "ok";
   const guardadas = h.extra<CamarasGuardadas>("camaras");
-  return { nivel, activas, porTipo, camaras: guardadas?.lista ?? [], infoCamaras: guardadas ?? null };
+  // Primero las del Ayuntamiento de Vitoria; después, las más cercanas
+  const camaras = [...(guardadas?.lista ?? [])].sort((x, y) =>
+    Number(!!y.municipal) - Number(!!x.municipal) || distanciaKm(VITORIA.lat, VITORIA.lon, x.lat, x.lon) - distanciaKm(VITORIA.lat, VITORIA.lon, y.lat, y.lon));
+  return { nivel: peor(nivel, ...puertos.map(p => (p.nivelEstado === "ok" ? "ok" : "aviso") as Nivel)),
+    activas, porTipo, camaras, infoCamaras: guardadas ?? null, puertos };
+}
+
+export interface Puerto { carretera: string; tramo: string; estado: string; causa: string | null; nivelEstado: Nivel; inicio: number }
+
+/** "T: Abierto C: Precaución A: Cerrado" (turismos, camiones, articulados) → el peor de los tres. */
+export function nivelPuerto(estado: string): Nivel {
+  if (/cerrad|prohib|cortad/i.test(estado)) return "critico";
+  if (/precauci|cadena|condicionad|neum|restringid/i.test(estado)) return "aviso";
+  return "ok";
+}
+
+/** Un puerto por carretera y sentido (el más reciente), los que tienen problemas primero. */
+function construirPuertos(lista: Incidencia[]): Puerto[] {
+  const ultimo = new Map<string, Incidencia>();
+  for (const i of lista) {
+    const clave = `${i.carretera}|${i.sentido}|${i.pkInicio}`;
+    if (!ultimo.has(clave) || ultimo.get(clave)!.inicio < i.inicio) ultimo.set(clave, i);
+  }
+  const orden: Record<string, number> = { critico: 0, aviso: 1, ok: 2 };
+  return [...ultimo.values()].map(i => ({
+    carretera: i.carretera ?? "", tramo: [i.sentido, i.pkInicio != null ? `km ${i.pkInicio}${i.pkFin != null ? `–${i.pkFin}` : ""}` : null].filter(Boolean).join(" · "),
+    estado: i.nivel ?? "Sin estado", causa: i.causa, nivelEstado: nivelPuerto(i.nivel ?? ""), inicio: i.inicio,
+  })).sort((a, b) => orden[a.nivelEstado] - orden[b.nivelEstado] || a.carretera.localeCompare(b.carretera));
 }
 
 // --------------------------------------------------------------------------

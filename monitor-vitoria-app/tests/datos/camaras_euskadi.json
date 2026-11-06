@@ -1,0 +1,71 @@
+{
+ "totalItems": 7,
+ "totalPages": 1,
+ "currentPage": 1,
+ "cameras": [
+  {
+   "cameraId": "30",
+   "sourceId": "6",
+   "cameraName": "Antonia Fija 1 - Avenida Zabalgana",
+   "urlImage": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CAM30",
+   "latitude": "42.838785",
+   "longitude": "-2.696882"
+  },
+  {
+   "cameraId": "31",
+   "sourceId": "6",
+   "cameraName": "Antonia Fija 2 - Alto Armentia",
+   "urlImage": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CAM31",
+   "latitude": "42.837707",
+   "longitude": "-2.697583"
+  },
+  {
+   "cameraId": "32",
+   "sourceId": "6",
+   "cameraName": "Antonia Fija 3 - Portal de Castilla",
+   "urlImage": "https://www.vitoria-gasteiz.org/c11-01w/cameras?action=get&id=CAM32",
+   "latitude": "42.838081",
+   "longitude": "-2.695962"
+  },
+  {
+   "cameraId": "75",
+   "sourceId": "2",
+   "cameraName": "CCTV 232 - Cámara DOMO 232",
+   "latitude": "4792953.64",
+   "longitude": "507650.15",
+   "road": "N - 637",
+   "kilometer": "016+500",
+   "address": "Cruces"
+  },
+  {
+   "cameraId": "76",
+   "sourceId": "2",
+   "cameraName": "DOMO 233",
+   "latitude": "4794032.11",
+   "longitude": "502765.43",
+   "road": "N - 637",
+   "kilometer": "011+000",
+   "address": "Cruces"
+  },
+  {
+   "cameraId": "1",
+   "sourceId": "1",
+   "cameraName": "Iurreta",
+   "urlImage": "https://www.trafikoa.eus/static/files/tr/camaras/819.jpg",
+   "latitude": "43.18725",
+   "longitude": "-2.673754",
+   "road": "A-8",
+   "kilometer": "91.000"
+  },
+  {
+   "cameraId": "2",
+   "sourceId": "1",
+   "cameraName": "Montorra",
+   "urlImage": "https://www.trafikoa.eus/static/files/tr/camaras/820.jpg",
+   "latitude": "43.21167",
+   "longitude": "-2.719359",
+   "road": "A-8",
+   "kilometer": "96.000"
+  }
+ ]
+}

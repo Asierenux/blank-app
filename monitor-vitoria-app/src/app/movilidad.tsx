@@ -24,7 +24,7 @@ const REGION_TRAFICO = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitude
 
 const NOMBRE_TIPO: Record<string, string> = {
   accidente: "Accidente", corte: "Corte", obras: "Obras", retencion: "Retención", meteo: "Meteorología",
-  averia: "Avería", peligro: "Peligro", evento: "Evento", otro: "Otros",
+  averia: "Avería", peligro: "Peligro", evento: "Evento", otro: "Otros", puerto: "Puerto",
 };
 
 function Chapa({ v, c }: { v: Vehiculo; c: ReturnType<typeof useColores> }) {
@@ -38,29 +38,23 @@ function Chapa({ v, c }: { v: Vehiculo; c: ReturnType<typeof useColores> }) {
   );
 }
 
-function ImagenCamara({ cam }: { cam: Camara }) {
+function ImagenCamara({ cam, alFallar }: { cam: Camara; alFallar: (id: string) => void }) {
   const c = useColores();
   const [i, setI] = useState(0);
   const url = cam.candidatas[i];
   const fallida = !url;
+  useEffect(() => { if (fallida) alFallar(cam.id); }, [fallida, cam.id, alFallar]);
+  if (fallida) return null;          // sin foto disponible: no se enseña
   return (
     <Pressable style={{ width: 260, gap: 6 }} onPress={() => Linking.openURL(cam.imagen).catch(e =>
       Alert.alert("No se puede abrir", `${cam.imagen}\n\n${(e as Error).message}`))}>
-      {!fallida ? (
-        <Image
-          // sin "?t=…" (estropeaba algunas direcciones); "reload" evita ver una foto antigua guardada
-          source={{ uri: url, cache: "reload", headers: { Referer: "https://www.trafikoa.eus/" } }}
-          onError={() => setI(x => x + 1)}
-          style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta }}
-        />
-      ) : (
-        <View style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta, padding: 12, gap: 4, justifyContent: "center" }}>
-          <Text style={{ color: c.texto, fontWeight: "600" }}>Imagen no disponible</Text>
-          <Text selectable style={{ color: c.suave, fontSize: 11 }} numberOfLines={4}>{cam.imagen}</Text>
-          <Text style={{ color: c.acento, fontSize: 12 }}>Toca para abrirla en Safari ↗</Text>
-        </View>
-      )}
-      <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{cam.nombre}</Text>
+      <Image
+        // sin "?t=…" (estropeaba algunas direcciones); "reload" evita ver una foto antigua guardada
+        source={{ uri: url, cache: "reload" }}
+        onError={() => setI(x => x + 1)}
+        style={{ width: 260, height: 160, borderRadius: 14, backgroundColor: c.tarjetaAlta }}
+      />
+      <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{cam.municipal ? "📍 " : ""}{cam.nombre}</Text>
     </Pressable>
   );
 }
@@ -76,6 +70,8 @@ export default function Movilidad() {
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
   const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
+  const [fallidas, setFallidas] = useState<Set<string>>(new Set());
+  const alFallar = useCallback((id: string) => setFallidas(f => (f.has(id) ? f : new Set(f).add(id))), []);
   const { historial } = useDatos();
   const gasolineras = panel?.gasolineras?.lista ?? [];
   const historialGasolina = historial.ejecuciones.gasolina;
@@ -279,20 +275,35 @@ export default function Movilidad() {
                 </View>
               ))}
             </Tarjeta>
+            {trafico.puertos.length > 0 && (
+              <>
+                <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Puertos de montaña</Text>
+                <Tarjeta>
+                  {trafico.puertos.map((p, k) => (
+                    <Fila key={`${p.carretera}${p.tramo}`} ultima={k === trafico.puertos.length - 1}
+                      izquierda={`${p.carretera}${p.tramo ? ` · ${p.tramo}` : ""}`}
+                      detalle={`${p.estado.replace(/T:/, "Turismos:").replace(/C:/, "· Camiones:").replace(/A:/, "· Articulados:")}${p.causa && p.causa !== "Desconocida" ? ` · ${p.causa}` : ""}`}
+                      derecha={<Insignia nivel={p.nivelEstado} texto={p.nivelEstado === "ok" ? "Abierto" : p.nivelEstado === "aviso" ? "Precaución" : "Cerrado"} />} />
+                  ))}
+                </Tarjeta>
+              </>
+            )}
             <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Cámaras</Text>
             <Text onPress={() => Linking.openURL("https://trafikoa.euskadi.eus/")} style={{ color: c.acento, fontSize: 14 }}>
               Ver las cámaras en la web oficial de Trafikoa ↗
             </Text>
             {trafico.camaras.length > 0 ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
-                {trafico.camaras.slice(0, 15).map(cam => <ImagenCamara key={cam.id} cam={cam} />)}
+                {trafico.camaras.slice(0, 20).map(cam => <ImagenCamara key={cam.id} cam={cam} alFallar={alFallar} />)}
               </ScrollView>
             ) : null}
-            {trafico.camaras.length > 0 && trafico.infoCamaras?.muestra ? (
-              <Text selectable style={{ color: c.tenue, fontSize: 11 }}>
-                Diagnóstico · {trafico.infoCamaras.recibidas} cámaras recibidas. Ejemplo: {trafico.infoCamaras.muestra}
-              </Text>
-            ) : null}
+            {fallidas.size > 0 && (
+              <Etiqueta>
+                {fallidas.size >= Math.min(trafico.camaras.length, 20)
+                  ? "Ninguna cámara cercana tiene foto disponible ahora mismo (las de carreteras del Gobierno Vasco publican direcciones que ya no existen)."
+                  : `${fallidas.size} cámaras sin foto disponible no se muestran.`}
+              </Etiqueta>
+            )}
             {trafico.camaras.length > 0 ? null : (
               <Aviso nivel="aviso" texto={
                 !trafico.infoCamaras ? "Aún no se ha descargado la lista de cámaras."

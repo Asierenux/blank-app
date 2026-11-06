@@ -1,0 +1,1494 @@
+{
+  "type" : "FeatureCollection",
+  "features" : [ {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.61947521199466, 42.51824807424149 ]
+    },
+    "properties" : {
+      "id" : "83",
+      "name" : "ELCIEGO",
+      "address" : "C/ Gabriel Celaya, 8",
+      "location" : {
+        "municipality" : "Elciego",
+        "county" : "Araba/Álava",
+        "municipalityId" : "022",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "83",
+          "name" : "ELCIEGO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/83"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9633852821260223, 43.1440289422417 ]
+    },
+    "properties" : {
+      "id" : "55",
+      "name" : "LLODIO",
+      "address" : "C/ Lamuza, s/n",
+      "location" : {
+        "municipality" : "Laudio/Llodio",
+        "county" : "Araba/Álava",
+        "municipalityId" : "036",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "55",
+          "name" : "LLODIO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/55"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.3937033896081683, 42.84901250588428 ]
+    },
+    "properties" : {
+      "id" : "76",
+      "name" : "AGURAIN",
+      "address" : "C/ Fueros, 11. Subcomisaría de la Ertzaintza.",
+      "location" : {
+        "municipality" : "Agurain/Salvatierra",
+        "county" : "Araba/Álava",
+        "municipalityId" : "051",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "76",
+          "name" : "AGURAIN",
+          "href" : "https://api.euskadi.eus/air-quality/stations/76"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.231732505322038, 42.87516709375477 ]
+    },
+    "properties" : {
+      "id" : "79",
+      "name" : "VALDEREJO",
+      "address" : "Ctro. de Interpretación. Parque Natural de Valderejo",
+      "location" : {
+        "municipality" : "Valdegovía/Gaubea",
+        "county" : "Araba/Álava",
+        "municipalityId" : "055",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "79",
+          "name" : "VALDEREJO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/79"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.672563184280286, 42.840099615592926 ]
+    },
+    "properties" : {
+      "id" : "85",
+      "name" : "FARMACIA",
+      "address" : "Paseo Universidad, 7. Fac. Farmacia UPV",
+      "location" : {
+        "municipality" : "Vitoria-Gasteiz",
+        "county" : "Araba/Álava",
+        "municipalityId" : "059",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "85",
+          "name" : "FARMACIA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/85"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.667784994714487, 42.85604797053618 ]
+    },
+    "properties" : {
+      "id" : "75",
+      "name" : "3 DE MARZO",
+      "address" : "Plaza Tres de Marzo, s/n",
+      "location" : {
+        "municipality" : "Vitoria-Gasteiz",
+        "county" : "Araba/Álava",
+        "municipalityId" : "059",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "75",
+          "name" : "3 DE MARZO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/75"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.661230556636825, 42.84370295644861 ]
+    },
+    "properties" : {
+      "id" : "77",
+      "name" : "LOS HERRAN",
+      "address" : "Parque Judizmendi. Bº Judizmendi",
+      "location" : {
+        "municipality" : "Vitoria-Gasteiz",
+        "county" : "Araba/Álava",
+        "municipalityId" : "059",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "77",
+          "name" : "LOS HERRAN",
+          "href" : "https://api.euskadi.eus/air-quality/stations/77"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.6807098224581067, 42.85478118366939 ]
+    },
+    "properties" : {
+      "id" : "78",
+      "name" : "AV. GASTEIZ",
+      "address" : "Avda. Gasteiz, 97",
+      "location" : {
+        "municipality" : "Vitoria-Gasteiz",
+        "county" : "Araba/Álava",
+        "municipalityId" : "059",
+        "countyId" : "01"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "78",
+          "name" : "AV. GASTEIZ",
+          "href" : "https://api.euskadi.eus/air-quality/stations/78"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.02332524753123, 43.22137866586519 ]
+    },
+    "properties" : {
+      "id" : "206",
+      "name" : "ANDOAIN",
+      "address" : "Ikastola Aita larramendi",
+      "location" : {
+        "municipality" : "Andoain",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "009",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "206",
+          "name" : "ANDOAIN",
+          "href" : "https://api.euskadi.eus/air-quality/stations/206"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.1548873966664503, 43.25060521979407 ]
+    },
+    "properties" : {
+      "id" : "65",
+      "name" : "PAGOETA",
+      "address" : "Jardín Botánico de Iturraran. Parque Natural de Pagoeta. ",
+      "location" : {
+        "municipality" : "Aia",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "016",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "65",
+          "name" : "PAGOETA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/65"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.265542713009416, 43.178981551719794 ]
+    },
+    "properties" : {
+      "id" : "74",
+      "name" : "AZPEITIA",
+      "address" : "Garmendia Auzoa",
+      "location" : {
+        "municipality" : "Azpeitia",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "018",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "74",
+          "name" : "AZPEITIA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/74"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.191380269702985, 43.04809432240711 ]
+    },
+    "properties" : {
+      "id" : "73",
+      "name" : "BEASAIN",
+      "address" : "Plaza Gipuzkoa, 1",
+      "location" : {
+        "municipality" : "Beasain",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "019",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "73",
+          "name" : "BEASAIN",
+          "href" : "https://api.euskadi.eus/air-quality/stations/73"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.8594129027945114, 43.342775184321106 ]
+    },
+    "properties" : {
+      "id" : "86",
+      "name" : "JAIZKIBEL",
+      "address" : "Monte Jaizkibel, s/n",
+      "location" : {
+        "municipality" : "Hondarribia",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "036",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "86",
+          "name" : "JAIZKIBEL",
+          "href" : "https://api.euskadi.eus/air-quality/stations/86"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.977715640356133, 43.26743142273141 ]
+    },
+    "properties" : {
+      "id" : "68",
+      "name" : "HERNANI",
+      "address" : "C/ Aristizabal, s/n. Centro de salud Hernani.",
+      "location" : {
+        "municipality" : "Hernani",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "040",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "68",
+          "name" : "HERNANI",
+          "href" : "https://api.euskadi.eus/air-quality/stations/68"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.900131049811533, 43.32152243586307 ]
+    },
+    "properties" : {
+      "id" : "82",
+      "name" : "LEZO",
+      "address" : "Plaza Polantzarene, s/n",
+      "location" : {
+        "municipality" : "Lezo",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "053",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "82",
+          "name" : "LEZO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/82"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.4903966831445423, 43.06412079434686 ]
+    },
+    "properties" : {
+      "id" : "70",
+      "name" : "MONDRAGON",
+      "address" : "Plaza Jose María Arizmendiarrieta, s/n",
+      "location" : {
+        "municipality" : "Arrasate / Mondragón",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "055",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "70",
+          "name" : "MONDRAGON",
+          "href" : "https://api.euskadi.eus/air-quality/stations/70"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.010938423674493, 43.30941344063433 ]
+    },
+    "properties" : {
+      "id" : "66",
+      "name" : "AVDA. TOLOSA",
+      "address" : "C/ Andrestegi, 2 ",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "66",
+          "name" : "AVDA. TOLOSA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/66"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.960650618338729, 43.32199194732484 ]
+    },
+    "properties" : {
+      "id" : "67",
+      "name" : "ATEGORRIETA",
+      "address" : "Avda. Ategorrieta, 71",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "67",
+          "name" : "ATEGORRIETA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/67"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.9840112864449164, 43.302777170621106 ]
+    },
+    "properties" : {
+      "id" : "69",
+      "name" : "PUYO",
+      "address" : "Camino de Puyo, 14",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "69",
+          "name" : "PUYO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/69"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.9809008637096939, 43.31215280742268 ]
+    },
+    "properties" : {
+      "id" : "89",
+      "name" : "EASO",
+      "address" : "Plaza del Centenario, s/n",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "89",
+          "name" : "EASO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/89"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -1.9957411467011474, 43.29053138556358 ]
+    },
+    "properties" : {
+      "id" : "104",
+      "name" : "AÑORGA",
+      "address" : "Avda. de Añorga, 12 (Añorga Txiki)",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "104",
+          "name" : "AÑORGA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/104"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.0317166856330036, 43.25597376352475 ]
+    },
+    "properties" : {
+      "id" : "209",
+      "name" : "ZUBIETA METEO",
+      "address" : "ZUBIETA",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "209",
+          "name" : "ZUBIETA METEO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/209"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.0313507420960284, 43.272061873363164 ]
+    },
+    "properties" : {
+      "id" : "207",
+      "name" : "ZUBIETA",
+      "address" : "URIBITARTE IBILBIDEA",
+      "location" : {
+        "municipality" : "Donostia / San Sebastián",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "069",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "207",
+          "name" : "ZUBIETA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/207"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.078002156707588, 43.13078067861342 ]
+    },
+    "properties" : {
+      "id" : "72",
+      "name" : "TOLOSA",
+      "address" : "Avda. Martin Jose Iraola, 23",
+      "location" : {
+        "municipality" : "Tolosa",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "071",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "72",
+          "name" : "TOLOSA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/72"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.0505110667115676, 43.27378032307657 ]
+    },
+    "properties" : {
+      "id" : "208",
+      "name" : "USURBIL",
+      "address" : "San Inazio",
+      "location" : {
+        "municipality" : "Usurbil",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "073",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "208",
+          "name" : "USURBIL",
+          "href" : "https://api.euskadi.eus/air-quality/stations/208"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.316228856182885, 43.08507598449891 ]
+    },
+    "properties" : {
+      "id" : "99",
+      "name" : "ZUMARRAGA",
+      "address" : "Grupo Izazpi 3, 6 ",
+      "location" : {
+        "municipality" : "Zumarraga",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "080",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "99",
+          "name" : "ZUMARRAGA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/99"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.0191293415933154, 43.26870022418793 ]
+    },
+    "properties" : {
+      "id" : "205",
+      "name" : "LASARTE-ORIA",
+      "address" : "Parque Tximistarreta",
+      "location" : {
+        "municipality" : "Lasarte-Oria",
+        "county" : "Gipuzkoa",
+        "municipalityId" : "902",
+        "countyId" : "20"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "205",
+          "name" : "LASARTE-ORIA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/205"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.6508700717196243, 43.100442429429606 ]
+    },
+    "properties" : {
+      "id" : "202",
+      "name" : "URKIOLA",
+      "address" : "Urkiola auzoa, 8",
+      "location" : {
+        "municipality" : "Abadiño",
+        "county" : "Bizkaia",
+        "municipalityId" : "001",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "202",
+          "name" : "URKIOLA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/202"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.0973975060209376, 43.31960312849335 ]
+    },
+    "properties" : {
+      "id" : "203",
+      "name" : "LAS CARRERAS",
+      "address" : "Plaza Trinidad, s/n. Bº Las Carreras",
+      "location" : {
+        "municipality" : "Abanto y Ciérvana-Abanto Zierbena",
+        "county" : "Bizkaia",
+        "municipalityId" : "002",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "203",
+          "name" : "LAS CARRERAS",
+          "href" : "https://api.euskadi.eus/air-quality/stations/203"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.0741559961978044, 43.32047399433485 ]
+    },
+    "properties" : {
+      "id" : "57",
+      "name" : "ABANTO",
+      "address" : "Avda. del Minero, 2. Ayuntamiento",
+      "location" : {
+        "municipality" : "Abanto y Ciérvana-Abanto Zierbena",
+        "county" : "Bizkaia",
+        "municipalityId" : "002",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "57",
+          "name" : "ABANTO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/57"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.7506874305174405, 43.23590459584916 ]
+    },
+    "properties" : {
+      "id" : "101",
+      "name" : "BOROA",
+      "address" : "Parque Empresarial Boroa, s/n",
+      "location" : {
+        "municipality" : "Amorebieta-Etxano",
+        "county" : "Bizkaia",
+        "municipalityId" : "003",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "101",
+          "name" : "BOROA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/101"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.7344969803118295, 43.21890568490462 ]
+    },
+    "properties" : {
+      "id" : "94",
+      "name" : "ZELAIETA PARQUE",
+      "address" : "Parque Zelaieta ",
+      "location" : {
+        "municipality" : "Amorebieta-Etxano",
+        "county" : "Bizkaia",
+        "municipalityId" : "003",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "94",
+          "name" : "ZELAIETA PARQUE",
+          "href" : "https://api.euskadi.eus/air-quality/stations/94"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.7165885073623226, 43.209014222504145 ]
+    },
+    "properties" : {
+      "id" : "95",
+      "name" : "MONTORRA",
+      "address" : "Barrio Montorra fte. nº5",
+      "location" : {
+        "municipality" : "Amorebieta-Etxano",
+        "county" : "Bizkaia",
+        "municipalityId" : "003",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "95",
+          "name" : "MONTORRA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/95"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.987132999827669, 43.298378997955 ]
+    },
+    "properties" : {
+      "id" : "59",
+      "name" : "BARAKALDO",
+      "address" : "C/ Hogar propio, 7. CIFP Nicolás Larburu",
+      "location" : {
+        "municipality" : "Barakaldo",
+        "county" : "Bizkaia",
+        "municipalityId" : "013",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "59",
+          "name" : "BARAKALDO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/59"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.978696000976749, 43.28558799716144 ]
+    },
+    "properties" : {
+      "id" : "98",
+      "name" : "MUNOA",
+      "address" : "C/ Llano, 55. CEP Munoa. Bº Lutxana",
+      "location" : {
+        "municipality" : "Barakaldo",
+        "county" : "Bizkaia",
+        "municipalityId" : "013",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "98",
+          "name" : "MUNOA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/98"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.973456590856772, 43.25807942736176 ]
+    },
+    "properties" : {
+      "id" : "93",
+      "name" : "CASTREJANA",
+      "address" : "C/ Larrazabal, 1. Bº Castrejana",
+      "location" : {
+        "municipality" : "Barakaldo",
+        "county" : "Bizkaia",
+        "municipalityId" : "013",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "93",
+          "name" : "CASTREJANA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/93"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.8837610228035238, 43.24113129588412 ]
+    },
+    "properties" : {
+      "id" : "58",
+      "name" : "BASAURI",
+      "address" : "C/ Uribarri, 5. CEIP Bizkotxalde.",
+      "location" : {
+        "municipality" : "Basauri",
+        "county" : "Bizkaia",
+        "municipalityId" : "015",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "58",
+          "name" : "BASAURI",
+          "href" : "https://api.euskadi.eus/air-quality/stations/58"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.886508983250916, 43.2212234317361 ]
+    },
+    "properties" : {
+      "id" : "204",
+      "name" : "SAN MIGUEL",
+      "address" : "Parque pinceles. Bº San Miguel",
+      "location" : {
+        "municipality" : "Basauri",
+        "county" : "Bizkaia",
+        "municipalityId" : "015",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "204",
+          "name" : "SAN MIGUEL",
+          "href" : "https://api.euskadi.eus/air-quality/stations/204"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.945656664175787, 43.25880286639215 ]
+    },
+    "properties" : {
+      "id" : "81",
+      "name" : "Mª DIAZ HARO",
+      "address" : "C/ Mª Díaz de Haro, 60",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "81",
+          "name" : "Mª DIAZ HARO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/81"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.953278416670214, 43.28099012364825 ]
+    },
+    "properties" : {
+      "id" : "87",
+      "name" : "BANDERAS (meteo)",
+      "address" : "Monte Banderas, s/n",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "87",
+          "name" : "BANDERAS (meteo)",
+          "href" : "https://api.euskadi.eus/air-quality/stations/87"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9475439999557134, 43.26522199716327 ]
+    },
+    "properties" : {
+      "id" : "88",
+      "name" : "FERIA (meteo)",
+      "address" : "C/ Rafael Moreno Pitxitxi, s/n",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "88",
+          "name" : "FERIA (meteo)",
+          "href" : "https://api.euskadi.eus/air-quality/stations/88"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.960475856567045, 43.245553729819484 ]
+    },
+    "properties" : {
+      "id" : "92",
+      "name" : "ARRAIZ (Monte)",
+      "address" : "Camino de Arraiz, s/n",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "92",
+          "name" : "ARRAIZ (Monte)",
+          "href" : "https://api.euskadi.eus/air-quality/stations/92"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.902376115931137, 43.25491056506432 ]
+    },
+    "properties" : {
+      "id" : "62",
+      "name" : "EUROPA",
+      "address" : "Parque Europa. Bº Txurdinaga",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "62",
+          "name" : "EUROPA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/62"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.935188110338201, 43.26750551179745 ]
+    },
+    "properties" : {
+      "id" : "60",
+      "name" : "MAZARREDO",
+      "address" : "C/ Alameda Mazarredo, s/n (Guggenheim)",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "60",
+          "name" : "MAZARREDO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/60"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9656235254219667, 43.28300141003108 ]
+    },
+    "properties" : {
+      "id" : "211",
+      "name" : "UNIDAD MÓVIL 2",
+      "description" : "Campaña de medición en Elorrieta con UM2. ",
+      "address" : "Plaza Andalucia, C/Islas Canarias",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "211",
+          "name" : "UNIDAD MÓVIL 2",
+          "href" : "https://api.euskadi.eus/air-quality/stations/211"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9736111076332628, 43.278361140726474 ]
+    },
+    "properties" : {
+      "id" : "212",
+      "name" : "UNIDAD MÓVIL 10",
+      "description" : "Campaña móvil unidad móvil 10. Zorroza",
+      "address" : "Polideportivo zorroza",
+      "location" : {
+        "municipality" : "Bilbao",
+        "county" : "Bizkaia",
+        "municipalityId" : "020",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "212",
+          "name" : "UNIDAD MÓVIL 10",
+          "href" : "https://api.euskadi.eus/air-quality/stations/212"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.6379580009450136, 43.168285997690994 ]
+    },
+    "properties" : {
+      "id" : "71",
+      "name" : "DURANGO",
+      "address" : "C/ San Roque, 20 bajo. E.S. Roque",
+      "location" : {
+        "municipality" : "Durango",
+        "county" : "Bizkaia",
+        "municipalityId" : "027",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "71",
+          "name" : "DURANGO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/71"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.0227822073211765, 43.362055748944286 ]
+    },
+    "properties" : {
+      "id" : "90",
+      "name" : "ALGORTA (BBIZI2)",
+      "address" : "Carretera de Galea, s/n ",
+      "location" : {
+        "municipality" : "Getxo",
+        "county" : "Bizkaia",
+        "municipalityId" : "044",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "90",
+          "name" : "ALGORTA (BBIZI2)",
+          "href" : "https://api.euskadi.eus/air-quality/stations/90"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.799399084312731, 43.261226121618066 ]
+    },
+    "properties" : {
+      "id" : "102",
+      "name" : "LARRABETZU",
+      "address" : "Barrio Berrezoaga, 3",
+      "location" : {
+        "municipality" : "Larrabetzu",
+        "county" : "Bizkaia",
+        "municipalityId" : "052",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "102",
+          "name" : "LARRABETZU",
+          "href" : "https://api.euskadi.eus/air-quality/stations/102"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.7787382680350423, 43.21083033497371 ]
+    },
+    "properties" : {
+      "id" : "210",
+      "name" : "LEMONA",
+      "address" : "Juan Ajuriaguerra s/n",
+      "location" : {
+        "municipality" : "Lemoa",
+        "county" : "Bizkaia",
+        "municipalityId" : "055",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "210",
+          "name" : "LEMONA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/210"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.7031593675211343, 43.40588884294258 ]
+    },
+    "properties" : {
+      "id" : "64",
+      "name" : "MUNDAKA",
+      "address" : "Camino Goitiz, s/n. Depósito de Agua",
+      "location" : {
+        "municipality" : "Mundaka",
+        "county" : "Bizkaia",
+        "municipalityId" : "068",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "64",
+          "name" : "MUNDAKA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/64"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.112994770178107, 43.33265015831669 ]
+    },
+    "properties" : {
+      "id" : "103",
+      "name" : "SAN JULIAN",
+      "address" : "Camino a Valles, s/n. Bº San Julian",
+      "location" : {
+        "municipality" : "Muskiz",
+        "county" : "Bizkaia",
+        "municipalityId" : "071",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "103",
+          "name" : "SAN JULIAN",
+          "href" : "https://api.euskadi.eus/air-quality/stations/103"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.1127162723783197, 43.32071311956527 ]
+    },
+    "properties" : {
+      "id" : "63",
+      "name" : "MUSKIZ",
+      "address" : "C/ Giba Fregenal, s/n. Estación de Renfe",
+      "location" : {
+        "municipality" : "Muskiz",
+        "county" : "Bizkaia",
+        "municipalityId" : "071",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "63",
+          "name" : "MUSKIZ",
+          "href" : "https://api.euskadi.eus/air-quality/stations/63"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.023333333735672, 43.32694444265417 ]
+    },
+    "properties" : {
+      "id" : "201",
+      "name" : "NAUTICA",
+      "address" : "C/ Mª Díaz de Haro, 68 (Esc. Náutica)",
+      "location" : {
+        "municipality" : "Portugalete",
+        "county" : "Bizkaia",
+        "municipalityId" : "078",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "201",
+          "name" : "NAUTICA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/201"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.0629905698856272, 43.3344367083824 ]
+    },
+    "properties" : {
+      "id" : "84",
+      "name" : "SERANTES",
+      "address" : "Camino Serantes igoera, s/n",
+      "location" : {
+        "municipality" : "Santurtzi",
+        "county" : "Bizkaia",
+        "municipalityId" : "082",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "84",
+          "name" : "SERANTES",
+          "href" : "https://api.euskadi.eus/air-quality/stations/84"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.042560000349237, 43.33301199742545 ]
+    },
+    "properties" : {
+      "id" : "96",
+      "name" : "SANTURCE",
+      "address" : "C/ Vista Alegre, 29 ",
+      "location" : {
+        "municipality" : "Santurtzi",
+        "county" : "Bizkaia",
+        "municipalityId" : "082",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "96",
+          "name" : "SANTURCE",
+          "href" : "https://api.euskadi.eus/air-quality/stations/96"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9959496198447484, 43.307726099387494 ]
+    },
+    "properties" : {
+      "id" : "97",
+      "name" : "SESTAO",
+      "address" : "Parque Portopin",
+      "location" : {
+        "municipality" : "Sestao",
+        "county" : "Bizkaia",
+        "municipalityId" : "084",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "97",
+          "name" : "SESTAO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/97"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.134461258966499, 43.2128572411877 ]
+    },
+    "properties" : {
+      "id" : "54",
+      "name" : "ZALLA",
+      "address" : "Avda. Kosme Bibanko Etxebarria, 2",
+      "location" : {
+        "municipality" : "Zalla",
+        "county" : "Bizkaia",
+        "municipalityId" : "096",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "54",
+          "name" : "ZALLA",
+          "href" : "https://api.euskadi.eus/air-quality/stations/54"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.9772399863752486, 43.3026526345891 ]
+    },
+    "properties" : {
+      "id" : "56",
+      "name" : "ERANDIO",
+      "address" : "Avda. José Luis Goyoaga, s/n (Pasaje de Altzaga)",
+      "location" : {
+        "municipality" : "Erandio",
+        "county" : "Bizkaia",
+        "municipalityId" : "902",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "56",
+          "name" : "ERANDIO",
+          "href" : "https://api.euskadi.eus/air-quality/stations/56"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.93038581833024, 43.29842135635236 ]
+    },
+    "properties" : {
+      "id" : "61",
+      "name" : "SANGRONIZ",
+      "address" : "C/ Iturrikosolo, s/n",
+      "location" : {
+        "municipality" : "Sondika",
+        "county" : "Bizkaia",
+        "municipalityId" : "904",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "61",
+          "name" : "SANGRONIZ",
+          "href" : "https://api.euskadi.eus/air-quality/stations/61"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -2.988024000380936, 43.247567997964374 ]
+    },
+    "properties" : {
+      "id" : "100",
+      "name" : "ALONSOTEGI",
+      "address" : "C/ Baztieta, s/n. Bº Irauregi",
+      "location" : {
+        "municipality" : "Alonsotegi",
+        "county" : "Bizkaia",
+        "municipalityId" : "912",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "100",
+          "name" : "ALONSOTEGI",
+          "href" : "https://api.euskadi.eus/air-quality/stations/100"
+        }
+      }
+    }
+  }, {
+    "type" : "Feature",
+    "geometry" : {
+      "type" : "Point",
+      "coordinates" : [ -3.080988277376953, 43.35305543364201 ]
+    },
+    "properties" : {
+      "id" : "91",
+      "name" : "ZIERBENA (Puerto)",
+      "address" : "Puerto de Zierbena, s/n. Bº El Puerto",
+      "location" : {
+        "municipality" : "Zierbena",
+        "county" : "Bizkaia",
+        "municipalityId" : "913",
+        "countyId" : "48"
+      },
+      "_links" : {
+        "self" : {
+          "id" : "91",
+          "name" : "ZIERBENA (Puerto)",
+          "href" : "https://api.euskadi.eus/air-quality/stations/91"
+        }
+      }
+    }
+  } ]
+}

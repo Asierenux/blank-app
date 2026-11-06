@@ -13,7 +13,7 @@ const URL = "https://api.euskadi.eus/traffic/v1.0";
 const MAX_PAGINAS = 60;
 
 export type TipoIncidencia =
-  "accidente" | "corte" | "obras" | "retencion" | "meteo" | "averia" | "peligro" | "evento" | "otro";
+  "accidente" | "corte" | "obras" | "retencion" | "meteo" | "puerto" | "averia" | "peligro" | "evento" | "otro";
 
 export interface Incidencia {
   id: string;
@@ -35,6 +35,8 @@ export interface Incidencia {
 
 export interface Camara {
   id: string;
+  /** Cámara del Ayuntamiento de Vitoria (las de carreteras del Gobierno Vasco tienen fotos rotas) */
+  municipal?: boolean;
   nombre: string;
   carretera: string | null;
   lat: number;
@@ -48,12 +50,14 @@ const CATEGORIAS: [TipoIncidencia, string[]][] = [
   ["corte", ["corte de carretera", "carretera cortada", "corte total"]],
   ["obras", ["obras", "corte de carril", "ocupacion", "ocupación"]],
   ["retencion", ["congestión", "congestion", "retención", "retencion", "tráfico denso", "trafico denso"]],
-  ["meteo", ["vialidad invernal", "puertos de montaña", "condiciones meteorol", "nieve", "hielo"]],
+  // "Puertos de montaña" es el ESTADO de cada puerto (casi siempre "T: Abierto C: Abierto A: Abierto"), no una incidencia
+  ["puerto", ["puertos de montaña", "puerto de montaña"]],
+  ["meteo", ["vialidad invernal", "condiciones meteorol", "nieve", "hielo"]],
   ["averia", ["vehículo averiado", "vehiculo averiado", "avería", "averia"]],
   ["peligro", ["peligro", "obstáculo", "obstaculo"]],
   ["evento", ["evento", "prueba deportiva"]],
 ];
-const VENTANA_H: Partial<Record<TipoIncidencia, number>> = { accidente: 4, obras: 12, meteo: 12 };
+const VENTANA_H: Partial<Record<TipoIncidencia, number>> = { accidente: 4, obras: 12, meteo: 12, puerto: 12 };
 
 export const categoria = (texto: string): TipoIncidencia => {
   const t = (texto || "").toLowerCase();
@@ -111,14 +115,36 @@ export function convertirCamara(x: any): Camara | null {
     enlaces.find(([, v]) => /\.(jpe?g|png|gif)(\?|$)/i.test(v))?.[1] ??
     enlaces.find(([k]) => /imag|foto|photo|snapshot/i.test(k))?.[1] ??
     enlaces.find(([k]) => k.toLowerCase().includes("url"))?.[1];
-  const lat = numero(Object.entries(x).find(([k]) => k.toLowerCase().startsWith("lat"))?.[1]);
-  const lon = numero(Object.entries(x).find(([k]) => /^(lon|lng)/i.test(k))?.[1]);
+  let lat = numero(Object.entries(x).find(([k]) => k.toLowerCase().startsWith("lat"))?.[1]);
+  let lon = numero(Object.entries(x).find(([k]) => /^(lon|lng)/i.test(k))?.[1]);
   if (!imagen || lat == null || lon == null) return null;
+  // Algunas fuentes (Bizkaia) dan metros UTM en vez de grados: "latitude": "4792953.64"
+  if (Math.abs(lat) > 1000) [lat, lon] = utmAGrados(lon, lat);
   const nombre = ["cameraName", "name", "description", "address", "road"].map(k => x[k]).find(Boolean) ?? "Cámara";
   return {
-    id: String(x.cameraId ?? x.id ?? imagen), nombre: String(nombre), carretera: texto(x.road),
+    id: `${x.sourceId ?? ""}-${x.cameraId ?? x.id ?? imagen}`, nombre: String(nombre), carretera: texto(x.road),
+    municipal: /vitoria-gasteiz\.org/i.test(imagen),
     lat, lon, imagen, candidatas: variantes([imagen, ...enlaces.map(([, v]) => v).filter(v => v !== imagen)]),
   };
+}
+
+/** Coordenadas UTM (huso 30 norte, ETRS89) → [latitud, longitud] en grados. */
+export function utmAGrados(x: number, y: number, huso = 30): [number, number] {
+  const a = 6378137, f = 1 / 298.257222101, k0 = 0.9996;
+  const e2 = f * (2 - f), ep2 = e2 / (1 - e2);
+  const m = y / k0;
+  const mu = m / (a * (1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256));
+  const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
+  const fi = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu)
+    + (151 * e1 ** 3 / 96) * Math.sin(6 * mu);
+  const c1 = ep2 * Math.cos(fi) ** 2, t1 = Math.tan(fi) ** 2;
+  const n1 = a / Math.sqrt(1 - e2 * Math.sin(fi) ** 2), r1 = (a * (1 - e2)) / (1 - e2 * Math.sin(fi) ** 2) ** 1.5;
+  const d = (x - 500000) / (n1 * k0);
+  const lat = fi - ((n1 * Math.tan(fi)) / r1) * (d ** 2 / 2 - (5 + 3 * t1 + 10 * c1 - 4 * c1 ** 2 - 9 * ep2) * d ** 4 / 24
+    + (61 + 90 * t1 + 298 * c1 + 45 * t1 ** 2 - 252 * ep2 - 3 * c1 ** 2) * d ** 6 / 720);
+  const lon = (d - (1 + 2 * t1 + c1) * d ** 3 / 6 + (5 - 2 * c1 + 28 * t1 - 3 * c1 ** 2 + 8 * ep2 + 24 * t1 ** 2) * d ** 5 / 120) / Math.cos(fi);
+  const r = 180 / Math.PI;
+  return [Math.round(lat * r * 1e6) / 1e6, Math.round(((huso - 1) * 6 - 180 + 3 + lon * r) * 1e6) / 1e6];
 }
 
 /** Para cada dirección, también la versión http:// y sin "www." (algunas cámaras solo responden así). */
@@ -154,7 +180,9 @@ async function incidenciasDelDia(descargar: Descargar, t: number): Promise<any[]
   return salida;
 }
 
-export interface CamarasGuardadas { t: number; lista: Camara[]; recibidas?: number; muestra?: string; error?: string }
+export interface CamarasGuardadas { t: number; lista: Camara[]; recibidas?: number; muestra?: string; error?: string; v?: number }
+/** Sube al cambiar el lector: obliga a volver a bajar la lista guardada en el móvil. */
+const VERSION_CAMARAS = 2;
 
 async function bajarCamaras(descargar: Descargar, t: number): Promise<CamarasGuardadas> {
   const crudas: any[] = [];
@@ -165,7 +193,7 @@ async function bajarCamaras(descargar: Descargar, t: number): Promise<CamarasGua
   }
   const lista = crudas.map(convertirCamara).filter((c): c is Camara => !!c && cerca(c.lat, c.lon));
   // Una muestra de lo que llega, para poder ver el formato si algo no cuadra
-  return { t, lista, recibidas: crudas.length, muestra: JSON.stringify(crudas[0] ?? null).slice(0, 400) };
+  return { t, lista, recibidas: crudas.length, muestra: JSON.stringify(crudas[0] ?? null).slice(0, 400), v: VERSION_CAMARAS };
 }
 
 export async function recogerTrafico(
@@ -182,7 +210,7 @@ export async function recogerTrafico(
   // Se renuevan cada día; si la última vez no hubo ninguna, se reintenta cada hora
   // (las guardadas por versiones anteriores, sin "recibidas", se vuelven a bajar)
   const espera = camaras?.lista.length && camaras.recibidas != null ? 86400e3 : 3600e3;
-  if (camaras && camaras.recibidas == null && !camaras.error) camaras = undefined;
+  if (camaras && camaras.v !== VERSION_CAMARAS && !camaras.error) camaras = undefined;
   if (!camaras || ahora - camaras.t > espera) {
     try {
       camaras = await bajarCamaras(descargar, ahora);

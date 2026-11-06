@@ -126,6 +126,11 @@ export default function Inicio() {
             <Cifra valor={String(trafico.activas.length)} unidad={trafico.activas.length === 1 ? "incidencia" : "incidencias"} tam={28} />
             <Insignia nivel={trafico.nivel} texto={trafico.activas.length ? undefined : "Despejado"} />
           </View>
+          {trafico.puertos.some(p => p.nivelEstado !== "ok") && (
+            <Text style={{ color: c.aviso, fontSize: 14, fontWeight: "600" }}>
+              ⛰️ Puertos: {trafico.puertos.filter(p => p.nivelEstado !== "ok").map(p => `${p.carretera} (${p.nivelEstado === "critico" ? "cerrado" : "precaución"})`).join(", ")}
+            </Text>
+          )}
           {trafico.activas.slice(0, 3).map(i => (
             <Text key={i.id} numberOfLines={1} style={{ color: c.suave, fontSize: 14 }}>
               • {i.nombre}{i.carretera ? ` · ${i.carretera}` : ""}{i.municipio ? ` (${i.municipio})` : ""}
