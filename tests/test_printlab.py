@@ -68,3 +68,13 @@ def test_exports_and_bed_check():
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         model = z.read("3D/3dmodel.model").decode()
     assert model.count("<object ") == 2 and 'unit="millimeter"' in model
+
+
+def test_celosia_con_vertices_coincidentes_sigue_cerrada():
+    # varillas que se cruzan generan vértices distintos en la misma posición: no deben fusionarse
+    from manifold3d import Manifold
+    esf = Manifold.sphere(1, 16)
+    a = Manifold.batch_hull([esf, esf.translate([10, 10, 20])])
+    b = Manifold.batch_hull([esf.translate([10, 0, 0]), esf.translate([0, 10, 20])])
+    t = geometry.to_trimesh(a + b)
+    assert t.is_watertight and t.volume > 0

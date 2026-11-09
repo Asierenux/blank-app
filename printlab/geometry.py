@@ -15,7 +15,9 @@ def to_trimesh(obj: Manifold | trimesh.Trimesh) -> trimesh.Trimesh:
     mesh = obj.to_mesh()
     verts = np.asarray(mesh.vert_properties)[:, :3]
     faces = np.asarray(mesh.tri_verts)
-    return trimesh.Trimesh(vertices=verts, faces=faces, process=True)
+    # sin process: manifold ya entrega una malla indexada y cerrada; fusionar vértices coincidentes
+    # (p. ej. donde se cruzan varillas) rompería la topología
+    return trimesh.Trimesh(vertices=verts, faces=faces, process=False)
 
 
 def from_trimesh(mesh: trimesh.Trimesh) -> Manifold:
