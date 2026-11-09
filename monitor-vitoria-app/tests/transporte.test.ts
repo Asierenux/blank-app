@@ -115,3 +115,19 @@ test("Sin internet: errores claros, sin romper", async () => {
   assert.equal(e.errores.length, 2);
   assert.match(e.errores[0], /404/);
 });
+
+test("El tranvía sigue la curva de la vía, no la recta entre paradas", async () => {
+  const { interpolarEnVia } = await import("../src/lib/fuentes/transporte");
+  // Vía en "L": hacia el este y luego hacia el norte (~400 m cada tramo)
+  const via: [number, number][] = [[42.840, -2.680], [42.840, -2.675], [42.8436, -2.675]];
+  const desde = { lat: 42.840, lon: -2.680, t: 0, nombre: "A" };
+  const hacia = { lat: 42.8436, lon: -2.675, t: 100, nombre: "B" };
+  const [lat, lon] = interpolarEnVia([via], desde, hacia, 50);      // a mitad de camino: en la esquina
+  assert.ok(Math.abs(lat - 42.840) < 0.0003 && Math.abs(lon - -2.675) < 0.0003, `${lat},${lon}`);
+  // en sentido contrario no vale esta forma → recta
+  const [lat2] = interpolarEnVia([[...via].reverse()], desde, hacia, 50);
+  assert.ok(Math.abs(lat2 - 42.8418) < 0.0003);
+  // en la vuelta (forma invertida) también encaja
+  const [lat3, lon3] = interpolarEnVia([[...via].reverse()], hacia, { ...desde, t: 200 }, 150);
+  assert.ok(Math.abs(lat3 - 42.840) < 0.0003 && Math.abs(lon3 - -2.675) < 0.0003);
+});

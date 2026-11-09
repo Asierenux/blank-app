@@ -29,6 +29,12 @@
         {
           "color": "#4f8cff"
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Para mostrar dónde estás en el mapa de autobuses, tranvía y tráfico."
+        }
       ]
     ],
     "experiments": {

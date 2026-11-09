@@ -234,6 +234,57 @@ export function interpolar(desde: PuntoTiempo | null | undefined, hacia: PuntoTi
   return [redondear(desde.lat + (hacia.lat - desde.lat) * f), redondear(desde.lon + (hacia.lon - desde.lon) * f)];
 }
 
+/** Proyecta un punto sobre una línea: distancia recorrida hasta el punto más cercano y lo lejos que queda (m). */
+function proyectar(forma: [number, number][], acum: number[], lat: number, lon: number): { d: number; error: number } {
+  const kx = 111320 * Math.cos((lat * Math.PI) / 180), ky = 110540;
+  let mejor = { d: 0, error: Infinity };
+  for (let i = 0; i < forma.length - 1; i++) {
+    const ax = forma[i][1] * kx, ay = forma[i][0] * ky, bx = forma[i + 1][1] * kx, by = forma[i + 1][0] * ky;
+    const px = lon * kx, py = lat * ky, dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+    const f = l2 ? Math.min(1, Math.max(0, ((px - ax) * dx + (py - ay) * dy) / l2)) : 0;
+    const error = Math.hypot(px - (ax + f * dx), py - (ay + f * dy));
+    if (error < mejor.error) mejor = { d: acum[i] + f * (acum[i + 1] - acum[i]), error };
+  }
+  return mejor;
+}
+
+function acumulada(forma: [number, number][]): number[] {
+  const acum = [0];
+  for (let i = 1; i < forma.length; i++) {
+    const kx = 111320 * Math.cos((forma[i][0] * Math.PI) / 180);
+    acum.push(acum[i - 1] + Math.hypot((forma[i][1] - forma[i - 1][1]) * kx, (forma[i][0] - forma[i - 1][0]) * 110540));
+  }
+  return acum;
+}
+
+function puntoEn(forma: [number, number][], acum: number[], d: number): [number, number] {
+  let i = 0;
+  while (i < acum.length - 2 && acum[i + 1] < d) i++;
+  const tramo = acum[i + 1] - acum[i], f = tramo ? Math.min(1, Math.max(0, (d - acum[i]) / tramo)) : 0;
+  return [forma[i][0] + (forma[i + 1][0] - forma[i][0]) * f, forma[i][1] + (forma[i + 1][1] - forma[i][1]) * f];
+}
+
+/**
+ * Como `interpolar`, pero siguiendo el trazado real de la vía (curvas incluidas) en vez de una línea recta.
+ * Usa la forma de la línea que pasa por las dos paradas en el sentido de la marcha; si ninguna encaja, recta.
+ */
+export function interpolarEnVia(formas: [number, number][][], desde: PuntoTiempo | null | undefined, hacia: PuntoTiempo,
+  ahoraS: number): [number, number] {
+  if (!desde || hacia.t <= desde.t) return interpolar(desde, hacia, ahoraS);
+  const f = Math.min(1, Math.max(0, (ahoraS - desde.t) / (hacia.t - desde.t)));
+  let mejor: { forma: [number, number][]; acum: number[]; a: number; b: number; error: number } | null = null;
+  for (const forma of formas) {
+    if (forma.length < 2) continue;
+    const acum = acumulada(forma);
+    const a = proyectar(forma, acum, desde.lat, desde.lon), b = proyectar(forma, acum, hacia.lat, hacia.lon);
+    const error = Math.max(a.error, b.error);
+    if (b.d > a.d && error < 60 && (!mejor || error < mejor.error)) mejor = { forma, acum, a: a.d, b: b.d, error };
+  }
+  if (!mejor) return interpolar(desde, hacia, ahoraS);
+  const [lat, lon] = puntoEn(mejor.forma, mejor.acum, mejor.a + (mejor.b - mejor.a) * f);
+  return [redondear(lat), redondear(lon)];
+}
+
 export function llegadas(
   feed: Feed, h: Horario, operador: Operador, ahoraS: number, lineasValidas?: Set<string>,
 ): { vehiculos: Vehiculo[]; porParada: Record<string, Llegada[]> } {

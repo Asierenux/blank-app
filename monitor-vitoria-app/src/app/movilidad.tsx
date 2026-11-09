@@ -5,9 +5,10 @@
  *  - 📷 Cámaras: solo las fotos del Ayuntamiento, con buscador.
  *  - ⛽ Gasolina: precios en el mapa y en lista.
  */
+import * as Location from "expo-location";
 import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import MapView, { Circle, Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -19,7 +20,7 @@ import { ListaGasolineras } from "../componentes/novedades";
 import { colorVia, CuadriculaCamaras, ListaObras, TarjetaTraficoCiudad, VerCamara } from "../componentes/ciudad";
 import { agruparIncidencias, esImportante } from "../lib/agrupar";
 import type { Camara } from "../lib/fuentes/trafico";
-import { interpolar, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
+import { interpolarEnVia, type EstadoTransporte, type Recorrido, type Vehiculo } from "../lib/fuentes/transporte";
 import { colorNivel, useColores } from "../lib/tema";
 
 type Modo = "transporte" | "trafico" | "camaras" | "gasolina";
@@ -93,6 +94,28 @@ export default function Movilidad() {
   const [buscar, setBuscar] = useState("");
   const [ahora, setAhora] = useState(Date.now());
   const mapa = useRef<MapView>(null);
+  const [verme, setVerme] = useState(false);
+
+  // Mi posición: se pide permiso la primera vez que se toca el botón 📍
+  useEffect(() => {
+    Location.getForegroundPermissionsAsync().then(p => { if (p.granted) setVerme(true); }).catch(() => undefined);
+  }, []);
+  const irAMiPosicion = useCallback(async () => {
+    try {
+      let p = await Location.getForegroundPermissionsAsync();
+      if (!p.granted && p.canAskAgain) p = await Location.requestForegroundPermissionsAsync();
+      if (!p.granted) {
+        Alert.alert("Sin permiso de ubicación", "Actívalo en Ajustes del iPhone → Expo Go → Ubicación → «Al usar la app».",
+          [{ text: "Cancelar", style: "cancel" }, { text: "Abrir Ajustes", onPress: () => void Linking.openSettings() }]);
+        return;
+      }
+      setVerme(true);
+      const pos = await Location.getLastKnownPositionAsync() ?? await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      mapa.current?.animateToRegion({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, latitudeDelta: 0.012, longitudeDelta: 0.012 }, 500);
+    } catch (e) {
+      Alert.alert("No se pudo saber dónde estás", (e as Error).message);
+    }
+  }, []);
 
   const gasolineras = panel?.gasolineras?.lista ?? [];
   const historialGasolina = historial.ejecuciones.gasolina;
@@ -145,10 +168,12 @@ export default function Movilidad() {
       .filter(v => v.tipo === vehiculo && (!linea || v.linea === linea))
       .map(v => {
         if (!v.estimada || !v.hacia) return v;
-        const [lat, lon] = interpolar(v.desde, v.hacia, ahora / 1000);
+        // siguiendo las curvas de la vía de su línea, no en línea recta entre paradas
+        const formas = recorridos.filter(r => r.tipo === v.tipo && r.linea === v.linea).flatMap(r => r.formas);
+        const [lat, lon] = interpolarEnVia(formas, v.desde, v.hacia, ahora / 1000);
         return { ...v, lat, lon };
       });
-  }, [estado, verTransporte, vehiculo, linea, ahora]);
+  }, [estado, verTransporte, vehiculo, linea, ahora, recorridos]);
 
   const lineas = (estado?.lineasActivas ?? []).filter(l => l.tipo === vehiculo);
   const trazos = verTransporte ? recorridos.filter(r => r.tipo === vehiculo && (!linea || r.linea === linea)) : [];
@@ -202,7 +227,8 @@ export default function Movilidad() {
       </View>
 
       {modo !== "camaras" && (
-        <MapView ref={mapa} style={{ height: alturaMapa }} initialRegion={REGION} showsUserLocation={false}
+        <View style={{ height: alturaMapa }}>
+        <MapView ref={mapa} style={{ flex: 1 }} initialRegion={REGION} showsUserLocation={verme} showsMyLocationButton={false}
           showsPointsOfInterests={false} showsBuildings={false} pitchEnabled={false}>
           {trazos.flatMap(r => r.formas.map((f, i) => (
             <Polyline key={`${r.linea}-${i}`} coordinates={f.map(([latitude, longitude]) => ({ latitude, longitude }))}
@@ -245,6 +271,13 @@ export default function Movilidad() {
             </Marker>
           ))}
         </MapView>
+          <Pressable onPress={irAMiPosicion} accessibilityLabel="Ir a mi posición"
+            style={({ pressed }) => ({ position: "absolute", right: 12, bottom: 12, width: 44, height: 44, borderRadius: 22,
+              backgroundColor: c.tarjeta, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1,
+              shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } })}>
+            <Text style={{ fontSize: 20 }}>📍</Text>
+          </Pressable>
+        </View>
       )}
 
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled"
