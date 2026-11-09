@@ -6,13 +6,14 @@ _spec = importlib.util.spec_from_file_location("_funda_base", Path(__file__).wit
 _base = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_base)
 
-NOMBRE = "Funda enrollacables · Apple 20W USB-C"
-DESCRIPCION = "Preajuste para el cargador Apple 20W USB-C (versión EU). Medidas estimadas con datos de terceros (Apple no las publica): **compruébalas con calibre** o imprime antes la pieza de prueba.\n\n" + _base.DESCRIPCION
+NOMBRE = 'Funda enrollacables · Apple 20W USB-C'
+DESCRIPCION = "Preajuste para el cargador " + 'Apple 20W USB-C (EU). Cara frontal ovalada ≈44,5 × 25 mm y cuerpo de ≈38 mm (sin el cuello de las patas), medidos sobre fotos con cinta métrica (±1 mm): imprime antes la pieza de prueba.' + "\n\n" + _base.DESCRIPCION
 PARAMS = dict(_base.PARAMS)
 PARAMS.update({
-    "ancho": (45.0,) + _base.PARAMS["ancho"][1:],
-    "alto": (45.0,) + _base.PARAMS["alto"][1:],
+    "ancho": (44.5,) + _base.PARAMS["ancho"][1:],
+    "alto": (25.0,) + _base.PARAMS["alto"][1:],
     "radio": (11.0,) + _base.PARAMS["radio"][1:],
-    "profundidad": (28.5,) + _base.PARAMS["profundidad"][1:],
+    "profundidad": (37.0,) + _base.PARAMS["profundidad"][1:],
+    "puerto_lateral": (False,) + _base.PARAMS["puerto_lateral"][1:],
 })
 build = _base.build

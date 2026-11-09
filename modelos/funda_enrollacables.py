@@ -15,9 +15,8 @@ NOMBRE = "Funda enrollacables para cargador"
 DESCRIPCION = (
     "Funda que se encaja en el cuerpo del cargador y lo convierte en un carrete para el cable. "
     "Imprime una por cargador, en su color. **Mide con calibre** el ancho, el alto y el radio de las esquinas "
-    "de la cara frontal del cargador, y la **profundidad** desde la cara frontal hasta la base que toca el enchufe "
-    "(sin contar las patas ni la base redonda). Valores por defecto: cargador Apple 20W USB-C (versión EU), estimados "
-    "con datos publicados por terceros (Apple no publica sus medidas): compruébalos con calibre. "
+    "de la cara frontal del cargador, y la **profundidad** del cuerpo desde la cara frontal hasta el escalón donde "
+    "empieza el cuello de las patas. Si el USB está en un lateral, marca la opción y mide a qué distancia del frente está. "
     "Activa «Solo pieza de prueba» para imprimir en 10 minutos un aro que compruebe el ajuste antes de la funda completa."
 )
 
@@ -29,8 +28,14 @@ PARAMS = {
     "holgura": (0.15, 0.0, 0.6, 0.05, "Holgura por lado (mm): 0.1 apretado · 0.2 suave"),
     "d_cable": (4.0, 2.0, 8.0, 0.1, "Ø del cable (mm)"),
     "ala": (8.0, 5.0, 16.0, 0.5, "Cuánto sobresalen las pestañas (mm)"),
+    "puerto_lateral": (False, None, None, None, "USB en un lateral (abajo al enchufarlo), no en la cara frontal"),
+    "puerto_desde_frente": (25.0, 5.0, 55.0, 0.5, "Si es lateral: distancia de la cara frontal al centro del puerto (mm)"),
     "solo_prueba": (False, None, None, None, "Solo pieza de prueba de ajuste"),
 }
+
+# Ventana para el conector USB-C cuando el puerto está en el lateral (sobremoldeado típico 12.3 × 6.5 mm)
+VENTANA_ANCHO = 14.5
+VENTANA_LARGO = 9.0
 
 PARED = 1.6        # 4 perímetros con boquilla 0.4
 LABIO = 2.5        # cuánto cubre el marco delantero sobre la cara frontal
@@ -56,7 +61,8 @@ def _tronco(w0, h0, r0, z0, w1, h1, r1, z1) -> Manifold:
     return Manifold.batch_hull([_losa(w0, h0, r0, z0, z0 + e), _losa(w1, h1, r1, z1 - e, z1)])
 
 
-def build(ancho, alto, radio, profundidad, holgura, d_cable, ala, solo_prueba):
+def build(ancho, alto, radio, profundidad, holgura, d_cable, ala, solo_prueba,
+          puerto_lateral=False, puerto_desde_frente=25.0):
     # cavidad donde entra el cargador
     cw, ch, cr = ancho + 2 * holgura, alto + 2 * holgura, radio + holgura
     # exterior de la funda
@@ -92,11 +98,22 @@ def build(ancho, alto, radio, profundidad, holgura, d_cable, ala, solo_prueba):
         _losa(cw, ch, cr, GROSOR_LABIO, largo + 1),  # cavidad del cargador
         _losa(ancho - 2 * LABIO, alto - 2 * LABIO, max(radio - LABIO, 1.0), -1, GROSOR_LABIO + 0.01),  # ventana frontal
     ]
-    # ranura inferior para que el cable salga del puerto hacia el canal de enrollado
-    s = d_cable + 0.4
-    y_in = -(alto / 2 - LABIO) + 0.5
-    y_out = -(fh / 2) - 1
-    huecos.append(Manifold.cube([s, y_in - y_out, z_ranura_tope + 1]).translate([-s / 2, y_out, -1]))
+    if not puerto_lateral:
+        # ranura inferior en la pestaña delantera: el cable baja del puerto frontal al canal de enrollado
+        s = d_cable + 0.4
+        y_in = -(alto / 2 - LABIO) + 0.5
+        y_out = -(fh / 2) - 1
+        huecos.append(Manifold.cube([s, y_in - y_out, z_ranura_tope + 1]).translate([-s / 2, y_out, -1]))
+    elif not solo_prueba:
+        # ventana en la cara inferior para el conector: el cable sale directamente al canal de enrollado
+        zc = GROSOR_LABIO + puerto_desde_frente
+        z0, z1 = zc - VENTANA_LARGO / 2, zc + VENTANA_LARGO / 2
+        z_limite = largo - GROSOR_PESTANA - ala  # donde empieza la cara a 45º de la pestaña trasera
+        if z0 < GROSOR_PESTANA or z1 > z_limite:
+            raise ValueError(f"El puerto (a {puerto_desde_frente:g} mm del frente) cae sobre una pestaña. "
+                             "Revisa la distancia o reduce «ala».")
+        huecos.append(Manifold.cube([VENTANA_ANCHO, ch / 2 + 2, VENTANA_LARGO]).translate(
+            [-VENTANA_ANCHO / 2, -oh / 2 - 1, z0]))
 
     if not solo_prueba:
         # muescas tipo «ojo de cerradura» en la pestaña trasera (arriba y abajo) para enganchar el cable
