@@ -1,1 +1,9 @@
-streamlit
+streamlit>=1.40
+numpy
+scipy
+pandas
+pillow
+scikit-learn
+scikit-image
+tifffile
+joblib
