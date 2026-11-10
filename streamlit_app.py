@@ -107,22 +107,32 @@ with tab_train:
         bad = pick_images("Origen ", "bad", "p.ej. D:/gocator/ejemplos/malas")
 
     with st.expander("⚙️ Opciones de preprocesado"):
-        o1, o2, o3, o4 = st.columns(4)
-        long_side = o1.select_slider("Resolución de trabajo (lado largo, px)", [128, 192, 256, 320, 384, 512], 256,
-                                     help="Más resolución = detecta defectos más pequeños, pero es más lento.")
+        o1, o2, o3 = st.columns(3)
+        long_side = o1.select_slider("Resolución de trabajo (lado largo, px)",
+                                     [256, 384, 512, 768, 1024, 1536, 2048], 768,
+                                     help="Más resolución = detecta defectos más pequeños, pero es más lento. "
+                                          "Para imágenes alargadas (p.ej. 786×2000) usa 768–1024.")
         norm = o2.selectbox("Normalización", ["median", "robust", "none"],
                             format_func={"median": "Restar mediana (alturas)", "robust": "Robusta (mediana/rango)",
                                          "none": "Ninguna"}.get,
-                            help="'Restar mediana' compensa diferencias de altura absoluta entre piezas.")
+                            help="'Restar mediana' compensa diferencias de nivel/brillo entre piezas.")
         level = o3.checkbox("Quitar inclinación", help="Ajusta y resta un plano: útil si la pieza llega inclinada.")
-        zero_inv = o4.checkbox("Píxeles a 0 = sin dato", value=True,
-                               help="En exportaciones de 16 bits del Gocator el 0 suele indicar 'sin dato'.")
+        o4, o5, o6 = st.columns(3)
+        zero_inv = o4.checkbox("Fondo negro = sin dato", value=True,
+                               help="Los píxeles oscuros (fondo / sin medida del Gocator) no se analizan.")
+        inv_max = o5.number_input("Valor máximo considerado 'sin dato'", 0.0, 65535.0, 8.0, 1.0,
+                                  disabled=not zero_inv,
+                                  help="0 para PNG/TIFF de 16 bits; ~8 para JPG (el negro del JPG no es exacto).")
+        overlays = o6.checkbox("Borrar anotaciones de color", value=True,
+                               help="Elimina las cajas y textos verdes/rojos que dibuja el Gocator, para que el "
+                                    "modelo mire la pieza y no las marcas de las herramientas.")
 
     ready = len(good) >= 3
     if not ready:
         st.caption("Necesitas al menos 3 imágenes buenas. Con 3 o más malas se entrena además un clasificador.")
     if st.button("🚀 Entrenar modelo", type="primary", disabled=not ready):
-        cfg = PreprocessConfig(long_side=long_side, normalization=norm, level_plane=level, invalid_zero=zero_inv)
+        cfg = PreprocessConfig(long_side=long_side, normalization=norm, level_plane=level, invalid_zero=zero_inv,
+                               invalid_max=inv_max, remove_overlays=overlays)
         insp = Inspector(cfg)
         try:
             insp.fit(good, bad, progress=progress_cb())

@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Callable, Iterable
 
 import joblib
+from PIL import Image
 import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
@@ -32,7 +33,7 @@ from sklearn.preprocessing import StandardScaler
 from .features import anomaly_stats, global_features, image_anomaly_score, patch_descriptors
 from .imaging import PreprocessConfig, compute_target_shape, load_raw, preprocess
 
-MAX_BANK = 40000
+MAX_BANK = 120000
 Progress = Callable[[float, str], None] | None
 
 GOOD, BAD, DOUBT = "BUENA", "MALA", "DUDOSA"
@@ -104,7 +105,7 @@ class Inspector:
 
     # ------------------------------------------------------------------ util
     def _prep(self, path) -> tuple[np.ndarray, np.ndarray]:
-        return preprocess(load_raw(path), self.cfg)
+        return preprocess(load_raw(path, getattr(self.cfg, 'remove_overlays', True)), self.cfg)
 
     def _patch_dists(self, desc: np.ndarray) -> np.ndarray:
         d, _ = self.nn.kneighbors(self.patch_scaler.transform(desc), n_neighbors=1)
@@ -121,7 +122,8 @@ class Inspector:
         say = progress or (lambda f, m: None)
 
         # Tamaño objetivo a partir de las buenas
-        shapes = [load_raw(p).shape for p in good_paths[:50]]
+        shapes = [Image.open(p).size[::-1] if Path(p).suffix.lower() not in ('.csv', '.tif', '.tiff')
+                  else load_raw(p).shape for p in good_paths[:50]]
         self.cfg.target_shape = compute_target_shape(shapes, self.cfg.long_side)
         if len(set(shapes)) > 1:
             notes.append("Las imágenes buenas tienen tamaños distintos; se redimensionan a "
@@ -140,8 +142,16 @@ class Inspector:
         self.patch_scaler = StandardScaler().fit(np.concatenate(descs[:ng]))
         scaled = [self.patch_scaler.transform(d) for d in descs]
 
+        inv_col = descs[0].shape[1] - 1  # última columna = fracción sin dato
+
         def make_bank(idx):
+            raw = np.concatenate([descs[i] for i in idx])
             bank = np.concatenate([scaled[i] for i in idx])
+            bg = raw[:, inv_col] >= 0.999
+            if bg.sum() > 500:  # el fondo es todo igual: basta con unas pocas muestras
+                keep = ~bg
+                keep[rng.choice(np.where(bg)[0], 500, replace=False)] = True
+                bank = bank[keep]
             if len(bank) > MAX_BANK:
                 bank = bank[rng.choice(len(bank), MAX_BANK, replace=False)]
             return NearestNeighbors(n_neighbors=1).fit(bank)

@@ -28,7 +28,8 @@ def _progress(frac: float, msg: str) -> None:
 
 def _train(args) -> Inspector:
     cfg = PreprocessConfig(long_side=args.tamano, normalization=args.normalizacion,
-                           level_plane=args.nivelar, invalid_zero=args.cero_invalido)
+                           level_plane=args.nivelar, invalid_zero=args.cero_invalido,
+                           invalid_max=args.max_sin_dato, remove_overlays=not args.mantener_anotaciones)
     insp = Inspector(cfg)
     good = list_images(args.buenas, args.recursivo)
     bad = list_images(args.malas, args.recursivo) if args.malas else []
@@ -50,10 +51,13 @@ def main(argv=None) -> int:
     def train_args(p, required: bool):
         p.add_argument("--buenas", required=required, help="Directorio con imágenes buenas")
         p.add_argument("--malas", help="Directorio con imágenes malas")
-        p.add_argument("--tamano", type=int, default=256, help="Lado largo tras redimensionar")
+        p.add_argument("--tamano", type=int, default=768, help="Lado largo tras redimensionar")
         p.add_argument("--normalizacion", choices=["none", "median", "robust"], default="median")
         p.add_argument("--nivelar", action="store_true", help="Quitar inclinación (ajuste de plano)")
-        p.add_argument("--cero-invalido", action="store_true", help="Píxeles a 0 = sin dato")
+        p.add_argument("--cero-invalido", action="store_true", help="Fondo negro (<= --max-sin-dato) = sin dato")
+        p.add_argument("--max-sin-dato", type=float, default=0.0, help="Valor máx. 'sin dato' (8 para JPG)")
+        p.add_argument("--mantener-anotaciones", action="store_true",
+                       help="No borrar las cajas/textos de color del Gocator")
         p.add_argument("--recursivo", action="store_true", help="Buscar en subcarpetas")
 
     pt = sub.add_parser("entrenar", help="Entrena y guarda un modelo")

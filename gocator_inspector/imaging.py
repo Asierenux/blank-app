@@ -20,7 +20,9 @@ class PreprocessConfig:
     long_side: int = 256            # tamaño del lado largo tras redimensionar
     normalization: str = "median"   # "none" | "median" | "robust"
     level_plane: bool = False       # quitar inclinación (ajuste de plano)
-    invalid_zero: bool = False      # tratar los píxeles == 0 como "sin dato"
+    invalid_zero: bool = False      # tratar los píxeles <= invalid_max como "sin dato" (fondo negro)
+    invalid_max: float = 0.0        # p.ej. 8 para JPG de 8 bits (el negro del JPG no es exactamente 0)
+    remove_overlays: bool = True    # borrar anotaciones de color (cajas/textos verdes, rojos...) del Gocator
     target_shape: tuple[int, int] | None = None  # se fija al entrenar
 
     def to_dict(self) -> dict:
@@ -54,8 +56,31 @@ def _load_csv(path: Path) -> np.ndarray:
     return arr
 
 
-def load_raw(path: str | Path) -> np.ndarray:
-    """Devuelve la imagen como array float32 2D (NaN = sin dato)."""
+def _inpaint_nearest(img: np.ndarray, mask: np.ndarray) -> np.ndarray:
+    """Rellena los píxeles de `mask` con la media de sus vecinos válidos (ventana 7×7);
+    lo que quede sin vecinos válidos, con el píxel válido más cercano."""
+    from scipy import ndimage
+
+    if not mask.any():
+        return img
+    valid = (~mask).astype(np.float32)
+    num = ndimage.uniform_filter(np.where(mask, 0, img).astype(np.float32), 7)
+    den = ndimage.uniform_filter(valid, 7)
+    out = img.copy()
+    ok = mask & (den > 0.15)
+    out[ok] = num[ok] / den[ok]
+    rest = mask & ~ok
+    if rest.any():
+        idx = ndimage.distance_transform_edt(rest, return_distances=False, return_indices=True)
+        out = out[tuple(idx)]
+    return out
+
+
+def load_raw(path: str | Path, remove_overlays: bool = True) -> np.ndarray:
+    """Devuelve la imagen como array float32 2D (NaN = sin dato).
+
+    Si `remove_overlays`, los píxeles de color saturado (cajas y textos que dibuja el
+    Gocator encima de la imagen) se sustituyen por los píxeles grises vecinos."""
     path = Path(path)
     ext = path.suffix.lower()
     if ext == ".csv":
@@ -68,12 +93,24 @@ def load_raw(path: str | Path) -> np.ndarray:
         with Image.open(path) as im:
             if im.mode in ("I;16", "I;16B", "I;16L", "I", "F"):
                 arr = np.array(im)
+            elif im.mode in ("RGB", "RGBA", "P", "CMYK", "YCbCr", "LA"):
+                arr = np.array(im.convert("RGB"))  # en color, para poder borrar anotaciones
             else:
                 arr = np.array(im.convert("L"))
     arr = np.asarray(arr)
     if arr.ndim == 3:  # RGB / multicanal -> gris
         if arr.shape[-1] in (3, 4):
-            arr = arr[..., :3].astype(np.float32) @ np.array([0.299, 0.587, 0.114], np.float32)
+            rgb = arr[..., :3].astype(np.float32)
+            gray = rgb @ np.array([0.299, 0.587, 0.114], np.float32)
+            if remove_overlays:
+                sat = rgb.max(-1) - rgb.min(-1)
+                colored = sat > 0.15 * max(float(rgb.max()), 1.0)
+                if colored.any():
+                    from scipy import ndimage
+
+                    colored = ndimage.binary_dilation(colored, iterations=1)  # bordes antialias / JPEG
+                    gray = _inpaint_nearest(gray, colored)
+            arr = gray
         else:
             arr = arr[0]
     return arr.astype(np.float32)
@@ -94,6 +131,8 @@ def _fit_plane(img: np.ndarray, valid: np.ndarray) -> np.ndarray:
 def compute_target_shape(shapes: list[tuple[int, int]], long_side: int) -> tuple[int, int]:
     aspects = [h / w for h, w in shapes if h > 0 and w > 0]
     aspect = float(np.median(aspects)) if aspects else 1.0
+    if shapes:  # no ampliar por encima de la resolución original
+        long_side = min(long_side, int(np.median([max(s) for s in shapes])))
     if aspect >= 1:
         h, w = long_side, long_side / aspect
     else:
@@ -110,7 +149,7 @@ def preprocess(raw: np.ndarray, cfg: PreprocessConfig) -> tuple[np.ndarray, np.n
     img = raw.astype(np.float32).copy()
     invalid = ~np.isfinite(img)
     if cfg.invalid_zero:
-        invalid |= img == 0
+        invalid |= img <= cfg.invalid_max
     valid = ~invalid
 
     if valid.sum() == 0:

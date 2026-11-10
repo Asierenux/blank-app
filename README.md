@@ -40,6 +40,13 @@ python -m gocator_inspector separar --modelo pieza.joblib --entrada lote_123 --s
 
 Formatos: PNG/TIFF (8/16 bits o float), BMP, JPG y CSV (matriz de alturas).
 
+### Imágenes exportadas del Gocator con anotaciones (JPG con cajas verdes/rojas)
+- **Borrar anotaciones de color** (activado por defecto): elimina cajas, textos y cruces de las herramientas
+  para que el modelo mire la pieza y no las marcas (si no, aprendería "caja roja = mala").
+  Lo ideal sigue siendo exportar las imágenes **sin** anotaciones si el Gocator lo permite.
+- **Fondo negro = sin dato** con valor máximo ~8 en JPG (0 en PNG/TIFF de 16 bits).
+- **Resolución de trabajo** 768–1024 para imágenes alargadas tipo 786×2000 (~0,4–0,6 s por imagen).
+
 ## Demo y tests
 
 ```
