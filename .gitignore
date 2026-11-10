@@ -171,3 +171,4 @@ pesos/
 build/
 dist/
 *.zip
+!InspectorIA.spec
