@@ -165,3 +165,9 @@ cython_debug/
 # Datos/modelos locales
 datos_demo/
 *.joblib
+
+# Inspector IA
+pesos/
+build/
+dist/
+*.zip

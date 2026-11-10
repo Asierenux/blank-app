@@ -1,9 +1,11 @@
-streamlit>=1.40
-numpy
-scipy
-pandas
-pillow
-scikit-learn
-scikit-image
-tifffile
-joblib
+# Instalar torch en versión CPU:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+torch==2.15.0
+torchvision==0.29.2
+fastapi==0.162.2
+uvicorn==0.54.0
+python-multipart==0.0.32
+numpy==2.5.3
+scipy==1.18.1
+pillow==12.3.0
+tifffile==2026.11.8

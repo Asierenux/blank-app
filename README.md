@@ -1,55 +1,58 @@
-# 🔍 Inspector Gocator
+# 🔍 Inspector IA
 
-Herramienta para separar automáticamente las imágenes **malas** de un lote de imágenes / mapas de altura
-medidos con un Gocator. Le das ejemplos de imágenes **buenas** y **malas**, le indicas la carpeta a
-inspeccionar y te las clasifica en `malas/`, `dudosas/` y `buenas/`, con un mapa de calor que señala
-dónde está el posible defecto.
+Aplicación **100 % local** para detectar defectos en imágenes (Gocator u otras) con una IA que
+**tú enseñas pintando los defectos**. Pensada para PCs **sin tarjeta gráfica**.
 
-## Instalación
+- **Una IA por producto/puesto** (proyectos): «GI y MAC», «GI y RFI», «Flanco»…
+- **Etiquetar**: abres cada imagen, pintas con el pincel lo que es defecto (con zoom). Si no pintas nada, es **buena**.
+  Puedes distinguir **tipos de defecto** (grieta, golpe…) con colores.
+- **Entrenar** en el propio PC (5 / 15 / 45 min). Te dice cuántas malas habría detectado en imágenes que no vio.
+- **Inspeccionar** una carpeta: cada imagen sale 🔴 MALA / 🟡 DUDOSA / 🟢 BUENA con el defecto marcado.
+- **Corregir**: si se equivoca, la mandas al entrenamiento con la marca de la IA como punto de partida, la corriges y reentrenas.
+- **Separar**: copia o mueve los archivos a `malas\`, `dudosas\`, `buenas\` + informe CSV.
+
+## Privacidad
+
+- El servidor sólo escucha en `127.0.0.1`: no es accesible desde la red y rechaza peticiones que no vengan del propio PC.
+- Sin CDN, sin fuentes externas, sin telemetría (se desactiva explícitamente). La interfaz no carga nada de internet.
+- Los pesos preentrenados van **dentro** del ejecutable: no se descarga nada en tiempo de ejecución.
+- Los tests bloquean cualquier conexión de red y recorren el flujo completo, para comprobarlo en cada versión.
+- Los datos (imágenes copiadas, marcas, modelos) se guardan en `%USERPROFILE%\InspectorIA` (configurable con la variable `INSPECTOR_IA_DATOS`).
+
+## Instalación (Windows)
+
+1. Descarga `InspectorIA-windows.zip` (lo genera GitHub Actions: pestaña *Actions* → «Construir InspectorIA.exe» → *Artifacts*).
+2. Descomprímelo donde quieras (p. ej. `C:\InspectorIA`).
+3. Doble clic en `InspectorIA.exe`. Se abre una ventana negra (el servidor; ciérrala para salir) y el navegador con la aplicación.
+
+### Desde el código (desarrollo)
 
 ```
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
 pip install -r requirements.txt
+python InspectorIA.py
 ```
 
-## Uso con interfaz web
+## Cómo funciona la IA
+
+Red de segmentación U-Net con codificador ResNet18 (preentrenado en ImageNet), con un decodificador ligero
+para que entrene en CPU. Aprende en recortes a resolución completa, la mitad centrados en los defectos pintados.
+Por imagen: **MALA** si hay una zona con probabilidad ≥ umbral y área ≥ área mínima; **DUDOSA** en la franja
+intermedia; si no, **BUENA**. Los umbrales se sugieren con la validación y se pueden ajustar.
+
+Antes de analizar se borran las anotaciones de color del Gocator (cajas/textos) y el fondo negro se trata como «sin dato».
+
+## Recomendaciones
+
+- Empieza con 20–30 buenas y 20–50 malas pintadas por proyecto; más ejemplos de cada tipo de defecto = más fiable.
+- Pinta el defecto con un pequeño margen; no hace falta precisión de píxel.
+- Las imágenes buenas se pueden importar de golpe («Todas son BUENAS»).
+- Revisa siempre las DUDOSAS y usa «＋ Al entrenamiento» para que aprenda de sus errores.
+
+## Tests
 
 ```
-streamlit run streamlit_app.py
-```
-
-1. **Entrenar**: indica la carpeta de buenas (mín. 3, ideal 20–100) y la de malas (≥ 3 para activar el clasificador).
-2. **Inspeccionar**: indica la carpeta del lote → *Analizar*. Revisa la galería (mapa de calor) y corrige la tabla si hace falta.
-3. **Separar**: elige carpeta de salida y *Copiar* o *Mover*. Se genera además un `informe_*.csv`.
-
-El modelo se puede descargar (`.joblib`) y volver a cargar para no reentrenar cada vez.
-
-## Uso por línea de comandos (lotes / automatización)
-
-```
-python -m gocator_inspector entrenar --buenas ej/buenas --malas ej/malas --modelo pieza.joblib --cero-invalido
-python -m gocator_inspector separar --modelo pieza.joblib --entrada lote_123 --salida lote_123_clasificado
-```
-
-## Cómo funciona
-
-- **Detector de anomalías** (sólo necesita buenas): compara cada parche de la imagen con el parche más parecido
-  de todas las buenas. Detecta también defectos que nunca se le enseñaron. `1.0` = umbral calibrado.
-- **Clasificador** (buenas + malas): regresión logística sobre descriptores de textura, gradientes, zonas sin dato,
-  perfil de alturas y estadísticas de anomalía. Los umbrales se sugieren por validación cruzada.
-- Una imagen es **MALA** si cualquiera de los dos supera su umbral; **DUDOSA** en la franja intermedia.
-
-Formatos: PNG/TIFF (8/16 bits o float), BMP, JPG y CSV (matriz de alturas).
-
-### Imágenes exportadas del Gocator con anotaciones (JPG con cajas verdes/rojas)
-- **Borrar anotaciones de color** (activado por defecto): elimina cajas, textos y cruces de las herramientas
-  para que el modelo mire la pieza y no las marcas (si no, aprendería "caja roja = mala").
-  Lo ideal sigue siendo exportar las imágenes **sin** anotaciones si el Gocator lo permite.
-- **Fondo negro = sin dato** con valor máximo ~8 en JPG (0 en PNG/TIFF de 16 bits).
-- **Resolución de trabajo** 768–1024 para imágenes alargadas tipo 786×2000 (~0,4–0,6 s por imagen).
-
-## Demo y tests
-
-```
-python tests/synthetic.py datos_demo   # genera mapas de altura sintéticos con defectos
-python -m pytest tests
+pip install -r requirements-dev.txt
+python -m pytest -q tests          # rápidos
+python -m pytest -q -m slow tests  # entrenamiento real (~4 min)
 ```
