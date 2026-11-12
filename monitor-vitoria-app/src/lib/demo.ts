@@ -95,15 +95,16 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
     acumulado += lluviaEn(i);
     const efecto = Math.min(1, acumulado / 40);
     const crecida = Math.max(0, 7 * Math.exp(-(((i - 38) / 10) ** 2)));
+    const turbinado = i < 30 ? (30 - i) * 0.015 : 0;   // las últimas 30 h bajan: Barazar turbinando
     add("agua", "urrunaga.nivel", t, 543.02 + efecto * 0.42, "msnm");
-    add("agua", "urrunaga.porcentaje", t, 78.4 + efecto * 2.9, "%");
-    add("agua", "urrunaga.volumen", t, (78.4 + efecto * 2.9) * 0.7177, "hm³");
+    add("agua", "urrunaga.porcentaje", t, 78.4 + efecto * 2.9 - turbinado, "%");
+    add("agua", "urrunaga.volumen", t, (78.4 + efecto * 2.9 - turbinado) * 0.7177, "hm³");
     add("agua", "urrunaga.entrada", t, 2.1 + crecida * 0.7 + r() * 0.2, "m³/s");
-    add("agua", "urrunaga.salida", t, 1.6 + r() * 0.1, "m³/s");
-    add("agua", "ullibarri.porcentaje", t, 70.8 + efecto * 2.1, "%");
-    add("agua", "ullibarri.volumen", t, (70.8 + efecto * 2.1) * 1.47, "hm³");
+    add("agua", "urrunaga.salida", t, 0.3 + r() * 0.05, "m³/s");
+    add("agua", "ullibarri.porcentaje", t, 70.8 + efecto * 2.1 - turbinado, "%");
+    add("agua", "ullibarri.volumen", t, (70.8 + efecto * 2.1 - turbinado) * 1.47, "hm³");
     add("agua", "ullibarri.entrada", t, 4.2 + crecida + r() * 0.3, "m³/s");
-    add("hidro", "SAIH-A315.caudal", t, 6.1 + crecida * 1.1 + r() * 0.3, "m³/s");
+    add("hidro", "SAIH-A315.caudal", t, 1.4 + crecida * 0.4 + r() * 0.1, "m³/s");   // caudal ecológico
   }
 
   // Generación hidráulica: 30 días

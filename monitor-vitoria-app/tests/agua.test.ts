@@ -221,3 +221,22 @@ test("Curva cota-volumen: reproduce las lecturas reales", async () => {
   assert.ok(Math.abs(pctDesdeCota(ull, 544.5)! - 79.51) < 0.5);
   assert.equal(cotaDesdePct(ull, null), null);
 });
+
+test("Barazar: si los dos embalses pierden agua con las compuertas sin usar, está generando luz", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearTiempoReal, parsearFicha } = await import("../src/lib/fuentes/embalses");
+  const { construirPanel, potenciaBarazar } = await import("../src/lib/panel");
+  const h = new Historial(almacenEnMemoria());
+  for (const [id, f] of [["ullibarri", "ullivarri"], ["urrunaga", "urrunaga"]]) {
+    const html = readFileSync(new URL(`./datos/embalsesnet_${f}.html`, import.meta.url), "utf-8");
+    const e = ESTACIONES.find(x => x.id === id)!;
+    h.guardar([...parsearFicha(e, html), ...parsearTiempoReal(e, html)]);
+  }
+  const { agua } = construirPanel(h, UMBRALES_DEFECTO, {}, Date.UTC(2026, 10, 12, 8));
+  const urr = agua.embalses.find(x => x.id === "urrunaga")!;
+  assert.ok(Math.abs(urr.balance!.m3s - -1.2) < 0.15, String(urr.balance?.m3s));   // 37,42 → 37,31 hm³
+  assert.equal(agua.barazar?.estado, "probable");
+  assert.ok(Math.abs(agua.barazar!.perdidaM3s - 4.9) < 0.3, String(agua.barazar?.perdidaM3s));
+  assert.ok(Math.abs(agua.barazar!.potenciaMw - 14) < 1.5, String(agua.barazar?.potenciaMw));
+  assert.equal(Math.round(potenciaBarazar(100)), 84);                                // nunca más que la central
+});

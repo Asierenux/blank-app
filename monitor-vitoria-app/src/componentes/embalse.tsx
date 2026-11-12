@@ -1,6 +1,7 @@
 /**
  * Dibujo del estado de un embalse: corte con el cielo, los montes, la ladera con árboles,
  * el agua a su cota, la presa con sus compuertas y la central, y el río aguas abajo.
+ * Si se deduce que la central de Barazar está turbinando, la tubería va llena y sale el rayo ⚡.
  * Encima: lo que entra y sale, si sube o baja, y las líneas de referencia (compuertas,
  * máximo normal, hace un año y media de 10 años). Se dibuja solo la parte alta del embalse.
  */
@@ -9,7 +10,7 @@ import { View } from "react-native";
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polygon, Rect, Stop, Text as SvgText } from "react-native-svg";
 
 import { num } from "../lib/formato";
-import type { Embalse } from "../lib/panel";
+import type { Barazar, Embalse } from "../lib/panel";
 import { alfa, useColores } from "../lib/tema";
 
 const ALTO = 250;
@@ -19,7 +20,7 @@ function esDeDia(t = Date.now()) {
   return h >= 8 && h < 18;
 }
 
-export function DibujoEmbalse({ e }: { e: Embalse }) {
+export function DibujoEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | null }) {
   const c = useColores();
   const [W, setW] = useState(0);
   const nivel = e.nivel;
@@ -51,6 +52,7 @@ export function DibujoEmbalse({ e }: { e: Embalse }) {
   const hormigonOsc = oscuro ? "#6E7580" : "#AEB4BE";
 
   const comp = e.compuertas?.estado;
+  const turbina = !!barazar && barazar.estado !== "no" && barazar.potenciaMw >= 1;
   const subiendo = e.balance?.texto === "Llenándose", bajando = e.balance?.texto === "Vaciándose";
 
   // Línea de referencia discontinua con su etiqueta
@@ -94,8 +96,8 @@ export function DibujoEmbalse({ e }: { e: Embalse }) {
 
           {/* Cielo, sol o luna, y montes al fondo */}
           <Rect x={0} y={0} width={W} height={ALTO} fill={`url(#cielo-${e.id})`} />
-          {dia ? <Circle cx={W * 0.58} cy={22} r={12} fill="#FFD25A" opacity={0.95} />
-            : <G><Circle cx={W * 0.58} cy={22} r={10} fill="#F1F3F8" /><Circle cx={W * 0.58 + 5} cy={19} r={9} fill={cieloA} /></G>}
+          {dia ? <Circle cx={W * 0.68} cy={22} r={12} fill="#FFD25A" opacity={0.95} />
+            : <G><Circle cx={W * 0.68} cy={22} r={10} fill="#F1F3F8" /><Circle cx={W * 0.68 + 5} cy={19} r={9} fill={cieloA} /></G>}
           <Path d={`M 0 ${yC + 6} L ${W * 0.12} ${yC - 26} L ${W * 0.26} ${yC - 4} L ${W * 0.4} ${yC - 34} L ${W * 0.58} ${yC - 2} L ${W * 0.74} ${yC - 22} L ${W} ${yC + 2} L ${W} ${ALTO} L 0 ${ALTO} Z`} fill={monte1} />
           <Path d={`M 0 ${yC + 14} L ${W * 0.2} ${yC - 8} L ${W * 0.34} ${yC + 8} L ${W * 0.52} ${yC - 14} L ${W * 0.68} ${yC + 6} L ${W} ${yC - 6} L ${W} ${ALTO} L 0 ${ALTO} Z`} fill={monte2} />
 
@@ -145,9 +147,36 @@ export function DibujoEmbalse({ e }: { e: Embalse }) {
               </G>
             );
           })()}
-          <Rect x={pieX - 18} y={SUELO - 22} width={22} height={13} rx={2} fill={hormigonOsc} />
-          <Polygon points={`${pieX - 20},${SUELO - 22} ${pieX + 6},${SUELO - 22} ${pieX - 7},${SUELO - 29}`} fill={c.suave} />
-          <Rect x={pieX - 13} y={SUELO - 18} width={4} height={4} fill={dia ? "#334155" : "#FFD25A"} />
+          {/* Toma y tubería forzada hacia la central (Barazar) */}
+          <Path d={`M ${presaX - 26} ${SUELO - 5} L ${pieX - 10} ${SUELO - 5}`} stroke={oscuro ? "#1F2937" : "#475569"} strokeWidth={7} strokeLinecap="round" />
+          <Path d={`M ${presaX - 26} ${SUELO - 5} L ${pieX - 10} ${SUELO - 5}`} stroke={turbina ? "#7DD3FC" : (oscuro ? "#374151" : "#94A3B8")}
+            strokeWidth={3} strokeLinecap="round" strokeDasharray={turbina ? "6 3" : undefined} />
+          <Rect x={presaX - 30} y={SUELO - 10} width={6} height={10} rx={1} fill={oscuro ? "#1F2937" : "#475569"} />
+          {/* La central */}
+          <Rect x={pieX - 18} y={SUELO - 22} width={24} height={14} rx={2} fill={hormigonOsc} />
+          <Polygon points={`${pieX - 20},${SUELO - 22} ${pieX + 8},${SUELO - 22} ${pieX - 6},${SUELO - 30}`} fill={c.suave} />
+          <Rect x={pieX - 14} y={SUELO - 18} width={4} height={4} fill={turbina || !dia ? "#FFD25A" : "#334155"} />
+          <Rect x={pieX - 6} y={SUELO - 18} width={4} height={4} fill={turbina || !dia ? "#FFD25A" : "#334155"} />
+          {turbina && (
+            <G>
+              <Circle cx={pieX - 6} cy={SUELO - 40} r={9} fill="#FFD25A" opacity={0.3} />
+              <Polygon points={`${pieX - 4},${SUELO - 50} ${pieX - 11},${SUELO - 39} ${pieX - 6},${SUELO - 39} ${pieX - 8},${SUELO - 30} ${pieX},${SUELO - 42} ${pieX - 5},${SUELO - 42}`} fill="#FFD25A" />
+            </G>
+          )}
+          {barazar && (
+            <G>
+              <Rect x={W * 0.26} y={8} width={W * 0.34} height={36} rx={10}
+                fill={turbina ? alfa("#FFD25A", 0.92) : alfa(oscuro ? "#000000" : "#FFFFFF", 0.55)} />
+              <SvgText x={W * 0.43} y={23} fontSize={11} fontWeight="800" textAnchor="middle"
+                fill={turbina ? "#1F2937" : (oscuro ? "#E5E7EB" : "#1F2937")}>
+                {turbina ? `⚡ Genera ≈ ${num(barazar.potenciaMw, 0)} MW` : "¿Genera luz? No se sabe"}
+              </SvgText>
+              <SvgText x={W * 0.43} y={37} fontSize={9.5} fontWeight="700" textAnchor="middle"
+                fill={turbina ? "#374151" : (oscuro ? "#9CA3AF" : "#4B5563")}>
+                {barazar.estado === "probable" ? "central de Barazar · casi seguro" : barazar.estado === "posible" ? "central de Barazar · posible" : "central de Barazar"}
+              </SvgText>
+            </G>
+          )}
           <SvgText x={presaX + corona / 2} y={yC - 9} fontSize={10} fontWeight="700" fill={oscuro ? "#E5E7EB" : "#1F2937"} textAnchor="middle">
             {`Presa ${num(coron, 0)} m`}
           </SvgText>
@@ -186,7 +215,7 @@ export function DibujoEmbalse({ e }: { e: Embalse }) {
           {e.salida != null && (
             <G>
               <Path d={`M ${pieX + 8} ${SUELO - 16} l 18 0 m -5 -4 l 5 4 l -5 4`} stroke={oscuro ? "#FFFFFF" : "#0F172A"} strokeWidth={2} fill="none" strokeLinecap="round" />
-              <SvgText x={W - 6} y={SUELO - 36} fontSize={11} fontWeight="800" fill={oscuro ? "#FFFFFF" : "#0F172A"} textAnchor="end">
+              <SvgText x={W - 6} y={turbina ? SUELO - 60 : SUELO - 36} fontSize={11} fontWeight="800" fill={oscuro ? "#FFFFFF" : "#0F172A"} textAnchor="end">
                 {`Sale ${num(e.salida, 1)} m³/s`}
               </SvgText>
             </G>

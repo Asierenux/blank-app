@@ -9,14 +9,14 @@ import { Barra, GraficaLinea } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
 import { hace, num } from "../lib/formato";
-import type { Embalse, Rio } from "../lib/panel";
+import type { Barazar, Embalse, Rio } from "../lib/panel";
 import { useColores } from "../lib/tema";
 
 const signo = (v: number | null, d = 1) => (v == null ? "—" : `${v > 0 ? "+" : ""}${num(v, d)}`);
 const fecha = (t: number) =>
   new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", day: "numeric", month: "short" }).format(new Date(t));
 
-function TarjetaEmbalse({ e }: { e: Embalse }) {
+function TarjetaEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | null }) {
   const c = useColores();
   return (
     <Tarjeta>
@@ -39,7 +39,7 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
         </View>
       </View>
       <Barra pct={e.porcentaje ?? 0} color={c.agua} marcas={[85]} />
-      <DibujoEmbalse e={e} />
+      <DibujoEmbalse e={e} barazar={barazar} />
       {e.balance && (
         <View style={{ backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12, gap: 2 }}>
           <Etiqueta>¿Se llena o se vacía? · últimas {e.balance.horas} h</Etiqueta>
@@ -184,7 +184,21 @@ export default function Agua() {
       <Seccion titulo="Embalses">
         {ejEmb && !ejEmb.ok && <Aviso nivel="aviso" texto={`Embalses: ${ejEmb.error}`} />}
         {erroresEmb.length > 0 && <Aviso nivel="aviso" texto={erroresEmb.join(" · ")} />}
-        {agua.embalses.map(e => <TarjetaEmbalse key={e.id} e={e} />)}
+        {agua.barazar && (
+          <Tarjeta>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+              <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700", flex: 1 }}>⚡ ¿Generan luz?</Text>
+              <Insignia nivel={agua.barazar.estado === "probable" ? "ok" : agua.barazar.estado === "posible" ? "aviso" : "info"}
+                texto={agua.barazar.estado === "probable" ? "Casi seguro" : agua.barazar.estado === "posible" ? "Posible" : "No se sabe"} />
+            </View>
+            {agua.barazar.estado !== "no" && <Cifra valor={`≈ ${num(agua.barazar.potenciaMw, 0)}`} unidad="MW" />}
+            <Etiqueta>{agua.barazar.texto}</Etiqueta>
+            <Etiqueta>
+              {`El agua de los dos embalses (unidos por una tubería) sale hacia Bilbao por el salto de Barazar: 330 m de caída y 84 MW. Calculado con lo que pierden en 24 h; Iberdrola no publica su producción en directo.${agua.barazar.estado !== "no" && agua.barazar.potenciaMw > 0 ?` ${num(agua.barazar.potenciaMw, 0)} MW dan luz a unas ${num(Math.round(agua.barazar.potenciaMw * 1000 / 0.4 / 1000) * 1000, 0)} casas.` : ""}`}
+            </Etiqueta>
+          </Tarjeta>
+        )}
+        {agua.embalses.map(e => <TarjetaEmbalse key={e.id} e={e} barazar={agua.barazar} />)}
         <Text onPress={() => Linking.openURL("https://www.embalses.net/")} style={{ color: c.acento, fontSize: 14, paddingHorizontal: 4 }}>
           Datos del SAIH Ebro (cada pocas horas, sin confirmar) y del boletín semanal oficial · embalses.net ↗
         </Text>

@@ -322,6 +322,48 @@ export function estadoCompuertas(nivel: number | null, aliviadero: number | unde
   return { estado: "posibles", texto: "El agua está sobre el aliviadero: pueden abrirse para desembalsar (su posición no es pública)." };
 }
 
+/** Central de Barazar (Iberdrola): turbina el agua de Ullíbarri y Urrunaga camino de Undurraga y Bilbao. */
+export const BARAZAR = { potenciaMw: 84, saltoM: 330, rendimiento: 0.88 };
+
+export interface Barazar {
+  /** Agua que pierden juntos los dos embalses (m³/s, positivo = se vacían) */
+  perdidaM3s: number;
+  /** Potencia si toda esa agua pasara por las turbinas (MW, máx. 84) */
+  potenciaMw: number;
+  estado: "probable" | "posible" | "no";
+  texto: string;
+}
+
+/** MW que da un caudal en Barazar: ρ·g·Q·H·η */
+export const potenciaBarazar = (q: number) =>
+  Math.min(BARAZAR.potenciaMw, (1000 * 9.81 * q * BARAZAR.saltoM * BARAZAR.rendimiento) / 1e6);
+
+/**
+ * ¿Están generando luz? Iberdrola no publica la producción de Barazar (solo con clave de e·sios),
+ * pero se puede deducir: si los dos embalses (unidos por una tubería) pierden agua y las compuertas
+ * no pueden soltarla (agua bajo el aliviadero), esa agua sale casi seguro por el salto de Barazar.
+ */
+export function estimarBarazar(embalses: Embalse[]): Barazar | null {
+  const conBalance = embalses.filter(e => e.balance);
+  if (!conBalance.length) return null;
+  const perdida = -conBalance.reduce((a, e) => a + e.balance!.m3s, 0);
+  const alRio = embalses.reduce((a, e) => a + (e.salida ?? 0), 0);
+  const q = Math.max(0, perdida - alRio);
+  const potencia = Math.round(potenciaBarazar(q) * 10) / 10;
+  const cerradas = embalses.every(e => !e.compuertas || e.compuertas.estado === "cerradas");
+  if (perdida < 1.5) {
+    return { perdidaM3s: Math.round(perdida * 10) / 10, potenciaMw: 0, estado: "no",
+      texto: "Los embalses no pierden agua: si Barazar funciona, solo turbina lo que entra (no se puede saber)." };
+  }
+  const estado = cerradas && q >= 2 ? "probable" : q >= 2 ? "posible" : "no";
+  const texto = estado === "probable"
+    ? `Pierden ${num(perdida, 1)} m³/s y las compuertas no pueden soltar agua: casi seguro que sale por Barazar, generando unos ${num(potencia, 0)} MW.`
+    : estado === "posible"
+      ? `Pierden ${num(perdida, 1)} m³/s: parte puede ir al Zadorra por las compuertas. Si fuera toda por Barazar, unos ${num(potencia, 0)} MW.`
+      : `Pierden ${num(perdida, 1)} m³/s, que salen por el río aguas abajo.`;
+  return { perdidaM3s: Math.round(perdida * 10) / 10, potenciaMw: potencia, estado, texto };
+}
+
 function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number): Embalse {
   const info = h.extra<Record<string, InfoEmbalse>>("infoEmbalses")?.[e.id];
   // Primero el SAIH (al momento); si no hay, el boletín semanal
@@ -584,7 +626,7 @@ export function construirPanel(h: Historial, u: Umbrales, configuradas: Record<s
     kapildui: INDICADORES_KAPILDUI.map(d => construirIndicador(h, u, d, ahora)),
     pvpc: construirPvpc(h, ahora),
     agua: {
-      embalses, rios,
+      embalses, rios, barazar: estimarBarazar(embalses),
       lluvia: { h24: lluviaAcumulada(h, ahora, 24), h72: lluviaAcumulada(h, ahora, 72), d7: lluviaAcumulada(h, ahora, 168) },
     },
     trafico,
