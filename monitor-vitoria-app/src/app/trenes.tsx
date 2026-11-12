@@ -1,7 +1,8 @@
 /**
  * Trenes: panel de control de la red.
  *  - España: todos los trenes de Renfe en circulación (AVE, Avlo, Avant, Alvia, Intercity, Media
- *    Distancia, Regionales) con su posición real (Visor de trenes de Renfe, cada 15 s).
+ *    Distancia, Regionales y Cercanías) con su posición GPS real (datos abiertos oficiales de Renfe),
+ *    y los de Ouigo en su posición SEGÚN HORARIO (Ouigo no publica GPS; Iryo no publica nada).
  *  - Cerca de Vitoria: los de a menos de 100 km, más Euskotren (posición estimada).
  * Al tocar un tren: su recorrido completo con horas (horario oficial), el rastro por donde ha ido
  * desde que la app está abierta, dónde se ha parado y cuánto tiempo, velocidad y retraso.
@@ -21,7 +22,9 @@ import { itinerariosDemo, rastrosDemo, trenesDemo } from "../lib/demo";
 import { ESTACIONES_RENFE } from "../lib/estacionesRenfe";
 import { fechaMadrid, hace, hora } from "../lib/formato";
 import { HorarioRenfe, itinerarioDe, type Itinerario, type Itinerarios } from "../lib/fuentes/itinerarios";
-import { estadoTrenes, type EstadoTrenes, type Tren } from "../lib/fuentes/trenes";
+import { Ouigo } from "../lib/fuentes/ouigo";
+import { estadoTrenes } from "../lib/fuentes/redTrenes";
+import type { EstadoTrenes, Tren } from "../lib/fuentes/trenes";
 import { detectarParadas, SeguimientoTrenes, velocidad, type ParadaDetectada } from "../lib/seguimientoTrenes";
 import { alfa, useColores, type Colores } from "../lib/tema";
 import type { Nivel } from "../lib/tipos";
@@ -32,10 +35,11 @@ const CORTO: Record<string, string> = {
   AVE: "AVE", Avant: "AVT", Alvia: "ALV", Intercity: "IC", "Media Distancia": "MD", "Regional Exprés": "RX",
   Regional: "R", Proximidad: "P", AVLO: "AVLO", Tren: "T",
 };
-const ALTA = new Set(["AVE", "AVLO", "Avant", "Alvia"]);
+const ALTA = new Set(["AVE", "AVLO", "Avant", "Alvia", "Euromed"]);
+const ouigo = new Ouigo((u, o) => fetch(u, o));
 
 type Alcance = "espana" | "vitoria";
-type Filtro = "todos" | "alta" | "resto" | "retraso" | "parados" | "euskotren";
+type Filtro = "todos" | "alta" | "resto" | "cercanias" | "ouigo" | "retraso" | "parados" | "euskotren";
 
 // ---- Seguimiento y horario: viven mientras la app está abierta (y el rastro se guarda en el móvil)
 const CLAVE_RASTROS = "mv1:rastrosTrenes";
@@ -58,14 +62,17 @@ const horario = new HorarioRenfe((u, o) => fetch(u, o), {
 });
 
 const nivelRetraso = (m: number): Nivel => (m >= 30 ? "critico" : m >= 10 ? "aviso" : "ok");
-const textoRetraso = (m: number) => (m >= 2 ? `+${m} min` : m <= -2 ? `${m} min` : "En hora");
-const etiqueta = (t: Tren) => (t.operador === "Euskotren" ? t.tipo.replace("Euskotren ", "") : CORTO[t.tipo] ?? "T");
+const textoRetraso = (m: number, t?: Tren) => (t?.cortadoPor ? "¿Suprimido?" : t?.sinRetraso ? "Horario" : m >= 2 ? `+${m} min` : m <= -2 ? `${m} min` : "En hora");
+const etiqueta = (t: Tren) => (t.operador === "Euskotren" ? t.tipo.replace("Euskotren ", "") : t.red === "cercanias" ? t.linea ?? "C"
+  : t.operador === "Ouigo" ? "OUIGO" : CORTO[t.tipo] ?? "T");
 const ruta = (t: Tren) => (t.origen ? `${t.origen} → ${t.destino}` : `${t.tipo} → ${t.destino}`);
 const nombreTren = (t: Tren) => (t.operador === "Renfe" ? `${t.tipo} ${t.id}` : t.tipo);
 const hm = (min: number) => `${Math.floor(min / 60) % 24}:${String(Math.round(min) % 60).padStart(2, "0")}`;
 const duracion = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`);
 
-function colorRetraso(c: Colores, m: number) {
+function colorRetraso(c: Colores, m: number, t?: Tren) {
+  if (t?.cortadoPor) return "#8E8E93";        // su línea está cortada según Adif
+  if (t?.sinRetraso) return "#E6007E";      // Ouigo (según horario): su color, sin semáforo
   const n = nivelRetraso(m);
   return n === "critico" ? c.critico : n === "aviso" ? c.aviso : c.ok;
 }
@@ -73,11 +80,12 @@ function colorRetraso(c: Colores, m: number) {
 function Chapa({ t, c, grande = false, parado = false }: { t: Tren; c: Colores; grande?: boolean; parado?: boolean }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: grande ? 8 : 4, height: grande ? 28 : 20,
-      borderRadius: t.operador === "Euskotren" ? 5 : 10, backgroundColor: colorRetraso(c, t.retrasoMin), borderWidth: grande ? 2.5 : 1.5,
+      borderRadius: t.operador === "Euskotren" || t.red === "cercanias" ? 5 : 10, backgroundColor: colorRetraso(c, t.retrasoMin, t),
+      borderStyle: t.sinRetraso ? "dashed" : "solid", opacity: t.sinRetraso && !grande ? 0.85 : 1, borderWidth: grande ? 2.5 : 1.5,
       borderColor: parado ? "#111827" : t.operador === "Euskotren" ? (t.color ?? "#fff") : "#fff",
       shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
       <Text style={{ color: "#fff", fontSize: grande ? 13 : 9.5, fontWeight: "800" }}>
-        {parado ? "⏸ " : ""}{etiqueta(t)}{t.retrasoMin >= 2 ? ` +${t.retrasoMin}` : ""}
+        {parado ? "⏸ " : ""}{etiqueta(t)}{t.retrasoMin >= 2 && !t.sinRetraso ? ` +${t.retrasoMin}` : ""}
       </Text>
     </View>
   );
@@ -106,7 +114,7 @@ export default function Trenes() {
   const [verMas, setVerMas] = useState(false);
   const [verAvisos, setVerAvisos] = useState(false);
   const [, setTic] = useState(0);
-  const previos = useRef<Tren[]>([]);
+  const itRef = useRef<Itinerarios | null>(null);
   const mapa = useRef<MapView>(null);
 
   const refrescar = useCallback(async () => {
@@ -114,11 +122,11 @@ export default function Trenes() {
     try {
       const seg = await cargarSeguimiento();
       const ahora = Date.now();
-      const e = DEMO ? trenesDemo(ahora) : await estadoTrenes((u, o) => fetch(u, o), previos.current, ahora, {
-        radioKm: Infinity,
+      const e = DEMO ? trenesDemo(ahora) : await estadoTrenes((u, o) => fetch(u, o), ahora, {
+        radioKm: Infinity, itinerarios: itRef.current,
         euskotren: () => transporte.trenesEuskotren(), avisosEuskotren: () => transporte.avisosEuskotren(),
+        ouigo: () => ouigo.trenes(ahora),
       });
-      if (e.trenes.length) previos.current = e.trenes;
       seg.anotar(e.trenes, ahora);
       guardarSeguimiento();
       setEstado(e);
@@ -137,8 +145,8 @@ export default function Trenes() {
   // El horario oficial (recorridos) se baja una vez al día, al entrar en la pestaña
   useEffect(() => {
     if (DEMO) { setItinerarios(itinerariosDemo()); return; }
-    horario.itinerarios().then(setItinerarios).catch(() => undefined);
-  }, []);
+    horario.itinerarios().then(it => { itRef.current = it; setItinerarios(it); void refrescar(); }).catch(() => undefined);
+  }, [refrescar]);
 
   const ahora = Date.now();
   const seg = seguimiento;
@@ -149,10 +157,11 @@ export default function Trenes() {
     return p?.sigue ? p : null;
   };
   const enVia = (t: Tren) => { const p = paradoAhora(t); return !!p && !p.estacion && t.estado !== "estacion"; };
-  const visibles = alcance === "vitoria" ? todos.filter(t => t.distanciaKm <= 100) : todos.filter(t => t.operador === "Renfe");
+  const visibles = alcance === "vitoria" ? todos.filter(t => t.distanciaKm <= 100) : todos.filter(t => t.operador !== "Euskotren");
   const texto = buscar.trim().toLowerCase();
   const lista = useMemo(() => visibles.filter(t =>
-    (filtro === "todos" || (filtro === "alta" && ALTA.has(t.tipo)) || (filtro === "resto" && t.operador === "Renfe" && !ALTA.has(t.tipo))
+    (filtro === "todos" || (filtro === "alta" && ALTA.has(t.tipo)) || (filtro === "resto" && t.red === "ld" && !ALTA.has(t.tipo))
+      || (filtro === "cercanias" && t.red === "cercanias") || (filtro === "ouigo" && t.operador === "Ouigo")
       || (filtro === "retraso" && t.retrasoMin >= 15) || (filtro === "parados" && enVia(t)) || (filtro === "euskotren" && t.operador === "Euskotren"))
     && (!texto || [t.id, t.tipo, t.origen, t.destino, t.anterior, t.siguiente].some(x => x.toLowerCase().includes(texto))))
     .sort((a, b) => (alcance === "vitoria" ? a.distanciaKm - b.distanciaKm : b.retrasoMin - a.retrasoMin)),
@@ -161,13 +170,16 @@ export default function Trenes() {
   const tren = todos.find(t => t.id === elegido) ?? null;
 
   // Resumen de la red
-  const renfe = todos.filter(t => t.operador === "Renfe");
+  // El resumen es de la red de larga distancia y AV de Renfe (Cercanías aparte)
+  const renfe = todos.filter(t => t.red === "ld");
+  const cercanias = todos.filter(t => t.red === "cercanias");
   const conRetraso = renfe.filter(t => t.retrasoMin >= 15).length;
   const parados = renfe.filter(enVia);
   const medio = renfe.length ? Math.round(renfe.reduce((a, t) => a + Math.max(0, t.retrasoMin), 0) / renfe.length) : 0;
 
   // Del tren elegido: recorrido, rastro y paradas
-  const it = tren && itinerarios ? itinerarioDe(itinerarios, tren.id, fechaMadrid(ahora)) : null;
+  const it: Itinerario | null = tren?.recorrido ? { inicio: "", fin: "", paradas: tren.recorrido }
+    : tren && itinerarios && tren.red === "ld" ? itinerarioDe(itinerarios, tren.id, fechaMadrid(ahora)) : null;
   const rastro = tren && seg ? seg.rastro(tren.id) : [];
   const paradas: ParadaDetectada[] = tren ? detectarParadas(rastro, ahora) : [];
   const vel = tren && !tren.estimada ? velocidad(rastro) : null;
@@ -176,7 +188,7 @@ export default function Trenes() {
 
   const elegir = (t: Tren) => {
     setElegido(t.id);
-    const itn = itinerarios ? itinerarioDe(itinerarios, t.id, fechaMadrid(Date.now())) : null;
+    const itn = t.recorrido ? { paradas: t.recorrido } : itinerarios && t.red === "ld" ? itinerarioDe(itinerarios, t.id, fechaMadrid(Date.now())) : null;
     const puntos = (itn?.paradas ?? []).map(([s]) => ESTACIONES_RENFE[s]).filter(Boolean).map(([, latitude, longitude]) => ({ latitude, longitude }));
     puntos.push({ latitude: t.lat, longitude: t.lon });
     if (puntos.length > 1 && mapa.current?.fitToCoordinates) {
@@ -193,7 +205,9 @@ export default function Trenes() {
   const chips: [Filtro, string][] = [
     ["todos", `Todos · ${visibles.length}`],
     ["alta", `Alta velocidad · ${visibles.filter(t => ALTA.has(t.tipo)).length}`],
-    ["resto", `MD y regionales · ${visibles.filter(t => t.operador === "Renfe" && !ALTA.has(t.tipo)).length}`],
+    ["resto", `MD y regionales · ${visibles.filter(t => t.red === "ld" && !ALTA.has(t.tipo)).length}`],
+    ["cercanias", `Cercanías · ${visibles.filter(t => t.red === "cercanias").length}`],
+    ["ouigo", `Ouigo (horario) · ${visibles.filter(t => t.operador === "Ouigo").length}`],
     ["retraso", `+15 min · ${visibles.filter(t => t.retrasoMin >= 15).length}`],
     ["parados", `Parados en vía · ${visibles.filter(enVia).length}`],
     ...(alcance === "vitoria" ? [["euskotren", `Euskotren · ${visibles.filter(t => t.operador === "Euskotren").length}`] as [Filtro, string]] : []),
@@ -201,7 +215,8 @@ export default function Trenes() {
   const avisos = estado?.avisos ?? [];
   const adif = avisos.filter(a => a.fuente === "Adif" && !a.ascensor);
   const otros = avisos.filter(a => a.fuente !== "Adif" && !a.ascensor);
-  const enMapa = tren ? [tren] : lista;
+  // Las Cercanías (cientos) solo se pintan si se eligen o se buscan, para que el mapa se lea
+  const enMapa = tren ? [tren] : filtro === "cercanias" || texto ? lista : lista.filter(t => t.red !== "cercanias");
 
   return (
     <View style={{ flex: 1, backgroundColor: c.fondo }}>
@@ -213,7 +228,7 @@ export default function Trenes() {
           </Text>
         </View>
         <Segmentos<Alcance> valor={alcance} cambiar={cambiarAlcance} opciones={[
-          { valor: "espana", texto: `🇪🇸 Toda la red${renfe.length ? ` · ${renfe.length}` : ""}` },
+          { valor: "espana", texto: `🇪🇸 Toda España${renfe.length ? ` · ${renfe.length + cercanias.length}` : ""}` },
           { valor: "vitoria", texto: "📍 Cerca de Vitoria" },
         ]} />
       </View>
@@ -269,6 +284,9 @@ export default function Trenes() {
                 </View>
                 <Pressable onPress={() => setElegido(null)} hitSlop={10}><Text style={{ color: c.acento, fontSize: 16 }}>Cerrar</Text></Pressable>
               </View>
+              {tren.cortadoPor && (
+                <Aviso nivel="critico" texto={`Adif: «${tren.cortadoPor}». Este tren va por esa línea, así que probablemente no circula (Ouigo no publica si lo ha suprimido).`} />
+              )}
               <Text style={{ color: parado && !parado.estacion ? c.critico : c.texto, fontSize: 16, fontWeight: "700" }}>
                 {parado
                   ? `⏸ Parado ${parado.estacion ? `en ${parado.estacion}` : `en plena vía entre ${tren.anterior} y ${tren.siguiente}`} desde las ${hora(parado.desde)} (${duracion(parado.minutos)})`
@@ -277,7 +295,7 @@ export default function Trenes() {
               </Text>
               <View style={{ flexDirection: "row", gap: 8 }}>
                 {[
-                  ["Retraso", textoRetraso(tren.retrasoMin), colorRetraso(c, tren.retrasoMin)],
+                  ["Retraso", textoRetraso(tren.retrasoMin, tren), colorRetraso(c, tren.retrasoMin, tren)],
                   ["Velocidad", parado ? "0 km/h" : vel != null ? `≈ ${vel} km/h` : "—", c.texto],
                   ["Próxima", tren.llegadaSiguiente ? hora(tren.llegadaSiguiente) : "—", c.texto],
                 ].map(([t, v, col]) => (
@@ -288,13 +306,15 @@ export default function Trenes() {
                 ))}
               </View>
               <Etiqueta>
-                {tren.estimada
+                {tren.operador === "Ouigo"
+                  ? "Posición SEGÚN HORARIO: Ouigo no publica el GPS ni los retrasos de sus trenes. Si va con retraso o está parado, no se puede saber."
+                  : tren.estimada
                   ? "Posición estimada: Euskotren no publica el GPS de sus trenes (se calcula con su horario en tiempo real)."
                   : `Posición GPS ${hace(tren.t)}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
               </Etiqueta>
             </Tarjeta>
 
-            <Tarjeta>
+            {!tren.estimada && <Tarjeta>
               <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Paradas detectadas</Text>
               {paradas.length === 0 && (
                 <Etiqueta>{rastro.length > 1 ? "No se ha parado más de 2 min desde que lo sigues." : "Se empieza a seguir ahora: su rastro y sus paradas aparecerán aquí."}</Etiqueta>
@@ -310,7 +330,7 @@ export default function Trenes() {
                 </View>
               ))}
               <Etiqueta>{`Rastro desde las ${rastro[0] ? hora(rastro[0][0]) : "—"} (mientras la app está abierta; se guarda 5 h).`}</Etiqueta>
-            </Tarjeta>
+            </Tarjeta>}
 
             <Tarjeta>
               <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Recorrido</Text>
@@ -325,7 +345,7 @@ export default function Trenes() {
                       <View style={{ position: "absolute", top: i === 0 ? 15 : 0, bottom: i === it.paradas.length - 1 ? 15 : 0, width: 3,
                         backgroundColor: pasada ? c.acento : c.linea }} />
                       <View style={{ marginTop: 9, width: siguiente ? 14 : 10, height: siguiente ? 14 : 10, borderRadius: 7,
-                        backgroundColor: pasada ? c.acento : siguiente ? colorRetraso(c, tren.retrasoMin) : c.tarjeta, borderWidth: 2,
+                        backgroundColor: pasada ? c.acento : siguiente ? colorRetraso(c, tren.retrasoMin, tren) : c.tarjeta, borderWidth: 2,
                         borderColor: pasada ? c.acento : c.suave }} />
                     </View>
                     <Text style={{ flex: 1, color: pasada ? c.tenue : c.texto, fontSize: 14, fontWeight: siguiente ? "800" : "500" }}>
@@ -335,7 +355,7 @@ export default function Trenes() {
                       {hm(prevista)}
                     </Text>
                     {estimada != null && (
-                      <Text style={{ color: colorRetraso(c, tren.retrasoMin), fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] }}>{hm(estimada)}</Text>
+                      <Text style={{ color: colorRetraso(c, tren.retrasoMin, tren), fontSize: 13, fontWeight: "700", fontVariant: ["tabular-nums"] }}>{hm(estimada)}</Text>
                     )}
                   </View>
                 );
@@ -345,14 +365,15 @@ export default function Trenes() {
           </>
         ) : (
           /* ---------------- Resumen de la red ---------------- */
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {[
-              ["Circulando", String(renfe.length), c.texto],
+              ["AV, larga y media distancia", String(renfe.length), c.texto],
+              ["Cercanías", String(cercanias.length), c.texto],
               ["Con +15 min", String(conRetraso), conRetraso ? c.aviso : c.ok],
               ["Parados en vía", String(parados.length), parados.length ? c.critico : c.ok],
               ["Retraso medio", `${medio} min`, medio >= 10 ? c.aviso : c.ok],
             ].map(([t, v, col]) => (
-              <View key={t} style={{ flex: 1, backgroundColor: c.tarjeta, borderRadius: 14, padding: 10, gap: 2 }}>
+              <View key={t} style={{ flexGrow: 1, flexBasis: "30%", backgroundColor: c.tarjeta, borderRadius: 14, padding: 10, gap: 2 }}>
                 <Text style={{ color: col, fontSize: 19, fontWeight: "800" }} numberOfLines={1} adjustsFontSizeToFit>{v}</Text>
                 <Text style={{ color: c.suave, fontSize: 11, lineHeight: 13 }} numberOfLines={2}>{t}</Text>
               </View>
@@ -385,11 +406,12 @@ export default function Trenes() {
                     <View style={{ flex: 1, gap: 1 }}>
                       <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{ruta(t)}</Text>
                       <Text numberOfLines={1} style={{ color: p && !p.estacion ? c.critico : c.suave, fontSize: 12.5 }}>
-                        {p && !p.estacion ? `⏸ Parado en vía ${duracion(p.minutos)} · ${t.anterior} → ${t.siguiente}`
+                        {t.cortadoPor ? "⚠️ Línea cortada (Adif): probablemente no circula"
+                          : p && !p.estacion ? `⏸ Parado en vía ${duracion(p.minutos)} · ${t.anterior} → ${t.siguiente}`
                           : t.estado === "estacion" ? `${t.estimada ? "≈ " : ""}En ${t.siguiente}` : `${t.estimada ? "≈ " : ""}${t.anterior} → ${t.siguiente}`}
                       </Text>
                     </View>
-                    <Text style={{ color: colorRetraso(c, t.retrasoMin), fontWeight: "800", fontSize: 13 }}>{textoRetraso(t.retrasoMin)}</Text>
+                    <Text style={{ color: colorRetraso(c, t.retrasoMin, t), fontWeight: "800", fontSize: 13 }}>{textoRetraso(t.retrasoMin, t)}</Text>
                   </Pressable>
                 );
               })}
@@ -427,8 +449,9 @@ export default function Trenes() {
               </Tarjeta>
             )}
             <Etiqueta>
-              Renfe publica la posición GPS de sus trenes de alta velocidad, larga y media distancia (cada ~15 s). Iryo y Ouigo no
-              publican la suya. "Parado en vía": quieto 2 min o más lejos de una estación, según su rastro.
+              Renfe publica en abierto la posición GPS y el retraso de todos sus trenes (alta velocidad, larga y media distancia y
+              Cercanías). Ouigo solo publica su horario: sus trenes salen donde deberían estar (rosa, borde discontinuo). Iryo no
+              publica nada, así que no aparece. "Parado en vía": quieto 2 min o más lejos de una estación, según su rastro.
             </Etiqueta>
           </>
         )}

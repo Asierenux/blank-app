@@ -1,0 +1,3700 @@
+{
+  "header": {
+    "gtfsRealtimeVersion": "2.0",
+    "timestamp": "1794498110"
+  },
+  "entity": [{
+    "id": "VP_12685",
+    "vehicle": {
+      "trip": {
+        "tripId": "1268512026-11-11"
+      },
+      "position": {
+        "latitude": 43.489944,
+        "longitude": -8.228837
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "21008",
+      "vehicle": {
+        "id": "12685",
+        "label": "12685"
+      }
+    }
+  }, {
+    "id": "VP_04334",
+    "vehicle": {
+      "trip": {
+        "tripId": "0433412026-11-12"
+      },
+      "position": {
+        "latitude": 42.284863,
+        "longitude": -7.827175
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "08251",
+      "vehicle": {
+        "id": "04334",
+        "label": "04334"
+      }
+    }
+  }, {
+    "id": "VP_04334",
+    "vehicle": {
+      "trip": {
+        "tripId": "0433422026-11-12"
+      },
+      "position": {
+        "latitude": 42.284863,
+        "longitude": -7.827175
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "08251",
+      "vehicle": {
+        "id": "04334",
+        "label": "04334"
+      }
+    }
+  }, {
+    "id": "VP_04384",
+    "vehicle": {
+      "trip": {
+        "tripId": "0438412026-11-11"
+      },
+      "position": {
+        "latitude": 42.340416,
+        "longitude": -8.610642
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "23004",
+      "vehicle": {
+        "id": "04384",
+        "label": "04384"
+      }
+    }
+  }, {
+    "id": "VP_12960",
+    "vehicle": {
+      "trip": {
+        "tripId": "1296012026-11-11"
+      },
+      "position": {
+        "latitude": 42.519577,
+        "longitude": -8.104719
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "31308",
+      "vehicle": {
+        "id": "12960",
+        "label": "12960"
+      }
+    }
+  }, {
+    "id": "VP_13032",
+    "vehicle": {
+      "trip": {
+        "tripId": "1303212026-11-11"
+      },
+      "position": {
+        "latitude": 36.474426,
+        "longitude": -6.2585244
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "51405",
+      "vehicle": {
+        "id": "13032",
+        "label": "13032"
+      }
+    }
+  }, {
+    "id": "VP_04969",
+    "vehicle": {
+      "trip": {
+        "tripId": "0496912026-11-12"
+      },
+      "position": {
+        "latitude": 41.029102,
+        "longitude": -5.559926
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "30100",
+      "vehicle": {
+        "id": "04969",
+        "label": "04969"
+      }
+    }
+  }, {
+    "id": "VP_04969",
+    "vehicle": {
+      "trip": {
+        "tripId": "0496922026-11-12"
+      },
+      "position": {
+        "latitude": 41.029102,
+        "longitude": -5.559926
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "30100",
+      "vehicle": {
+        "id": "04969",
+        "label": "04969"
+      }
+    }
+  }, {
+    "id": "VP_13014",
+    "vehicle": {
+      "trip": {
+        "tripId": "1301412026-11-11"
+      },
+      "position": {
+        "latitude": 36.930943,
+        "longitude": -6.09183
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "51205",
+      "vehicle": {
+        "id": "13014",
+        "label": "13014"
+      }
+    }
+  }, {
+    "id": "VP_05160",
+    "vehicle": {
+      "trip": {
+        "tripId": "0516012026-11-11"
+      },
+      "position": {
+        "latitude": 39.767044,
+        "longitude": -1.9624866
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "03216",
+      "vehicle": {
+        "id": "05160",
+        "label": "05160"
+      }
+    }
+  }, {
+    "id": "VP_13015",
+    "vehicle": {
+      "trip": {
+        "tripId": "1301512026-11-11"
+      },
+      "position": {
+        "latitude": 37.387665,
+        "longitude": -5.9778624
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "51003",
+      "vehicle": {
+        "id": "13015",
+        "label": "13015"
+      }
+    }
+  }, {
+    "id": "VP_05162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0516212026-11-11"
+      },
+      "position": {
+        "latitude": 39.157887,
+        "longitude": -1.9882628
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60600",
+      "vehicle": {
+        "id": "05162",
+        "label": "05162"
+      }
+    }
+  }, {
+    "id": "VP_13017",
+    "vehicle": {
+      "trip": {
+        "tripId": "1301712026-11-11"
+      },
+      "position": {
+        "latitude": 36.468933,
+        "longitude": -6.206217
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "51400",
+      "vehicle": {
+        "id": "13017",
+        "label": "13017"
+      }
+    }
+  }, {
+    "id": "VP_05170",
+    "vehicle": {
+      "trip": {
+        "tripId": "0517012026-11-11"
+      },
+      "position": {
+        "latitude": 40.404823,
+        "longitude": -3.6894693
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "03208",
+      "vehicle": {
+        "id": "05170",
+        "label": "05170"
+      }
+    }
+  }, {
+    "id": "VP_13226",
+    "vehicle": {
+      "trip": {
+        "tripId": "1322612026-11-11"
+      },
+      "position": {
+        "latitude": 37.912514,
+        "longitude": -4.7206798
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "50500",
+      "vehicle": {
+        "id": "13226",
+        "label": "13226"
+      }
+    }
+  }, {
+    "id": "VP_05178",
+    "vehicle": {
+      "trip": {
+        "tripId": "0517812026-11-11"
+      },
+      "position": {
+        "latitude": 39.94196,
+        "longitude": -3.5043159
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "03208",
+      "vehicle": {
+        "id": "05178",
+        "label": "05178"
+      }
+    }
+  }, {
+    "id": "VP_13909",
+    "vehicle": {
+      "trip": {
+        "tripId": "1390912026-11-11"
+      },
+      "position": {
+        "latitude": 36.806713,
+        "longitude": -4.707016
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "54405",
+      "vehicle": {
+        "id": "13909",
+        "label": "13909"
+      }
+    }
+  }, {
+    "id": "VP_14003",
+    "vehicle": {
+      "trip": {
+        "tripId": "1400312026-11-11"
+      },
+      "position": {
+        "latitude": 38.503166,
+        "longitude": -0.8015471
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60905",
+      "vehicle": {
+        "id": "14003",
+        "label": "14003"
+      }
+    }
+  }, {
+    "id": "VP_05382",
+    "vehicle": {
+      "trip": {
+        "tripId": "0538212026-11-11"
+      },
+      "position": {
+        "latitude": 41.626995,
+        "longitude": -5.7902927
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "30200",
+      "vehicle": {
+        "id": "05382",
+        "label": "05382"
+      }
+    }
+  }, {
+    "id": "VP_05742",
+    "vehicle": {
+      "trip": {
+        "tripId": "0574212026-11-11"
+      },
+      "position": {
+        "latitude": 38.078415,
+        "longitude": -0.943378
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "62002",
+      "vehicle": {
+        "id": "05742",
+        "label": "05742"
+      }
+    }
+  }, {
+    "id": "VP_05742",
+    "vehicle": {
+      "trip": {
+        "tripId": "0574222026-11-11"
+      },
+      "position": {
+        "latitude": 38.078415,
+        "longitude": -0.943378
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "05742",
+        "label": "05742"
+      }
+    }
+  }, {
+    "id": "VP_14202",
+    "vehicle": {
+      "trip": {
+        "tripId": "1420212026-11-11"
+      },
+      "position": {
+        "latitude": 38.122627,
+        "longitude": -0.87429374
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "62100",
+      "vehicle": {
+        "id": "14202",
+        "label": "14202"
+      }
+    }
+  }, {
+    "id": "VP_14202",
+    "vehicle": {
+      "trip": {
+        "tripId": "1420222026-11-11"
+      },
+      "position": {
+        "latitude": 38.122627,
+        "longitude": -0.87429374
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "62100",
+      "vehicle": {
+        "id": "14202",
+        "label": "14202"
+      }
+    }
+  }, {
+    "id": "VP_14202",
+    "vehicle": {
+      "trip": {
+        "tripId": "1420232026-11-11"
+      },
+      "position": {
+        "latitude": 38.122627,
+        "longitude": -0.87429374
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "14202",
+        "label": "14202"
+      }
+    }
+  }, {
+    "id": "VP_05792",
+    "vehicle": {
+      "trip": {
+        "tripId": "0579212026-11-11"
+      },
+      "position": {
+        "latitude": 42.04563,
+        "longitude": -4.251649
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "10600",
+      "vehicle": {
+        "id": "05792",
+        "label": "05792"
+      }
+    }
+  }, {
+    "id": "VP_05792",
+    "vehicle": {
+      "trip": {
+        "tripId": "0579222026-11-11"
+      },
+      "position": {
+        "latitude": 42.04563,
+        "longitude": -4.251649
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "10600",
+      "vehicle": {
+        "id": "05792",
+        "label": "05792"
+      }
+    }
+  }, {
+    "id": "VP_05792",
+    "vehicle": {
+      "trip": {
+        "tripId": "0579232026-11-11"
+      },
+      "position": {
+        "latitude": 42.04563,
+        "longitude": -4.251649
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "05792",
+        "label": "05792"
+      }
+    }
+  }, {
+    "id": "VP_05863",
+    "vehicle": {
+      "trip": {
+        "tripId": "0586312026-11-11"
+      },
+      "position": {
+        "latitude": 39.000107,
+        "longitude": -1.8472564
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "03208",
+      "vehicle": {
+        "id": "05863",
+        "label": "05863"
+      }
+    }
+  }, {
+    "id": "VP_05863",
+    "vehicle": {
+      "trip": {
+        "tripId": "0586322026-11-11"
+      },
+      "position": {
+        "latitude": 39.000107,
+        "longitude": -1.8472564
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "03208",
+      "vehicle": {
+        "id": "05863",
+        "label": "05863"
+      }
+    }
+  }, {
+    "id": "VP_08173",
+    "vehicle": {
+      "trip": {
+        "tripId": "0817312026-11-11"
+      },
+      "position": {
+        "latitude": 40.290554,
+        "longitude": -3.6808722
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "08173",
+        "label": "08173"
+      }
+    }
+  }, {
+    "id": "VP_35623",
+    "vehicle": {
+      "trip": {
+        "tripId": "3562312026-11-11"
+      },
+      "position": {
+        "latitude": 39.05821,
+        "longitude": -0.47951615
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "64100",
+      "vehicle": {
+        "id": "35623",
+        "label": "35623"
+      }
+    }
+  }, {
+    "id": "VP_35623",
+    "vehicle": {
+      "trip": {
+        "tripId": "3562322026-11-11"
+      },
+      "position": {
+        "latitude": 39.05821,
+        "longitude": -0.47951615
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "64100",
+      "vehicle": {
+        "id": "35623",
+        "label": "35623"
+      }
+    }
+  }, {
+    "id": "VP_35623",
+    "vehicle": {
+      "trip": {
+        "tripId": "3562332026-11-11"
+      },
+      "position": {
+        "latitude": 39.05821,
+        "longitude": -0.47951615
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "35623",
+        "label": "35623"
+      }
+    }
+  }, {
+    "id": "VP_08175",
+    "vehicle": {
+      "trip": {
+        "tripId": "0817512026-11-11"
+      },
+      "position": {
+        "latitude": 37.668064,
+        "longitude": -5.52908
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "50500",
+      "vehicle": {
+        "id": "08175",
+        "label": "08175"
+      }
+    }
+  }, {
+    "id": "VP_14406",
+    "vehicle": {
+      "trip": {
+        "tripId": "1440612026-11-11"
+      },
+      "position": {
+        "latitude": 38.86615,
+        "longitude": -1.1031228
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "64100",
+      "vehicle": {
+        "id": "14406",
+        "label": "14406"
+      }
+    }
+  }, {
+    "id": "VP_08377",
+    "vehicle": {
+      "trip": {
+        "tripId": "0837712026-11-11"
+      },
+      "position": {
+        "latitude": 41.83271,
+        "longitude": 2.7371542
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "79300",
+      "vehicle": {
+        "id": "08377",
+        "label": "08377"
+      }
+    }
+  }, {
+    "id": "VP_14547",
+    "vehicle": {
+      "trip": {
+        "tripId": "1454712026-11-11"
+      },
+      "position": {
+        "latitude": 37.747013,
+        "longitude": -0.9672061
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "61304",
+      "vehicle": {
+        "id": "14547",
+        "label": "14547"
+      }
+    }
+  }, {
+    "id": "VP_08575",
+    "vehicle": {
+      "trip": {
+        "tripId": "0857512026-11-11"
+      },
+      "position": {
+        "latitude": 37.22678,
+        "longitude": -4.7413974
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "02002",
+      "vehicle": {
+        "id": "08575",
+        "label": "08575"
+      }
+    }
+  }, {
+    "id": "VP_15015",
+    "vehicle": {
+      "trip": {
+        "tripId": "1501512026-11-11"
+      },
+      "position": {
+        "latitude": 41.219936,
+        "longitude": 1.7309104
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71600",
+      "vehicle": {
+        "id": "15015",
+        "label": "15015"
+      }
+    }
+  }, {
+    "id": "VP_08764",
+    "vehicle": {
+      "trip": {
+        "tripId": "0876412026-11-11"
+      },
+      "position": {
+        "latitude": 37.888447,
+        "longitude": -4.789464
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "51003",
+      "vehicle": {
+        "id": "08764",
+        "label": "08764"
+      }
+    }
+  }, {
+    "id": "VP_08835",
+    "vehicle": {
+      "trip": {
+        "tripId": "0883512026-11-11"
+      },
+      "position": {
+        "latitude": 37.23209,
+        "longitude": -3.9853647
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05000",
+      "vehicle": {
+        "id": "08835",
+        "label": "08835"
+      }
+    }
+  }, {
+    "id": "VP_15016",
+    "vehicle": {
+      "trip": {
+        "tripId": "1501612026-11-11"
+      },
+      "position": {
+        "latitude": 41.208168,
+        "longitude": 1.7041192
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71700",
+      "vehicle": {
+        "id": "15016",
+        "label": "15016"
+      }
+    }
+  }, {
+    "id": "VP_09160",
+    "vehicle": {
+      "trip": {
+        "tripId": "0916012026-11-12"
+      },
+      "position": {
+        "latitude": 43.21697,
+        "longitude": -8.448725
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "31412",
+      "vehicle": {
+        "id": "09160",
+        "label": "09160"
+      }
+    }
+  }, {
+    "id": "VP_15018",
+    "vehicle": {
+      "trip": {
+        "tripId": "1501812026-11-11"
+      },
+      "position": {
+        "latitude": 41.111366,
+        "longitude": 1.2533424
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71502",
+      "vehicle": {
+        "id": "15018",
+        "label": "15018"
+      }
+    }
+  }, {
+    "id": "VP_09162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0916212026-11-12"
+      },
+      "position": {
+        "latitude": 43.10876,
+        "longitude": -8.4722395
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "31412",
+      "vehicle": {
+        "id": "09162",
+        "label": "09162"
+      }
+    }
+  }, {
+    "id": "VP_15044",
+    "vehicle": {
+      "trip": {
+        "tripId": "1504412026-11-11"
+      },
+      "position": {
+        "latitude": 41.18637,
+        "longitude": 1.4551821
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "72101",
+      "vehicle": {
+        "id": "15044",
+        "label": "15044"
+      }
+    }
+  }, {
+    "id": "VP_09167",
+    "vehicle": {
+      "trip": {
+        "tripId": "0916712026-11-11"
+      },
+      "position": {
+        "latitude": 38.356033,
+        "longitude": -0.5276254
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60911",
+      "vehicle": {
+        "id": "09167",
+        "label": "09167"
+      }
+    }
+  }, {
+    "id": "VP_15045",
+    "vehicle": {
+      "trip": {
+        "tripId": "1504512026-11-11"
+      },
+      "position": {
+        "latitude": 41.38422,
+        "longitude": 2.1855106
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71802",
+      "vehicle": {
+        "id": "15045",
+        "label": "15045"
+      }
+    }
+  }, {
+    "id": "VP_09171",
+    "vehicle": {
+      "trip": {
+        "tripId": "0917112026-11-12"
+      },
+      "position": {
+        "latitude": 42.8787,
+        "longitude": -8.5283785
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "22100",
+      "vehicle": {
+        "id": "09171",
+        "label": "09171"
+      }
+    }
+  }, {
+    "id": "VP_15218",
+    "vehicle": {
+      "trip": {
+        "tripId": "1521812026-11-11"
+      },
+      "position": {
+        "latitude": 41.107918,
+        "longitude": 1.2113302
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71500",
+      "vehicle": {
+        "id": "15218",
+        "label": "15218"
+      }
+    }
+  }, {
+    "id": "VP_09172",
+    "vehicle": {
+      "trip": {
+        "tripId": "0917212026-11-12"
+      },
+      "position": {
+        "latitude": 42.236073,
+        "longitude": -8.7090435
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "23004",
+      "vehicle": {
+        "id": "09172",
+        "label": "09172"
+      }
+    }
+  }, {
+    "id": "VP_15510",
+    "vehicle": {
+      "trip": {
+        "tripId": "1551012026-11-11"
+      },
+      "position": {
+        "latitude": 41.84968,
+        "longitude": 0.29123613
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "78400",
+      "vehicle": {
+        "id": "15510",
+        "label": "15510"
+      }
+    }
+  }, {
+    "id": "VP_09173",
+    "vehicle": {
+      "trip": {
+        "tripId": "0917312026-11-12"
+      },
+      "position": {
+        "latitude": 42.826756,
+        "longitude": -8.615066
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "23008",
+      "vehicle": {
+        "id": "09173",
+        "label": "09173"
+      }
+    }
+  }, {
+    "id": "VP_15609",
+    "vehicle": {
+      "trip": {
+        "tripId": "1560912026-11-11"
+      },
+      "position": {
+        "latitude": 41.62075,
+        "longitude": 0.633935
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "15609",
+        "label": "15609"
+      }
+    }
+  }, {
+    "id": "VP_09175",
+    "vehicle": {
+      "trip": {
+        "tripId": "0917512026-11-11"
+      },
+      "position": {
+        "latitude": 38.23523,
+        "longitude": -0.78171825
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "03412",
+      "vehicle": {
+        "id": "09175",
+        "label": "09175"
+      }
+    }
+  }, {
+    "id": "VP_15642",
+    "vehicle": {
+      "trip": {
+        "tripId": "1564212026-11-11"
+      },
+      "position": {
+        "latitude": 42.110016,
+        "longitude": -0.44699004
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "74204",
+      "vehicle": {
+        "id": "15642",
+        "label": "15642"
+      }
+    }
+  }, {
+    "id": "VP_08163",
+    "vehicle": {
+      "trip": {
+        "tripId": "0816312026-11-11"
+      },
+      "position": {
+        "latitude": 40.06154,
+        "longitude": -3.6740499
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "03208",
+      "vehicle": {
+        "id": "08163",
+        "label": "08163"
+      }
+    }
+  }, {
+    "id": "VP_15657",
+    "vehicle": {
+      "trip": {
+        "tripId": "1565712026-11-11"
+      },
+      "position": {
+        "latitude": 41.652718,
+        "longitude": -0.89602864
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "15657",
+        "label": "15657"
+      }
+    }
+  }, {
+    "id": "VP_15726",
+    "vehicle": {
+      "trip": {
+        "tripId": "1572612026-11-11"
+      },
+      "position": {
+        "latitude": 41.8412,
+        "longitude": 2.8006039
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "79300",
+      "vehicle": {
+        "id": "15726",
+        "label": "15726"
+      }
+    }
+  }, {
+    "id": "VP_15784",
+    "vehicle": {
+      "trip": {
+        "tripId": "1578412026-11-11"
+      },
+      "position": {
+        "latitude": 42.027363,
+        "longitude": 2.8750553
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "79300",
+      "vehicle": {
+        "id": "15784",
+        "label": "15784"
+      }
+    }
+  }, {
+    "id": "VP_09725",
+    "vehicle": {
+      "trip": {
+        "tripId": "0972512026-11-12"
+      },
+      "position": {
+        "latitude": 41.379074,
+        "longitude": 2.139723
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "79300",
+      "vehicle": {
+        "id": "09725",
+        "label": "09725"
+      }
+    }
+  }, {
+    "id": "VP_09725",
+    "vehicle": {
+      "trip": {
+        "tripId": "0972522026-11-11"
+      },
+      "position": {
+        "latitude": 41.379074,
+        "longitude": 2.139723
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "09725",
+        "label": "09725"
+      }
+    }
+  }, {
+    "id": "VP_09725",
+    "vehicle": {
+      "trip": {
+        "tripId": "0972532026-11-12"
+      },
+      "position": {
+        "latitude": 41.379074,
+        "longitude": 2.139723
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "09725",
+        "label": "09725"
+      }
+    }
+  }, {
+    "id": "VP_09742",
+    "vehicle": {
+      "trip": {
+        "tripId": "0974212026-11-11"
+      },
+      "position": {
+        "latitude": 43.024654,
+        "longitude": 3.0398784
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "04307",
+      "vehicle": {
+        "id": "09742",
+        "label": "09742"
+      }
+    }
+  }, {
+    "id": "VP_09742",
+    "vehicle": {
+      "trip": {
+        "tripId": "0974222026-11-11"
+      },
+      "position": {
+        "latitude": 43.024654,
+        "longitude": 3.0398784
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "04307",
+      "vehicle": {
+        "id": "09742",
+        "label": "09742"
+      }
+    }
+  }, {
+    "id": "VP_15868",
+    "vehicle": {
+      "trip": {
+        "tripId": "1586812026-11-11"
+      },
+      "position": {
+        "latitude": 41.39203,
+        "longitude": 2.1646564
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "15868",
+        "label": "15868"
+      }
+    }
+  }, {
+    "id": "VP_04142",
+    "vehicle": {
+      "trip": {
+        "tripId": "0414212026-11-12"
+      },
+      "position": {
+        "latitude": 41.090015,
+        "longitude": -4.4170613
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "17000",
+      "vehicle": {
+        "id": "04142",
+        "label": "04142"
+      }
+    }
+  }, {
+    "id": "VP_02149",
+    "vehicle": {
+      "trip": {
+        "tripId": "0214912026-11-11"
+      },
+      "position": {
+        "latitude": 43.329823,
+        "longitude": -4.035385
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "02149",
+        "label": "02149"
+      }
+    }
+  }, {
+    "id": "VP_04345",
+    "vehicle": {
+      "trip": {
+        "tripId": "0434512026-11-12"
+      },
+      "position": {
+        "latitude": 42.45017,
+        "longitude": -8.060761
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "31400",
+      "vehicle": {
+        "id": "04345",
+        "label": "04345"
+      }
+    }
+  }, {
+    "id": "VP_04345",
+    "vehicle": {
+      "trip": {
+        "tripId": "0434522026-11-12"
+      },
+      "position": {
+        "latitude": 42.45017,
+        "longitude": -8.060761
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "04345",
+        "label": "04345"
+      }
+    }
+  }, {
+    "id": "VP_00632",
+    "vehicle": {
+      "trip": {
+        "tripId": "0063212026-11-12"
+      },
+      "position": {
+        "latitude": 42.65189,
+        "longitude": -1.644878
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "80100",
+      "vehicle": {
+        "id": "00632",
+        "label": "00632"
+      }
+    }
+  }, {
+    "id": "VP_00632",
+    "vehicle": {
+      "trip": {
+        "tripId": "0063222026-11-12"
+      },
+      "position": {
+        "latitude": 42.65189,
+        "longitude": -1.644878
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "80100",
+      "vehicle": {
+        "id": "00632",
+        "label": "00632"
+      }
+    }
+  }, {
+    "id": "VP_00632",
+    "vehicle": {
+      "trip": {
+        "tripId": "0063232026-11-12"
+      },
+      "position": {
+        "latitude": 42.65189,
+        "longitude": -1.644878
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "00632",
+        "label": "00632"
+      }
+    }
+  }, {
+    "id": "VP_00632",
+    "vehicle": {
+      "trip": {
+        "tripId": "0063242026-11-12"
+      },
+      "position": {
+        "latitude": 42.65189,
+        "longitude": -1.644878
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "80100",
+      "vehicle": {
+        "id": "00632",
+        "label": "00632"
+      }
+    }
+  }, {
+    "id": "VP_00694",
+    "vehicle": {
+      "trip": {
+        "tripId": "0069412026-11-12"
+      },
+      "position": {
+        "latitude": 39.363655,
+        "longitude": -0.41439858
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "65000",
+      "vehicle": {
+        "id": "00694",
+        "label": "00694"
+      }
+    }
+  }, {
+    "id": "VP_04257",
+    "vehicle": {
+      "trip": {
+        "tripId": "0425712026-11-12"
+      },
+      "position": {
+        "latitude": 42.69426,
+        "longitude": -2.9312508
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "11208",
+      "vehicle": {
+        "id": "04257",
+        "label": "04257"
+      }
+    }
+  }, {
+    "id": "VP_04176",
+    "vehicle": {
+      "trip": {
+        "tripId": "0417612026-11-12"
+      },
+      "position": {
+        "latitude": 43.14187,
+        "longitude": -2.9609663
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "04176",
+        "label": "04176"
+      }
+    }
+  }, {
+    "id": "VP_04176",
+    "vehicle": {
+      "trip": {
+        "tripId": "0417612026-11-12"
+      },
+      "position": {
+        "latitude": 43.078014,
+        "longitude": -2.326312
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "11208",
+      "vehicle": {
+        "id": "04176",
+        "label": "04176"
+      }
+    }
+  }, {
+    "id": "VP_04786",
+    "vehicle": {
+      "trip": {
+        "tripId": "0478612026-11-12"
+      },
+      "position": {
+        "latitude": 42.686516,
+        "longitude": -2.9547458
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "11014",
+      "vehicle": {
+        "id": "04786",
+        "label": "04786"
+      }
+    }
+  }, {
+    "id": "VP_12431",
+    "vehicle": {
+      "trip": {
+        "tripId": "1243112026-11-12"
+      },
+      "position": {
+        "latitude": 42.572685,
+        "longitude": -8.686896
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "23004",
+      "vehicle": {
+        "id": "12431",
+        "label": "12431"
+      }
+    }
+  }, {
+    "id": "VP_15876",
+    "vehicle": {
+      "trip": {
+        "tripId": "1587612026-11-11"
+      },
+      "position": {
+        "latitude": 42.3911,
+        "longitude": 3.1514368
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "79312",
+      "vehicle": {
+        "id": "15876",
+        "label": "15876"
+      }
+    }
+  }, {
+    "id": "VP_12484",
+    "vehicle": {
+      "trip": {
+        "tripId": "1248412026-11-11"
+      },
+      "position": {
+        "latitude": 42.44631,
+        "longitude": -8.633771
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "23008",
+      "vehicle": {
+        "id": "12484",
+        "label": "12484"
+      }
+    }
+  }, {
+    "id": "VP_12538",
+    "vehicle": {
+      "trip": {
+        "tripId": "1253812026-11-12"
+      },
+      "position": {
+        "latitude": 43.29754,
+        "longitude": -8.444202
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "31412",
+      "vehicle": {
+        "id": "12538",
+        "label": "12538"
+      }
+    }
+  }, {
+    "id": "VP_12683",
+    "vehicle": {
+      "trip": {
+        "tripId": "1268312026-11-11"
+      },
+      "position": {
+        "latitude": 43.31794,
+        "longitude": -8.368608
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "20410",
+      "vehicle": {
+        "id": "12683",
+        "label": "12683"
+      }
+    }
+  }, {
+    "id": "VP_00192",
+    "vehicle": {
+      "trip": {
+        "tripId": "0019212026-11-12"
+      },
+      "position": {
+        "latitude": 39.97907,
+        "longitude": -4.2848563
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "35200",
+      "vehicle": {
+        "id": "00192",
+        "label": "00192"
+      }
+    }
+  }, {
+    "id": "VP_00192",
+    "vehicle": {
+      "trip": {
+        "tripId": "0019222026-11-12"
+      },
+      "position": {
+        "latitude": 39.97907,
+        "longitude": -4.2848563
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "35200",
+      "vehicle": {
+        "id": "00192",
+        "label": "00192"
+      }
+    }
+  }, {
+    "id": "VP_15918",
+    "vehicle": {
+      "trip": {
+        "tripId": "1591812026-11-11"
+      },
+      "position": {
+        "latitude": 41.726498,
+        "longitude": 2.5686986
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "79107",
+      "vehicle": {
+        "id": "15918",
+        "label": "15918"
+      }
+    }
+  }, {
+    "id": "VP_00295",
+    "vehicle": {
+      "trip": {
+        "tripId": "0029512026-11-12"
+      },
+      "position": {
+        "latitude": 38.890736,
+        "longitude": -6.9816666
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "37603",
+      "vehicle": {
+        "id": "00295",
+        "label": "00295"
+      }
+    }
+  }, {
+    "id": "VP_00295",
+    "vehicle": {
+      "trip": {
+        "tripId": "0029522026-11-12"
+      },
+      "position": {
+        "latitude": 38.890736,
+        "longitude": -6.9816666
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "37603",
+      "vehicle": {
+        "id": "00295",
+        "label": "00295"
+      }
+    }
+  }, {
+    "id": "VP_00280",
+    "vehicle": {
+      "trip": {
+        "tripId": "0028012026-11-12"
+      },
+      "position": {
+        "latitude": 43.051895,
+        "longitude": -2.9995017
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "13106",
+      "vehicle": {
+        "id": "00280",
+        "label": "00280"
+      }
+    }
+  }, {
+    "id": "VP_01463",
+    "vehicle": {
+      "trip": {
+        "tripId": "0146312026-11-12"
+      },
+      "position": {
+        "latitude": 38.382587,
+        "longitude": -0.52895117
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60911",
+      "vehicle": {
+        "id": "01463",
+        "label": "01463"
+      }
+    }
+  }, {
+    "id": "VP_01463",
+    "vehicle": {
+      "trip": {
+        "tripId": "0146322026-11-12"
+      },
+      "position": {
+        "latitude": 38.382587,
+        "longitude": -0.52895117
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60911",
+      "vehicle": {
+        "id": "01463",
+        "label": "01463"
+      }
+    }
+  }, {
+    "id": "VP_01463",
+    "vehicle": {
+      "trip": {
+        "tripId": "0146332026-11-12"
+      },
+      "position": {
+        "latitude": 38.382587,
+        "longitude": -0.52895117
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60911",
+      "vehicle": {
+        "id": "01463",
+        "label": "01463"
+      }
+    }
+  }, {
+    "id": "VP_17012",
+    "vehicle": {
+      "trip": {
+        "tripId": "1701212026-11-11"
+      },
+      "position": {
+        "latitude": 39.945484,
+        "longitude": -6.147185
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "30000",
+      "vehicle": {
+        "id": "17012",
+        "label": "17012"
+      }
+    }
+  }, {
+    "id": "VP_00530",
+    "vehicle": {
+      "trip": {
+        "tripId": "0053012026-11-12"
+      },
+      "position": {
+        "latitude": 42.04577,
+        "longitude": -1.5844299
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "81202",
+      "vehicle": {
+        "id": "00530",
+        "label": "00530"
+      }
+    }
+  }, {
+    "id": "VP_00530",
+    "vehicle": {
+      "trip": {
+        "tripId": "0053022026-11-12"
+      },
+      "position": {
+        "latitude": 42.04577,
+        "longitude": -1.5844299
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "81202",
+      "vehicle": {
+        "id": "00530",
+        "label": "00530"
+      }
+    }
+  }, {
+    "id": "VP_00437",
+    "vehicle": {
+      "trip": {
+        "tripId": "0043712026-11-12"
+      },
+      "position": {
+        "latitude": 42.690685,
+        "longitude": -2.941961
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "11200",
+      "vehicle": {
+        "id": "00437",
+        "label": "00437"
+      }
+    }
+  }, {
+    "id": "VP_00437",
+    "vehicle": {
+      "trip": {
+        "tripId": "0043722026-11-12"
+      },
+      "position": {
+        "latitude": 42.690685,
+        "longitude": -2.941961
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "00437",
+        "label": "00437"
+      }
+    }
+  }, {
+    "id": "VP_00437",
+    "vehicle": {
+      "trip": {
+        "tripId": "0043732026-11-12"
+      },
+      "position": {
+        "latitude": 42.690685,
+        "longitude": -2.941961
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "11200",
+      "vehicle": {
+        "id": "00437",
+        "label": "00437"
+      }
+    }
+  }, {
+    "id": "VP_17041",
+    "vehicle": {
+      "trip": {
+        "tripId": "1704112026-11-11"
+      },
+      "position": {
+        "latitude": 40.406128,
+        "longitude": -3.689053
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "17000",
+      "vehicle": {
+        "id": "17041",
+        "label": "17041"
+      }
+    }
+  }, {
+    "id": "VP_04325",
+    "vehicle": {
+      "trip": {
+        "tripId": "0432512026-11-12"
+      },
+      "position": {
+        "latitude": 42.529556,
+        "longitude": -7.5032597
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "20305",
+      "vehicle": {
+        "id": "04325",
+        "label": "04325"
+      }
+    }
+  }, {
+    "id": "VP_04325",
+    "vehicle": {
+      "trip": {
+        "tripId": "0432522026-11-12"
+      },
+      "position": {
+        "latitude": 42.529556,
+        "longitude": -7.5032597
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "04325",
+        "label": "04325"
+      }
+    }
+  }, {
+    "id": "VP_17702",
+    "vehicle": {
+      "trip": {
+        "tripId": "1770212026-11-11"
+      },
+      "position": {
+        "latitude": 40.329323,
+        "longitude": -3.7709925
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "35001",
+      "vehicle": {
+        "id": "17702",
+        "label": "17702"
+      }
+    }
+  }, {
+    "id": "VP_17810",
+    "vehicle": {
+      "trip": {
+        "tripId": "1781012026-11-11"
+      },
+      "position": {
+        "latitude": 38.913174,
+        "longitude": -6.072079
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "37410",
+      "vehicle": {
+        "id": "17810",
+        "label": "17810"
+      }
+    }
+  }, {
+    "id": "VP_00606",
+    "vehicle": {
+      "trip": {
+        "tripId": "0060612026-11-12"
+      },
+      "position": {
+        "latitude": 41.218437,
+        "longitude": -2.1124885
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "00606",
+        "label": "00606"
+      }
+    }
+  }, {
+    "id": "VP_00609",
+    "vehicle": {
+      "trip": {
+        "tripId": "0060912026-11-12"
+      },
+      "position": {
+        "latitude": 42.149548,
+        "longitude": -1.6351395
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80108",
+      "vehicle": {
+        "id": "00609",
+        "label": "00609"
+      }
+    }
+  }, {
+    "id": "VP_18012",
+    "vehicle": {
+      "trip": {
+        "tripId": "1801212026-11-11"
+      },
+      "position": {
+        "latitude": 41.047115,
+        "longitude": -4.70175
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "10400",
+      "vehicle": {
+        "id": "18012",
+        "label": "18012"
+      }
+    }
+  }, {
+    "id": "VP_18014",
+    "vehicle": {
+      "trip": {
+        "tripId": "1801412026-11-11"
+      },
+      "position": {
+        "latitude": 42.371,
+        "longitude": -3.6662495
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "14100",
+      "vehicle": {
+        "id": "18014",
+        "label": "18014"
+      }
+    }
+  }, {
+    "id": "VP_18021",
+    "vehicle": {
+      "trip": {
+        "tripId": "1802112026-11-11"
+      },
+      "position": {
+        "latitude": 42.920383,
+        "longitude": -1.9748591
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80003",
+      "vehicle": {
+        "id": "18021",
+        "label": "18021"
+      }
+    }
+  }, {
+    "id": "VP_00621",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062112026-11-12"
+      },
+      "position": {
+        "latitude": 42.82511,
+        "longitude": -1.6615183
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80108",
+      "vehicle": {
+        "id": "00621",
+        "label": "00621"
+      }
+    }
+  }, {
+    "id": "VP_00621",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062122026-11-12"
+      },
+      "position": {
+        "latitude": 42.82511,
+        "longitude": -1.6615183
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80108",
+      "vehicle": {
+        "id": "00621",
+        "label": "00621"
+      }
+    }
+  }, {
+    "id": "VP_00621",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062132026-11-12"
+      },
+      "position": {
+        "latitude": 42.82511,
+        "longitude": -1.6615183
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "00621",
+        "label": "00621"
+      }
+    }
+  }, {
+    "id": "VP_00621",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062142026-11-12"
+      },
+      "position": {
+        "latitude": 42.82511,
+        "longitude": -1.6615183
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80108",
+      "vehicle": {
+        "id": "00621",
+        "label": "00621"
+      }
+    }
+  }, {
+    "id": "VP_00621",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062152026-11-12"
+      },
+      "position": {
+        "latitude": 42.82511,
+        "longitude": -1.6615183
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "00621",
+        "label": "00621"
+      }
+    }
+  }, {
+    "id": "VP_18023",
+    "vehicle": {
+      "trip": {
+        "tripId": "1802312026-11-11"
+      },
+      "position": {
+        "latitude": 42.05175,
+        "longitude": -1.5900981
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "81202",
+      "vehicle": {
+        "id": "18023",
+        "label": "18023"
+      }
+    }
+  }, {
+    "id": "VP_18027",
+    "vehicle": {
+      "trip": {
+        "tripId": "1802712026-11-11"
+      },
+      "position": {
+        "latitude": 39.12052,
+        "longitude": -0.45463043
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "64100",
+      "vehicle": {
+        "id": "18027",
+        "label": "18027"
+      }
+    }
+  }, {
+    "id": "VP_18029",
+    "vehicle": {
+      "trip": {
+        "tripId": "1802912026-11-11"
+      },
+      "position": {
+        "latitude": 42.334705,
+        "longitude": -1.7171777
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "80115",
+      "vehicle": {
+        "id": "18029",
+        "label": "18029"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062212026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "20100",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062222026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "20100",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062232026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "20100",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062242026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062252026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_00622",
+    "vehicle": {
+      "trip": {
+        "tripId": "0062262026-11-12"
+      },
+      "position": {
+        "latitude": 42.577152,
+        "longitude": -5.579906
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "00622",
+        "label": "00622"
+      }
+    }
+  }, {
+    "id": "VP_18040",
+    "vehicle": {
+      "trip": {
+        "tripId": "1804012026-11-11"
+      },
+      "position": {
+        "latitude": 39.111588,
+        "longitude": -2.0004401
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60600",
+      "vehicle": {
+        "id": "18040",
+        "label": "18040"
+      }
+    }
+  }, {
+    "id": "VP_18061",
+    "vehicle": {
+      "trip": {
+        "tripId": "1806112026-11-11"
+      },
+      "position": {
+        "latitude": 43.29909,
+        "longitude": -1.9562736
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "11511",
+      "vehicle": {
+        "id": "18061",
+        "label": "18061"
+      }
+    }
+  }, {
+    "id": "VP_01152",
+    "vehicle": {
+      "trip": {
+        "tripId": "0115212026-11-11"
+      },
+      "position": {
+        "latitude": 41.19192,
+        "longitude": 1.2717974
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04104",
+      "vehicle": {
+        "id": "01152",
+        "label": "01152"
+      }
+    }
+  }, {
+    "id": "VP_01152",
+    "vehicle": {
+      "trip": {
+        "tripId": "0115222026-11-11"
+      },
+      "position": {
+        "latitude": 41.19192,
+        "longitude": 1.2717974
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04104",
+      "vehicle": {
+        "id": "01152",
+        "label": "01152"
+      }
+    }
+  }, {
+    "id": "VP_18065",
+    "vehicle": {
+      "trip": {
+        "tripId": "1806512026-11-11"
+      },
+      "position": {
+        "latitude": 40.534985,
+        "longitude": -3.888197
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "10200",
+      "vehicle": {
+        "id": "18065",
+        "label": "18065"
+      }
+    }
+  }, {
+    "id": "VP_01161",
+    "vehicle": {
+      "trip": {
+        "tripId": "0116112026-11-11"
+      },
+      "position": {
+        "latitude": 40.957794,
+        "longitude": 0.8754331
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "65300",
+      "vehicle": {
+        "id": "01161",
+        "label": "01161"
+      }
+    }
+  }, {
+    "id": "VP_01162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0116212026-11-11"
+      },
+      "position": {
+        "latitude": 40.624386,
+        "longitude": 0.47998235
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04104",
+      "vehicle": {
+        "id": "01162",
+        "label": "01162"
+      }
+    }
+  }, {
+    "id": "VP_17056",
+    "vehicle": {
+      "trip": {
+        "tripId": "1705612026-11-11"
+      },
+      "position": {
+        "latitude": 41.419506,
+        "longitude": -0.49051872
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71108",
+      "vehicle": {
+        "id": "17056",
+        "label": "17056"
+      }
+    }
+  }, {
+    "id": "VP_01192",
+    "vehicle": {
+      "trip": {
+        "tripId": "0119212026-11-11"
+      },
+      "position": {
+        "latitude": 38.756214,
+        "longitude": -0.93056285
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "65000",
+      "vehicle": {
+        "id": "01192",
+        "label": "01192"
+      }
+    }
+  }, {
+    "id": "VP_16000",
+    "vehicle": {
+      "trip": {
+        "tripId": "1600012026-11-11"
+      },
+      "position": {
+        "latitude": 43.022934,
+        "longitude": -2.3343363
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "11305",
+      "vehicle": {
+        "id": "16000",
+        "label": "16000"
+      }
+    }
+  }, {
+    "id": "VP_13032",
+    "vehicle": {
+      "trip": {
+        "tripId": "1303212026-11-11"
+      },
+      "position": {
+        "latitude": 36.461037,
+        "longitude": -6.211542
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "13032",
+        "label": "13032"
+      }
+    }
+  }, {
+    "id": "VP_03308",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330812026-11-11"
+      },
+      "position": {
+        "latitude": 40.381954,
+        "longitude": -3.6808329
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "03308",
+        "label": "03308"
+      }
+    }
+  }, {
+    "id": "VP_03308",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330822026-11-11"
+      },
+      "position": {
+        "latitude": 40.381954,
+        "longitude": -3.6808329
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "03308",
+        "label": "03308"
+      }
+    }
+  }, {
+    "id": "VP_03308",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330832026-11-11"
+      },
+      "position": {
+        "latitude": 40.381954,
+        "longitude": -3.6808329
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "03308",
+        "label": "03308"
+      }
+    }
+  }, {
+    "id": "VP_18034",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803412026-11-11"
+      },
+      "position": {
+        "latitude": 40.398666,
+        "longitude": -3.6764712
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "60400",
+      "vehicle": {
+        "id": "18034",
+        "label": "18034"
+      }
+    }
+  }, {
+    "id": "VP_18034",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803422026-11-11"
+      },
+      "position": {
+        "latitude": 40.398666,
+        "longitude": -3.6764712
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "60400",
+      "vehicle": {
+        "id": "18034",
+        "label": "18034"
+      }
+    }
+  }, {
+    "id": "VP_18034",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803432026-11-11"
+      },
+      "position": {
+        "latitude": 40.398666,
+        "longitude": -3.6764712
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "18034",
+        "label": "18034"
+      }
+    }
+  }, {
+    "id": "VP_03143",
+    "vehicle": {
+      "trip": {
+        "tripId": "0314312026-11-11"
+      },
+      "position": {
+        "latitude": 41.33058,
+        "longitude": 2.0894098
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03143",
+        "label": "03143"
+      }
+    }
+  }, {
+    "id": "VP_03143",
+    "vehicle": {
+      "trip": {
+        "tripId": "0314322026-11-11"
+      },
+      "position": {
+        "latitude": 41.33058,
+        "longitude": 2.0894098
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03143",
+        "label": "03143"
+      }
+    }
+  }, {
+    "id": "VP_03143",
+    "vehicle": {
+      "trip": {
+        "tripId": "0314332026-11-11"
+      },
+      "position": {
+        "latitude": 41.33058,
+        "longitude": 2.0894098
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "03143",
+        "label": "03143"
+      }
+    }
+  }, {
+    "id": "VP_03143",
+    "vehicle": {
+      "trip": {
+        "tripId": "0314342026-11-11"
+      },
+      "position": {
+        "latitude": 41.33058,
+        "longitude": 2.0894098
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03143",
+        "label": "03143"
+      }
+    }
+  }, {
+    "id": "VP_03150",
+    "vehicle": {
+      "trip": {
+        "tripId": "0315012026-11-11"
+      },
+      "position": {
+        "latitude": 41.015953,
+        "longitude": -2.4830375
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "03150",
+        "label": "03150"
+      }
+    }
+  }, {
+    "id": "VP_03151",
+    "vehicle": {
+      "trip": {
+        "tripId": "0315112026-11-11"
+      },
+      "position": {
+        "latitude": 41.474995,
+        "longitude": 1.9655302
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03151",
+        "label": "03151"
+      }
+    }
+  }, {
+    "id": "VP_18035",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803512026-11-11"
+      },
+      "position": {
+        "latitude": 39.16969,
+        "longitude": -3.2328882
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60400",
+      "vehicle": {
+        "id": "18035",
+        "label": "18035"
+      }
+    }
+  }, {
+    "id": "VP_18035",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803522026-11-11"
+      },
+      "position": {
+        "latitude": 39.16969,
+        "longitude": -3.2328882
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60400",
+      "vehicle": {
+        "id": "18035",
+        "label": "18035"
+      }
+    }
+  }, {
+    "id": "VP_18035",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803532026-11-11"
+      },
+      "position": {
+        "latitude": 39.16969,
+        "longitude": -3.2328882
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "18035",
+        "label": "18035"
+      }
+    }
+  }, {
+    "id": "VP_18035",
+    "vehicle": {
+      "trip": {
+        "tripId": "1803542026-11-11"
+      },
+      "position": {
+        "latitude": 39.16969,
+        "longitude": -3.2328882
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "18035",
+        "label": "18035"
+      }
+    }
+  }, {
+    "id": "VP_18063",
+    "vehicle": {
+      "trip": {
+        "tripId": "1806312026-11-11"
+      },
+      "position": {
+        "latitude": 41.98109,
+        "longitude": -4.4277487
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "14100",
+      "vehicle": {
+        "id": "18063",
+        "label": "18063"
+      }
+    }
+  }, {
+    "id": "VP_03152",
+    "vehicle": {
+      "trip": {
+        "tripId": "0315212026-11-11"
+      },
+      "position": {
+        "latitude": 40.89087,
+        "longitude": -2.7195964
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "03152",
+        "label": "03152"
+      }
+    }
+  }, {
+    "id": "VP_18104",
+    "vehicle": {
+      "trip": {
+        "tripId": "1810412026-11-11"
+      },
+      "position": {
+        "latitude": 43.122612,
+        "longitude": -4.082603
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "14202",
+      "vehicle": {
+        "id": "18104",
+        "label": "18104"
+      }
+    }
+  }, {
+    "id": "VP_03305",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330512026-11-11"
+      },
+      "position": {
+        "latitude": 41.620403,
+        "longitude": 0.3816177
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "78400",
+      "vehicle": {
+        "id": "03305",
+        "label": "03305"
+      }
+    }
+  }, {
+    "id": "VP_03305",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330522026-11-11"
+      },
+      "position": {
+        "latitude": 41.620403,
+        "longitude": 0.3816177
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "03305",
+        "label": "03305"
+      }
+    }
+  }, {
+    "id": "VP_03305",
+    "vehicle": {
+      "trip": {
+        "tripId": "0330532026-11-11"
+      },
+      "position": {
+        "latitude": 41.620403,
+        "longitude": 0.3816177
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "78400",
+      "vehicle": {
+        "id": "03305",
+        "label": "03305"
+      }
+    }
+  }, {
+    "id": "VP_15624",
+    "vehicle": {
+      "trip": {
+        "tripId": "1562412026-11-11"
+      },
+      "position": {
+        "latitude": 41.673748,
+        "longitude": 1.2746897
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "78501",
+      "vehicle": {
+        "id": "15624",
+        "label": "15624"
+      }
+    }
+  }, {
+    "id": "VP_03160",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316012026-11-11"
+      },
+      "position": {
+        "latitude": 41.62567,
+        "longitude": 0.54513466
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "03160",
+        "label": "03160"
+      }
+    }
+  }, {
+    "id": "VP_15625",
+    "vehicle": {
+      "trip": {
+        "tripId": "1562512026-11-11"
+      },
+      "position": {
+        "latitude": 41.72208,
+        "longitude": 1.5350658
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "78503",
+      "vehicle": {
+        "id": "15625",
+        "label": "15625"
+      }
+    }
+  }, {
+    "id": "VP_03161",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316112026-11-11"
+      },
+      "position": {
+        "latitude": 41.60343,
+        "longitude": -0.89299077
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03161",
+        "label": "03161"
+      }
+    }
+  }, {
+    "id": "VP_15626",
+    "vehicle": {
+      "trip": {
+        "tripId": "1562612026-11-11"
+      },
+      "position": {
+        "latitude": 41.72208,
+        "longitude": 1.5350658
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "78504",
+      "vehicle": {
+        "id": "15626",
+        "label": "15626"
+      }
+    }
+  }, {
+    "id": "VP_12608",
+    "vehicle": {
+      "trip": {
+        "tripId": "1260812026-11-11"
+      },
+      "position": {
+        "latitude": 42.3925,
+        "longitude": -7.1132607
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "20212",
+      "vehicle": {
+        "id": "12608",
+        "label": "12608"
+      }
+    }
+  }, {
+    "id": "VP_13039",
+    "vehicle": {
+      "trip": {
+        "tripId": "1303912026-11-11"
+      },
+      "position": {
+        "latitude": 37.429703,
+        "longitude": -6.0642996
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "43005",
+      "vehicle": {
+        "id": "13039",
+        "label": "13039"
+      }
+    }
+  }, {
+    "id": "VP_03162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316212026-11-11"
+      },
+      "position": {
+        "latitude": 41.624462,
+        "longitude": 0.42147258
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03162",
+        "label": "03162"
+      }
+    }
+  }, {
+    "id": "VP_03162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316222026-11-11"
+      },
+      "position": {
+        "latitude": 41.624462,
+        "longitude": 0.42147258
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03162",
+        "label": "03162"
+      }
+    }
+  }, {
+    "id": "VP_03162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316232026-11-11"
+      },
+      "position": {
+        "latitude": 41.624462,
+        "longitude": 0.42147258
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "vehicle": {
+        "id": "03162",
+        "label": "03162"
+      }
+    }
+  }, {
+    "id": "VP_03162",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316242026-11-11"
+      },
+      "position": {
+        "latitude": 41.624462,
+        "longitude": 0.42147258
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03162",
+        "label": "03162"
+      }
+    }
+  }, {
+    "id": "VP_13083",
+    "vehicle": {
+      "trip": {
+        "tripId": "1308312026-11-11"
+      },
+      "position": {
+        "latitude": 37.66125,
+        "longitude": -5.531011
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "51003",
+      "vehicle": {
+        "id": "13083",
+        "label": "13083"
+      }
+    }
+  }, {
+    "id": "VP_13942",
+    "vehicle": {
+      "trip": {
+        "tripId": "1394212026-11-11"
+      },
+      "position": {
+        "latitude": 36.954285,
+        "longitude": -2.492102
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "56308",
+      "vehicle": {
+        "id": "13942",
+        "label": "13942"
+      }
+    }
+  }, {
+    "id": "VP_03163",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316312026-11-11"
+      },
+      "position": {
+        "latitude": 41.426556,
+        "longitude": -1.5560449
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03163",
+        "label": "03163"
+      }
+    }
+  }, {
+    "id": "VP_03163",
+    "vehicle": {
+      "trip": {
+        "tripId": "0316322026-11-11"
+      },
+      "position": {
+        "latitude": 41.426556,
+        "longitude": -1.5560449
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03163",
+        "label": "03163"
+      }
+    }
+  }, {
+    "id": "VP_71802",
+    "vehicle": {
+      "trip": {
+        "tripId": "7180212026-11-11"
+      },
+      "position": {
+        "latitude": 43.546093,
+        "longitude": -8.078065
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "05113",
+      "vehicle": {
+        "id": "71802",
+        "label": "71802"
+      }
+    }
+  }, {
+    "id": "VP_71813",
+    "vehicle": {
+      "trip": {
+        "tripId": "7181312026-11-11"
+      },
+      "position": {
+        "latitude": 43.657055,
+        "longitude": -7.6001716
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05156",
+      "vehicle": {
+        "id": "71813",
+        "label": "71813"
+      }
+    }
+  }, {
+    "id": "VP_03170",
+    "vehicle": {
+      "trip": {
+        "tripId": "0317012026-11-11"
+      },
+      "position": {
+        "latitude": 41.475983,
+        "longitude": 1.9631953
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60000",
+      "vehicle": {
+        "id": "03170",
+        "label": "03170"
+      }
+    }
+  }, {
+    "id": "VP_71822",
+    "vehicle": {
+      "trip": {
+        "tripId": "7182212026-11-11"
+      },
+      "position": {
+        "latitude": 43.379597,
+        "longitude": -5.7921753
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05504",
+      "vehicle": {
+        "id": "71822",
+        "label": "71822"
+      }
+    }
+  }, {
+    "id": "VP_71832",
+    "vehicle": {
+      "trip": {
+        "tripId": "7183212026-11-11"
+      },
+      "position": {
+        "latitude": 43.550995,
+        "longitude": -6.152206
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05247",
+      "vehicle": {
+        "id": "71832",
+        "label": "71832"
+      }
+    }
+  }, {
+    "id": "VP_03171",
+    "vehicle": {
+      "trip": {
+        "tripId": "0317112026-11-11"
+      },
+      "position": {
+        "latitude": 40.592762,
+        "longitude": -3.118019
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "03171",
+        "label": "03171"
+      }
+    }
+  }, {
+    "id": "VP_71833",
+    "vehicle": {
+      "trip": {
+        "tripId": "7183312026-11-11"
+      },
+      "position": {
+        "latitude": 43.38749,
+        "longitude": -5.188415
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05545",
+      "vehicle": {
+        "id": "71833",
+        "label": "71833"
+      }
+    }
+  }, {
+    "id": "VP_03172",
+    "vehicle": {
+      "trip": {
+        "tripId": "0317212026-11-11"
+      },
+      "position": {
+        "latitude": 41.334126,
+        "longitude": 2.0995538
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "04040",
+      "vehicle": {
+        "id": "03172",
+        "label": "03172"
+      }
+    }
+  }, {
+    "id": "VP_71852",
+    "vehicle": {
+      "trip": {
+        "tripId": "7185212026-11-11"
+      },
+      "position": {
+        "latitude": 43.307823,
+        "longitude": -4.231833
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05641",
+      "vehicle": {
+        "id": "71852",
+        "label": "71852"
+      }
+    }
+  }, {
+    "id": "VP_03173",
+    "vehicle": {
+      "trip": {
+        "tripId": "0317312026-11-11"
+      },
+      "position": {
+        "latitude": 40.40235,
+        "longitude": -3.6855714
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "04007",
+      "vehicle": {
+        "id": "03173",
+        "label": "03173"
+      }
+    }
+  }, {
+    "id": "VP_71876",
+    "vehicle": {
+      "trip": {
+        "tripId": "7187612026-11-11"
+      },
+      "position": {
+        "latitude": 43.166653,
+        "longitude": -3.2277377
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "05721",
+      "vehicle": {
+        "id": "71876",
+        "label": "71876"
+      }
+    }
+  }, {
+    "id": "VP_03192",
+    "vehicle": {
+      "trip": {
+        "tripId": "0319212026-11-11"
+      },
+      "position": {
+        "latitude": 42.159683,
+        "longitude": 2.9043531
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "79300",
+      "vehicle": {
+        "id": "03192",
+        "label": "03192"
+      }
+    }
+  }, {
+    "id": "VP_03192",
+    "vehicle": {
+      "trip": {
+        "tripId": "0319222026-11-11"
+      },
+      "position": {
+        "latitude": 42.159683,
+        "longitude": 2.9043531
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "03192",
+        "label": "03192"
+      }
+    }
+  }, {
+    "id": "VP_71891",
+    "vehicle": {
+      "trip": {
+        "tripId": "7189112026-11-11"
+      },
+      "position": {
+        "latitude": 42.78768,
+        "longitude": -4.8449335
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "05752",
+      "vehicle": {
+        "id": "71891",
+        "label": "71891"
+      }
+    }
+  }, {
+    "id": "VP_34712",
+    "vehicle": {
+      "trip": {
+        "tripId": "3471212026-11-11"
+      },
+      "position": {
+        "latitude": 41.37988,
+        "longitude": 2.1409833
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "34712",
+        "label": "34712"
+      }
+    }
+  }, {
+    "id": "VP_18075",
+    "vehicle": {
+      "trip": {
+        "tripId": "1807512026-11-11"
+      },
+      "position": {
+        "latitude": 41.632397,
+        "longitude": -0.8668278
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "70807",
+      "vehicle": {
+        "id": "18075",
+        "label": "18075"
+      }
+    }
+  }, {
+    "id": "VP_04151",
+    "vehicle": {
+      "trip": {
+        "tripId": "0415112026-11-11"
+      },
+      "position": {
+        "latitude": 43.106014,
+        "longitude": -5.8225727
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "15211",
+      "vehicle": {
+        "id": "04151",
+        "label": "04151"
+      }
+    }
+  }, {
+    "id": "VP_04161",
+    "vehicle": {
+      "trip": {
+        "tripId": "0416112026-11-11"
+      },
+      "position": {
+        "latitude": 41.733086,
+        "longitude": -4.6199226
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "15100",
+      "vehicle": {
+        "id": "04161",
+        "label": "04161"
+      }
+    }
+  }, {
+    "id": "VP_04170",
+    "vehicle": {
+      "trip": {
+        "tripId": "0417012026-11-12"
+      },
+      "position": {
+        "latitude": 43.388218,
+        "longitude": -5.8272095
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "15211",
+      "vehicle": {
+        "id": "04170",
+        "label": "04170"
+      }
+    }
+  }, {
+    "id": "VP_18083",
+    "vehicle": {
+      "trip": {
+        "tripId": "1808312026-11-11"
+      },
+      "position": {
+        "latitude": 38.895573,
+        "longitude": -3.7097235
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "94004",
+      "vehicle": {
+        "id": "18083",
+        "label": "18083"
+      }
+    }
+  }, {
+    "id": "VP_18083",
+    "vehicle": {
+      "trip": {
+        "tripId": "1808332026-11-11"
+      },
+      "position": {
+        "latitude": 38.895573,
+        "longitude": -3.7097235
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "94004",
+      "vehicle": {
+        "id": "18083",
+        "label": "18083"
+      }
+    }
+  }, {
+    "id": "VP_18006",
+    "vehicle": {
+      "trip": {
+        "tripId": "1800622026-11-11"
+      },
+      "position": {
+        "latitude": 41.64193,
+        "longitude": -4.726447
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "10500",
+      "vehicle": {
+        "id": "18006",
+        "label": "18006"
+      }
+    }
+  }, {
+    "id": "VP_18126",
+    "vehicle": {
+      "trip": {
+        "tripId": "1812612026-11-11"
+      },
+      "position": {
+        "latitude": 41.33578,
+        "longitude": 2.1040032
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "18126",
+        "label": "18126"
+      }
+    }
+  }, {
+    "id": "VP_04179",
+    "vehicle": {
+      "trip": {
+        "tripId": "0417912026-11-12"
+      },
+      "position": {
+        "latitude": 40.591515,
+        "longitude": -3.7149532
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "08004",
+      "vehicle": {
+        "id": "04179",
+        "label": "04179"
+      }
+    }
+  }, {
+    "id": "VP_04179",
+    "vehicle": {
+      "trip": {
+        "tripId": "0417922026-11-12"
+      },
+      "position": {
+        "latitude": 40.591515,
+        "longitude": -3.7149532
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "08004",
+      "vehicle": {
+        "id": "04179",
+        "label": "04179"
+      }
+    }
+  }, {
+    "id": "VP_18128",
+    "vehicle": {
+      "trip": {
+        "tripId": "1812812026-11-11"
+      },
+      "position": {
+        "latitude": 41.243046,
+        "longitude": 1.8679836
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "18128",
+        "label": "18128"
+      }
+    }
+  }, {
+    "id": "VP_04181",
+    "vehicle": {
+      "trip": {
+        "tripId": "0418112026-11-12"
+      },
+      "position": {
+        "latitude": 39.95648,
+        "longitude": -3.3635166
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "17000",
+      "vehicle": {
+        "id": "04181",
+        "label": "04181"
+      }
+    }
+  }, {
+    "id": "VP_18129",
+    "vehicle": {
+      "trip": {
+        "tripId": "1812912026-11-11"
+      },
+      "position": {
+        "latitude": 40.8861,
+        "longitude": 0.8006144
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "65404",
+      "vehicle": {
+        "id": "18129",
+        "label": "18129"
+      }
+    }
+  }, {
+    "id": "VP_18130",
+    "vehicle": {
+      "trip": {
+        "tripId": "1813012026-11-11"
+      },
+      "position": {
+        "latitude": 41.08109,
+        "longitude": 1.0452087
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71401",
+      "vehicle": {
+        "id": "18130",
+        "label": "18130"
+      }
+    }
+  }, {
+    "id": "VP_04565",
+    "vehicle": {
+      "trip": {
+        "tripId": "0456512026-11-11"
+      },
+      "position": {
+        "latitude": 42.017735,
+        "longitude": -6.368419
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "22100",
+      "vehicle": {
+        "id": "04565",
+        "label": "04565"
+      }
+    }
+  }, {
+    "id": "VP_18131",
+    "vehicle": {
+      "trip": {
+        "tripId": "1813112026-11-11"
+      },
+      "position": {
+        "latitude": 41.13303,
+        "longitude": 1.329328
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71500",
+      "vehicle": {
+        "id": "18131",
+        "label": "18131"
+      }
+    }
+  }, {
+    "id": "VP_18181",
+    "vehicle": {
+      "trip": {
+        "tripId": "1818112026-11-11"
+      },
+      "position": {
+        "latitude": 39.39609,
+        "longitude": -3.205348
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60402",
+      "vehicle": {
+        "id": "18181",
+        "label": "18181"
+      }
+    }
+  }, {
+    "id": "VP_18181",
+    "vehicle": {
+      "trip": {
+        "tripId": "1818132026-11-11"
+      },
+      "position": {
+        "latitude": 39.39609,
+        "longitude": -3.205348
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "60402",
+      "vehicle": {
+        "id": "18181",
+        "label": "18181"
+      }
+    }
+  }, {
+    "id": "VP_04375",
+    "vehicle": {
+      "trip": {
+        "tripId": "0437512026-11-12"
+      },
+      "position": {
+        "latitude": 41.143745,
+        "longitude": -4.4463143
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "30200",
+      "vehicle": {
+        "id": "04375",
+        "label": "04375"
+      }
+    }
+  }, {
+    "id": "VP_04375",
+    "vehicle": {
+      "trip": {
+        "tripId": "0437522026-11-12"
+      },
+      "position": {
+        "latitude": 41.143745,
+        "longitude": -4.4463143
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "30200",
+      "vehicle": {
+        "id": "04375",
+        "label": "04375"
+      }
+    }
+  }, {
+    "id": "VP_18215",
+    "vehicle": {
+      "trip": {
+        "tripId": "1821512026-11-11"
+      },
+      "position": {
+        "latitude": 42.24509,
+        "longitude": -4.9706855
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "15008",
+      "vehicle": {
+        "id": "18215",
+        "label": "18215"
+      }
+    }
+  }, {
+    "id": "VP_18316",
+    "vehicle": {
+      "trip": {
+        "tripId": "1831612026-11-11"
+      },
+      "position": {
+        "latitude": 41.331066,
+        "longitude": -4.893445
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "10500",
+      "vehicle": {
+        "id": "18316",
+        "label": "18316"
+      }
+    }
+  }, {
+    "id": "VP_18330",
+    "vehicle": {
+      "trip": {
+        "tripId": "1833012026-11-11"
+      },
+      "position": {
+        "latitude": 38.660156,
+        "longitude": -4.219068
+      },
+      "currentStatus": "STOPPED_AT",
+      "vehicle": {
+        "id": "18330",
+        "label": "18330"
+      }
+    }
+  }, {
+    "id": "VP_18777",
+    "vehicle": {
+      "trip": {
+        "tripId": "1877712026-11-11"
+      },
+      "position": {
+        "latitude": 38.71825,
+        "longitude": -4.878411
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "37305",
+      "vehicle": {
+        "id": "18777",
+        "label": "18777"
+      }
+    }
+  }, {
+    "id": "VP_18779",
+    "vehicle": {
+      "trip": {
+        "tripId": "1877912026-11-11"
+      },
+      "position": {
+        "latitude": 37.589706,
+        "longitude": -5.725218
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "40122",
+      "vehicle": {
+        "id": "18779",
+        "label": "18779"
+      }
+    }
+  }, {
+    "id": "VP_18907",
+    "vehicle": {
+      "trip": {
+        "tripId": "1890712026-11-11"
+      },
+      "position": {
+        "latitude": 40.805878,
+        "longitude": -4.8477955
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "34010",
+      "vehicle": {
+        "id": "18907",
+        "label": "18907"
+      }
+    }
+  }, {
+    "id": "VP_18904",
+    "vehicle": {
+      "trip": {
+        "tripId": "1890412026-11-11"
+      },
+      "position": {
+        "latitude": 40.89787,
+        "longitude": -5.2065334
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "34008",
+      "vehicle": {
+        "id": "18904",
+        "label": "18904"
+      }
+    }
+  }, {
+    "id": "VP_14461",
+    "vehicle": {
+      "trip": {
+        "tripId": "1446112026-11-11"
+      },
+      "position": {
+        "latitude": 40.191242,
+        "longitude": 0.17774163
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "65304",
+      "vehicle": {
+        "id": "14461",
+        "label": "14461"
+      }
+    }
+  }, {
+    "id": "VP_14463",
+    "vehicle": {
+      "trip": {
+        "tripId": "1446312026-11-11"
+      },
+      "position": {
+        "latitude": 40.341667,
+        "longitude": 0.26391336
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "65308",
+      "vehicle": {
+        "id": "14463",
+        "label": "14463"
+      }
+    }
+  }, {
+    "id": "VP_14450",
+    "vehicle": {
+      "trip": {
+        "tripId": "1445012026-11-11"
+      },
+      "position": {
+        "latitude": 40.191242,
+        "longitude": 0.17774163
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "65306",
+      "vehicle": {
+        "id": "14450",
+        "label": "14450"
+      }
+    }
+  }, {
+    "id": "VP_17505",
+    "vehicle": {
+      "trip": {
+        "tripId": "1750512026-11-11"
+      },
+      "position": {
+        "latitude": 41.111366,
+        "longitude": 1.2533424
+      },
+      "currentStatus": "STOPPED_AT",
+      "stopId": "71401",
+      "vehicle": {
+        "id": "17505",
+        "label": "17505"
+      }
+    }
+  }, {
+    "id": "VP_15038",
+    "vehicle": {
+      "trip": {
+        "tripId": "1503812026-11-11"
+      },
+      "position": {
+        "latitude": 41.1019,
+        "longitude": 0.77896893
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71302",
+      "vehicle": {
+        "id": "15038",
+        "label": "15038"
+      }
+    }
+  }, {
+    "id": "VP_17050",
+    "vehicle": {
+      "trip": {
+        "tripId": "1705012026-11-11"
+      },
+      "position": {
+        "latitude": 41.237396,
+        "longitude": 1.8193816
+      },
+      "currentStatus": "IN_TRANSIT_TO",
+      "stopId": "71801",
+      "vehicle": {
+        "id": "17050",
+        "label": "17050"
+      }
+    }
+  }]
+}

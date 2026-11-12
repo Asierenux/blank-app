@@ -126,7 +126,7 @@ export class Motor {
       case "camaras": return recogerCamarasVitoria(d, ahora);
       case "traficociudad": return recogerTraficoCiudad(d, ahora);
       case "obras": return recogerObras(d, ahora);
-      case "trenes": return recogerTrenes(d, this.h.extra<{ t: number; trenes: Tren[] }>("trenes") ?? null, ahora);
+      case "trenes": return recogerTrenes(d);
       case "aireoficial":
         return recogerAireOficial(d, this.h.extra<{ t: number; estaciones: EstacionAire[] }>("estacionesAire"), ahora);
     }

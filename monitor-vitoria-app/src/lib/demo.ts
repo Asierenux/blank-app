@@ -9,6 +9,7 @@ import { FLOTA_DEMO, ITINERARIOS_DEMO } from "./demoTrenes";
 import type { Itinerarios } from "./fuentes/itinerarios";
 import { parsearFlota } from "./fuentes/trenes";
 import { distanciaKm } from "./fuentes/comun";
+import { ESTACIONES_RENFE } from "./estacionesRenfe";
 import { VITORIA } from "./config";
 import { SeguimientoTrenes, type PuntoTren } from "./seguimientoTrenes";
 import type { Historial } from "./historial";
@@ -332,7 +333,18 @@ export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTren
     horaLlegadaSigEst: new Date(ahora + (5 + (i % 25)) * min + 3600e3).toISOString().slice(0, 19),
     time: Math.round((ahora - 10e3) / 1000),
   })) };
-  const renfe = parsearFlota(flota, ahora, Infinity);
+  const renfe = parsearFlota(flota, ahora, Infinity).map(t => ({ ...t, red: "ld" as const }));
+  // Ouigo según horario (uno en la línea Madrid-Andalucía, cortada por Adif)
+  const ouigo = ([["6571", "60000", "71801", 40.857, -0.994, [["60000", 960, 960], ["04040", 1043, 1045], ["71801", 1110, 1110]]],
+    ["6578", "60000", "54413", 39.2, -3.9, [["60000", 990, 990], ["50500", 1092, 1094], ["54413", 1148, 1148]]]] as const)
+    .map(([num, o, d, lat, lon, paradas]) => ({
+      id: `OUIGO-${num}`, operador: "Ouigo" as const, red: "ouigo" as const, tipo: "Ouigo", estimada: true, sinRetraso: true,
+      origen: ESTACIONES_RENFE[o][0], destino: ESTACIONES_RENFE[d][0], anterior: ESTACIONES_RENFE[o][0], siguiente: ESTACIONES_RENFE[paradas[1][0]][0],
+      codAnterior: o, codSiguiente: paradas[1][0], llegadaSiguiente: ahora + 25 * min, retrasoMin: 0, lat, lon,
+      distanciaKm: Math.round(distanciaKm(VITORIA.lat, VITORIA.lon, lat, lon)), t: ahora, material: null, estado: "marcha" as const,
+      paradoDesde: null, recorrido: paradas.map(p => [...p] as [string, number, number]),
+      cortadoPor: num === "6578" ? "Suspendida la circulación en la línea de alta velocidad Madrid-Andalucía" : undefined,
+    }));
   const eusko = ([["E1", "#005A8B", "Amara-Donostia", "Durango", "Zaldibar", 2, 43.1716, -2.5483],
     ["E1", "#005A8B", "Matiko-Bilbao", "Euba-Amorebieta", "Amorebieta", 0, 43.1946, -2.6968],
     ["E4", "#240078", "Bermeo", "Amorebieta Geralekua", "Zugaztieta-Muxika", 6, 43.2276, -2.7269],
@@ -345,8 +357,9 @@ export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTren
     }));
   return {
     t: ahora, errores: [],
-    trenes: [...renfe, ...eusko].sort((a, b) => a.distanciaKm - b.distanciaKm),
+    trenes: [...renfe, ...ouigo, ...eusko].sort((a, b) => a.distanciaKm - b.distanciaKm),
     avisos: [
+      { id: "adif-2", fuente: "Adif", ambito: "Andalucía / Castilla-La Mancha / Madrid", titulo: "Suspendida la circulación en la línea de alta velocidad Madrid-Andalucía", texto: "Se mantiene suspendida la circulación de trenes entre Madrid y Andalucía por la línea de alta velocidad.", desde: null, hasta: null, ascensor: false },
       { id: "adif-1", fuente: "Adif", ambito: "País Vasco", titulo: "Incidencia en Zorrotza", texto: "Línea de ancho métrico Bilbao-La Concordia - La Calzada: Se están registrando retrasos por una incidencia que afecta a la señalización en Zorrotza Zorrozgoiti. Se está trabajando para solucionarla a la mayor brevedad posible.", desde: null, hasta: null, ascensor: false },
       { id: "a1", texto: "Línea R3 Bilbao: por obras en la estación de Amurrio, los trenes circularán por vía única entre Llodio y Amurrio con posibles retrasos.", desde: ahora - 5 * 3600e3, hasta: null, ascensor: false },
       { id: "a2", texto: "AMURRIO. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 30 * 3600e3, hasta: null, ascensor: true },

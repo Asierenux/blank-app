@@ -470,3 +470,49 @@ test("Recorrido oficial de un tren por su número", async () => {
   assert.equal(itinerarioDe(it, "18061", "2026-11-12")?.paradas[1][0], "11208");
   assert.equal(itinerarioDe(it, "99999", "2026-11-12"), null);
 });
+
+test("Datos abiertos oficiales de Renfe: AV/larga distancia y Cercanías, con recorrido del horario", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearRenfeAbierto, tipoDeHorario } = await import("../src/lib/fuentes/renfeAbierto");
+  const leer = (n: string) => JSON.parse(readFileSync(new URL(`./datos/${n}`, import.meta.url), "utf-8"));
+  const ahora = 1794498110e3;
+  const it = { "03150": [{ inicio: "2026-11-11", fin: "2026-12-06", tipo: "AVE", paradas: [["71801", 925, 925], ["60000", 1107, 1107]] as [string, number, number][] }] };
+  const t = parsearRenfeAbierto({ posicionesLD: leer("renfe_vp_ld.json"), retrasosLD: leer("renfe_tu_ld.json"),
+    posicionesCercanias: leer("renfe_vp_cer.json"), retrasosCercanias: leer("renfe_tu_cer.json") }, it, ahora);
+  const ave = t.find(x => x.id === "03150")!;
+  assert.equal(ave.tipo, "AVE");
+  assert.equal(ave.red, "ld");
+  assert.equal(ave.origen, "Barcelona-Sants");
+  assert.equal(ave.siguiente, "Madrid-Puerta de Atocha-Almudena Grandes");
+  assert.equal(ave.anterior, "Barcelona-Sants");                       // la anterior del recorrido
+  assert.equal(ave.retrasoMin, 12);                                     // 720 s (y no lo pisa su entrada de cancelación)
+  assert.equal(ave.estado, "marcha");
+  const ids = t.filter(x => x.red === "ld").map(x => x.id);
+  assert.equal(new Set(ids).size, ids.length);                           // unidades acopladas: una sola vez
+  const c = t.filter(x => x.red === "cercanias");
+  assert.equal(c.length, 40);
+  assert.ok(c[0].tipo.startsWith("Cercanías C"));
+  assert.ok(c.every(x => x.siguiente !== "—" && !/^Estación \d/.test(x.siguiente)));   // todas con nombre de estación
+  assert.equal(tipoDeHorario("REG.EXP."), "Regional Exprés");
+});
+
+test("Ouigo por horario: dónde debería estar y aviso si Adif corta su línea", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { leerHorarioOuigo, posicionesOuigo, circula } = await import("../src/lib/fuentes/ouigo");
+  const { marcarCortados } = await import("../src/lib/fuentes/redTrenes");
+  const h = leerHorarioOuigo(readFileSync(new URL("./datos/ouigo_gtfs.zip", import.meta.url)));
+  assert.ok(h.viajes.length > 10);
+  assert.ok(h.viajes.every(v => v.paradas.every(p => /^\d{5}$/.test(p[0]))));     // códigos de Renfe
+  assert.equal(circula(h.servicios["1"], "2026-11-12"), true);           // jueves dentro del periodo
+  assert.equal(circula(h.servicios["1"], "2026-11-14"), false);          // sábado: no
+  const ahora = Date.parse("2026-11-12T16:50:00Z");                        // 17:50 en Madrid
+  const t = posicionesOuigo(h, ahora);
+  assert.ok(t.length > 0);
+  assert.ok(t.every(x => x.operador === "Ouigo" && x.sinRetraso && x.estimada && x.recorrido!.length > 1));
+  const malaga = t.find(x => x.destino.startsWith("Málaga") || x.origen.startsWith("Málaga"));
+  marcarCortados(t, [{ id: "adif-1", fuente: "Adif", titulo: "Suspendida la circulación en la línea de alta velocidad Madrid-Andalucía",
+    texto: "Se mantiene suspendida…", ambito: "Andalucía / Castilla-La Mancha / Madrid", desde: null, hasta: null, ascensor: false }]);
+  if (malaga) assert.match(malaga.cortadoPor!, /Madrid-Andalucía/);
+  const bcn = t.filter(x => x.recorrido!.every(p => !p[0].startsWith("5")) && x.recorrido!.some(p => p[0] === "71801"));
+  assert.ok(bcn.every(x => !x.cortadoPor));                                // Madrid-Barcelona no se ve afectado
+});

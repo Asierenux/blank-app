@@ -1,8 +1,7 @@
 /**
- * Trenes de Renfe en tiempo real (larga y media distancia), sin clave:
- *  - Posición, retraso y estación anterior/siguiente de cada tren: el mismo dato que usa el
- *    "Visor de trenes" de Renfe (flotaLD.json, se renueva cada ~15 s).
- *  - Avisos oficiales (GTFS-RT "alerts" de Renfe): obras, incidencias, ascensores…
+ * Tipos y utilidades comunes de los trenes, avisos de Renfe (GTFS-RT "alerts") e incidencias
+ * de Adif. Las posiciones salen de los datos abiertos oficiales de Renfe (renfeAbierto.ts),
+ * de Ouigo por horario (ouigo.ts) y de Euskotren (transporte.ts); todo se junta en redTrenes.ts.
  *
  * Renfe NO publica el motivo de cada parada: si un tren está quieto fuera de una estación,
  * la app solo puede decir desde cuándo (comparando posiciones) y enseñar los avisos de la zona.
@@ -13,8 +12,8 @@ import { fechaSinZonaMadrid } from "../formato";
 import { ErrorFuente, type Descargar } from "../tipos";
 import { bajar, bajarJson, distanciaKm, type Resultado } from "./comun";
 import type { Vehiculo } from "./transporte";
+import type { ParadaPrevista } from "./itinerarios";
 
-export const URL_FLOTA = "https://tiempo-real.largorecorrido.renfe.com/renfe-visor/flotaLD.json";
 export const URL_AVISOS_RENFE = "https://gtfsrt.renfe.com/alerts.json";
 export const RADIO_TRENES_KM = 100;
 
@@ -28,7 +27,7 @@ export const tipoTren = (cod: number) => PRODUCTOS[cod] ?? "Tren";
 export const nombreEstacion = (cod: string | null | undefined) => (cod ? ESTACIONES_RENFE[cod]?.[0] ?? `Estación ${cod}` : "—");
 
 export type EstadoTren = "estacion" | "marcha" | "parado";
-export type OperadorTren = "Renfe" | "Euskotren";
+export type OperadorTren = "Renfe" | "Euskotren" | "Ouigo";
 
 export interface Tren {
   id: string;               // número comercial (p. ej. "00622")
@@ -48,12 +47,23 @@ export interface Tren {
   material: string | null;  // serie y número del tren (p. ej. 130005)
   estado: EstadoTren;
   paradoDesde: number | null;
+  /** ld = alta velocidad, larga y media distancia; cercanias; ouigo; euskotren */
+  red?: "ld" | "cercanias" | "ouigo" | "euskotren";
+  linea?: string;
+  anden?: string | null;
+  /** Ouigo: sin datos de retraso (solo horario) */
+  sinRetraso?: boolean;
+  /** Recorrido previsto cuando no está en el horario de Renfe (Ouigo) */
+  recorrido?: ParadaPrevista[];
+  /** Incidencia de Adif que corta su línea (para los que van por horario: probablemente no circula) */
+  cortadoPor?: string;
 }
 
 
 /** Si un tren lleva al menos este tiempo sin moverse fuera de una estación, está "parado en plena vía". */
 export const PARADO_MIN = 4;
 
+/** Formato de la foto de trenes del modo demo (y de las pruebas). */
 export function parsearFlota(d: any, ahora = Date.now(), radioKm = RADIO_TRENES_KM, previos: Tren[] = []): Tren[] {
   const lista: Tren[] = [];
   const antes = new Map(previos.map(t => [t.id, t]));
@@ -117,7 +127,7 @@ export function deEuskotren(v: Vehiculo, ahora = Date.now()): Tren {
   const llega = v.llegaEnS ?? null;
   return {
     // "ES:Euskotren:Journey:15441850:" → "E1-15441850" (el número del viaje)
-    id: `${v.linea}-${(v.id.match(/\d+/g) ?? [v.id]).pop()}`, operador: "Euskotren", tipo: `Euskotren ${v.linea}`,
+    id: `${v.linea}-${(v.id.match(/\d+/g) ?? [v.id]).pop()}`, operador: "Euskotren", red: "euskotren", tipo: `Euskotren ${v.linea}`,
     estimada: true, color: v.color,
     origen: "", destino: v.destino || "—",
     anterior: v.desde?.nombre ?? v.parada ?? "—", siguiente: v.parada ?? "—",
@@ -155,48 +165,9 @@ export const URL_ADIF_ESTADO = "https://www.adif.es/viajeros/estado-de-la-red";
 
 export interface EstadoTrenes { t: number; trenes: Tren[]; avisos: AvisoRenfe[]; errores: string[] }
 
-/** Descarga trenes y avisos. Los avisos son opcionales: si fallan, se sigue con los trenes. */
-export interface OtrosOperadores {
-  /** Hasta qué distancia de Vitoria (Infinity = toda España) */
-  radioKm?: number;
-  /** Trenes de Euskotren ya estimados (Transporte.trenesEuskotren) */
-  euskotren?: () => Promise<Vehiculo[]>;
-  avisosEuskotren?: () => Promise<string[]>;
-}
-
-/**
- * Descarga todo lo de la pestaña Trenes. Cada fuente es independiente: si una falla, se avisa
- * y se enseña el resto (Renfe, Euskotren, avisos de Renfe, incidencias de Adif).
- */
-export async function estadoTrenes(descargar: Descargar, previos: Tren[] = [], ahora = Date.now(), otros: OtrosOperadores = {}): Promise<EstadoTrenes> {
-  const errores: string[] = [];
-  const falla = (que: string) => (e: unknown) => { errores.push(`${que}: ${(e as Error).message}`); return null; };
-  const [flota, avisos, eusko, avisosEusko, adif] = await Promise.all([
-    bajarJson(descargar, URL_FLOTA).catch(falla("Renfe")),
-    bajarJson(descargar, URL_AVISOS_RENFE).catch(falla("Avisos de Renfe")),
-    otros.euskotren ? otros.euskotren().catch(falla("Euskotren")) : null,
-    otros.avisosEuskotren ? otros.avisosEuskotren().catch(() => null) : null,
-    bajar(descargar, URL_ADIF_ESTADO, { headers: { Accept: "text/html" } }).then(r => r.text()).catch(falla("Adif")),
-  ]);
-  const trenes = [
-    ...(flota ? parsearFlota(flota, ahora, otros.radioKm ?? RADIO_TRENES_KM, previos) : []),
-    ...((eusko ?? []) as Vehiculo[]).map(v => deEuskotren(v, ahora)).filter(t => t.distanciaKm <= (otros.radioKm ?? RADIO_TRENES_KM)),
-  ].sort((a, b) => a.distanciaKm - b.distanciaKm);
-  const todos: AvisoRenfe[] = [
-    ...(adif ? parsearIncidenciasAdif(adif, (otros.radioKm ?? RADIO_TRENES_KM) === Infinity) : []),
-    ...((avisosEusko ?? []) as string[]).map((texto, i) => ({ id: `eusko-${i}`, fuente: "Euskotren" as const, texto, desde: null, hasta: null, ascensor: /igogailu|ascensor/i.test(texto) })),
-    ...(avisos ? parsearAvisosRenfe(avisos, ahora) : []),
-  ];
-  return { t: ahora, trenes, avisos: todos, errores };
-}
-
-/** Para el planificador: guarda la foto de los trenes (sirve para avisar de retrasos y paradas). */
-export async function recogerTrenes(descargar: Descargar, previos: { t: number; trenes: Tren[] } | null, ahora = Date.now()): Promise<Resultado> {
-  const flota = await bajarJson(descargar, URL_FLOTA);
-  if (!Array.isArray(flota?.trenes)) throw new ErrorFuente("Renfe: la respuesta no trae la lista de trenes");
-  const trenes = parsearFlota(flota, ahora, RADIO_TRENES_KM, previos?.trenes ?? []);
-  // Incidencias de Adif (opcional: si su web falla, se sigue con los trenes)
-  const adif = await bajar(descargar, URL_ADIF_ESTADO, { headers: { Accept: "text/html" } }).then(r => r.text())
-    .then(parsearIncidenciasAdif).catch(() => undefined);
-  return { lecturas: [], extra: { trenes: { t: ahora, trenes }, incidenciasAdif: adif } };
+/** Para el planificador: solo las incidencias de Adif (para avisar de las nuevas en la zona). */
+export async function recogerTrenes(descargar: Descargar): Promise<Resultado> {
+  const html = await bajar(descargar, URL_ADIF_ESTADO, { headers: { Accept: "text/html" } }).then(r => r.text());
+  if (!/aviso-item|estado de la red/i.test(html)) throw new ErrorFuente("Adif: la página de estado de la red no tiene el formato esperado");
+  return { lecturas: [], extra: { incidenciasAdif: parsearIncidenciasAdif(html) } };
 }

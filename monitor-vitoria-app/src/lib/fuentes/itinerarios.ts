@@ -16,7 +16,7 @@ export const URL_GTFS_RENFE_LD = "https://ssl.renfe.com/gtransit/Fichero_AV_LD/g
 
 /** [código de estación, llegada, salida] en minutos desde la medianoche del día de salida (puede pasar de 1440). */
 export type ParadaPrevista = [string, number, number];
-export interface Itinerario { inicio: string; fin: string; paradas: ParadaPrevista[] }
+export interface Itinerario { inicio: string; fin: string; paradas: ParadaPrevista[]; /** AVE, ALVIA, AVLO, MD… */ tipo?: string }
 /** Número comercial del tren → sus itinerarios (normalmente uno; varios si cambia de horario en el periodo). */
 export type Itinerarios = Record<string, Itinerario[]>;
 
@@ -40,21 +40,24 @@ function porLineas(texto: string, cada: (campos: string[]) => void) {
 
 /** Lee el GTFS y se queda con los viajes que valen `hoy` o el día anterior. */
 export function leerItinerarios(zip: Uint8Array, hoy: string): Itinerarios {
-  const quiero = new Set(["trips.txt", "stop_times.txt"]);
+  const quiero = new Set(["trips.txt", "stop_times.txt", "routes.txt"]);
   const archivos = unzipSync(zip, { filter: f => quiero.has(f.name.split("/").pop()!) });
   const texto = (n: string) => {
     const k = Object.keys(archivos).find(x => x.split("/").pop() === n);
     return k ? strFromU8(archivos[k]) : "";
   };
   const ayer = fechaMadrid(Date.parse(`${hoy}T12:00:00Z`) - 86400e3);
+  // routes.txt: route_id, agency_id, route_short_name…
+  const tipos = new Map<string, string>();
+  porLineas(texto("routes.txt"), c => { if (c[0] && c[2]) tipos.set(c[0], c[2].trim()); });
   // trips.txt: route_id, service_id, trip_id, trip_headsign, trip_short_name…
-  const viajes = new Map<string, { cod: string; inicio: string; fin: string }>();
+  const viajes = new Map<string, { cod: string; inicio: string; fin: string; tipo?: string }>();
   porLineas(texto("trips.txt"), c => {
     const servicio = c[1] ?? "", trip = c[2] ?? "", cod = (c[4] ?? "").trim() || trip.slice(0, 5);
     const inicio = servicio.slice(0, 10), fin = servicio.slice(10, 20);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio) || !/^\d{4}-\d{2}-\d{2}$/.test(fin)) return;
     if (fin < ayer || inicio > hoy) return;     // no vale ni hoy ni ayer
-    viajes.set(trip, { cod, inicio, fin });
+    viajes.set(trip, { cod, inicio, fin, tipo: tipos.get(c[0]) });
   });
   const paradas = new Map<string, [number, ParadaPrevista][]>();
   porLineas(texto("stop_times.txt"), c => {
@@ -68,7 +71,7 @@ export function leerItinerarios(zip: Uint8Array, hoy: string): Itinerarios {
     const p = paradas.get(trip);
     if (!p?.length) continue;
     p.sort((a, b) => a[0] - b[0]);
-    (salida[v.cod] ??= []).push({ inicio: v.inicio, fin: v.fin, paradas: p.map(x => x[1]) });
+    (salida[v.cod] ??= []).push({ inicio: v.inicio, fin: v.fin, paradas: p.map(x => x[1]), tipo: v.tipo });
   }
   return salida;
 }
