@@ -39,6 +39,7 @@ export interface Tren {
   tipo: string;             // AVE, Alvia, Media Distancia…
   origen: string; destino: string;
   anterior: string; siguiente: string;
+  codAnterior?: string | null; codSiguiente?: string | null;
   llegadaSiguiente: number | null;
   retrasoMin: number;       // negativo = adelantado
   lat: number; lon: number;
@@ -73,6 +74,7 @@ export function parsearFlota(d: any, ahora = Date.now(), radioKm = RADIO_TRENES_
       id, operador: "Renfe", tipo: tipoTren(Number(x.codProduct)),
       origen: nombreEstacion(x.codOrigen), destino: nombreEstacion(x.codDestino),
       anterior: nombreEstacion(x.codEstAnt), siguiente: nombreEstacion(x.codEstSig),
+      codAnterior: x.codEstAnt ? String(x.codEstAnt) : null, codSiguiente: x.codEstSig ? String(x.codEstSig) : null,
       llegadaSiguiente: fechaSinZonaMadrid(String(x.horaLlegadaSigEst ?? "")),
       retrasoMin: Number(x.ultRetraso) || 0,
       lat, lon, distanciaKm: Math.round(dist * 10) / 10, t,
@@ -133,7 +135,7 @@ const AMBITOS_ADIF = /pa[ií]s vasco|euskadi|navarra|rioja|castilla y le[oó]n|c
  * Incidencias de la red de Adif (www.adif.es/viajeros/estado-de-la-red): afectan a TODOS los
  * operadores (Renfe, Iryo, Ouigo, mercancías…) y explican la causa (avería, robo de cable, obras…).
  */
-export function parsearIncidenciasAdif(html: string): AvisoRenfe[] {
+export function parsearIncidenciasAdif(html: string, todas = false): AvisoRenfe[] {
   const salida: AvisoRenfe[] = [];
   const limpiar = (s: string) => s.replace(/<br\s*\/?>/gi, " ").replace(/<\/p>\s*<p>/gi, " ").replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
@@ -143,7 +145,7 @@ export function parsearIncidenciasAdif(html: string): AvisoRenfe[] {
     const titulo = limpiar(/aviso-card__titulo">([\s\S]*?)<\/span>/.exec(art)?.[1] ?? "");
     const texto = limpiar(/aviso-card__content">([\s\S]*?)<\/div>/.exec(art)?.[1] ?? "");
     if (!texto && !titulo) continue;
-    if (!AMBITOS_ADIF.test(ambito) && !ZONA.test(`${titulo} ${texto}`)) continue;
+    if (!todas && !AMBITOS_ADIF.test(ambito) && !ZONA.test(`${titulo} ${texto}`)) continue;
     salida.push({ id: `adif-${id}`, fuente: "Adif", titulo, ambito, texto: texto || titulo, desde: null, hasta: null, ascensor: /ascensor/i.test(texto) });
   }
   return salida;
@@ -155,6 +157,8 @@ export interface EstadoTrenes { t: number; trenes: Tren[]; avisos: AvisoRenfe[];
 
 /** Descarga trenes y avisos. Los avisos son opcionales: si fallan, se sigue con los trenes. */
 export interface OtrosOperadores {
+  /** Hasta qué distancia de Vitoria (Infinity = toda España) */
+  radioKm?: number;
   /** Trenes de Euskotren ya estimados (Transporte.trenesEuskotren) */
   euskotren?: () => Promise<Vehiculo[]>;
   avisosEuskotren?: () => Promise<string[]>;
@@ -175,11 +179,11 @@ export async function estadoTrenes(descargar: Descargar, previos: Tren[] = [], a
     bajar(descargar, URL_ADIF_ESTADO, { headers: { Accept: "text/html" } }).then(r => r.text()).catch(falla("Adif")),
   ]);
   const trenes = [
-    ...(flota ? parsearFlota(flota, ahora, RADIO_TRENES_KM, previos) : []),
-    ...((eusko ?? []) as Vehiculo[]).map(v => deEuskotren(v, ahora)).filter(t => t.distanciaKm <= RADIO_TRENES_KM),
+    ...(flota ? parsearFlota(flota, ahora, otros.radioKm ?? RADIO_TRENES_KM, previos) : []),
+    ...((eusko ?? []) as Vehiculo[]).map(v => deEuskotren(v, ahora)).filter(t => t.distanciaKm <= (otros.radioKm ?? RADIO_TRENES_KM)),
   ].sort((a, b) => a.distanciaKm - b.distanciaKm);
   const todos: AvisoRenfe[] = [
-    ...(adif ? parsearIncidenciasAdif(adif) : []),
+    ...(adif ? parsearIncidenciasAdif(adif, (otros.radioKm ?? RADIO_TRENES_KM) === Infinity) : []),
     ...((avisosEusko ?? []) as string[]).map((texto, i) => ({ id: `eusko-${i}`, fuente: "Euskotren" as const, texto, desde: null, hasta: null, ascensor: /igogailu|ascensor/i.test(texto) })),
     ...(avisos ? parsearAvisosRenfe(avisos, ahora) : []),
   ];

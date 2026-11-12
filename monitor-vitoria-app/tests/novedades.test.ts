@@ -388,21 +388,22 @@ test("Datos reales de Renfe: trenes cerca de Vitoria con tipo, estaciones, retra
   assert.ok(a.some(x => x.texto.startsWith("AMURRIO") && x.ascensor));
 });
 
-test("Motor: avisa una vez de un tren cercano con mucho retraso", async () => {
+test("Motor: no avisa de trenes con retraso o parados; sí, una vez, de una incidencia nueva de Adif", async () => {
   const { Motor } = await import("../src/lib/motor");
   const { readFileSync } = await import("node:fs");
   const flota = readFileSync(new URL("./datos/renfe_flota.json", import.meta.url), "utf-8");
+  const adif = readFileSync(new URL("./datos/adif_estado_red.html", import.meta.url), "utf-8");
   const h = new Historial(almacenEnMemoria());
   const enviados: string[] = [];
   const m = new Motor(h, {
-    descargar: async url => (url.includes("flotaLD") ? new Response(flota) : new Response("{}", { status: 500 })),
+    descargar: async url => (url.includes("flotaLD") ? new Response(flota) : url.includes("adif.es") ? new Response(adif) : new Response("{}", { status: 500 })),
     claves: async () => ({}), umbrales: () => U, alertasActivas: () => true,
     diarios: () => ({ resumen: false, precios: false }), notificar: async a => { enviados.push(a.titulo); },
   });
   await m.actualizar(true, ["trenes"]);
   await m.actualizar(true, ["trenes"]);
-  // 18061 va con 65 min a 16 km de Vitoria (el 00437 va adelantado y el 00622 está a 48 km: no avisan)
-  assert.deepEqual(enviados.filter(x => x.startsWith("🚆")), ["🚆 Media Distancia 18061 con 65 min de retraso"]);
+  assert.ok(!enviados.some(x => x.startsWith("🚆") || x.startsWith("🛑")));       // el 18061 lleva 65 min, pero no se avisa
+  assert.deepEqual(enviados.filter(x => x.startsWith("🚧")), ["🚧 Adif · Incidencia en Zorrotza (País Vasco)"]);
 });
 
 test("Datos reales de Adif: incidencias de la zona con su causa (todos los operadores)", async () => {
@@ -433,4 +434,39 @@ test("Euskotren: tren estimado al formato común con su retraso", async () => {
   assert.equal(t.estado, "marcha");
   assert.equal(t.llegadaSiguiente, ahora + 99e3);
   assert.ok(t.distanciaKm > 30 && t.distanciaKm < 45);
+});
+
+test("Seguimiento de trenes: rastro, paradas (en estación o en plena vía), duración y velocidad", async () => {
+  const { SeguimientoTrenes, detectarParadas, velocidad, estacionCercana } = await import("../src/lib/seguimientoTrenes");
+  const min = 60e3, t0 = Date.UTC(2026, 10, 12, 14, 0);
+  const s = new SeguimientoTrenes();
+  const tren = (t: number, lat: number, lon: number) => ({ id: "18061", t, lat, lon } as any);
+  // 10 min en marcha (≈ 1,1 km/min ≈ 66 km/h hacia el este), 4 min parado en Vitoria, 10 min parado en plena vía
+  for (let k = 0; k <= 10; k++) s.anotar([tren(t0 + k * min, 42.80, -2.80 + k * 0.0135)], t0 + k * min);
+  for (let k = 1; k <= 4; k++) s.anotar([tren(t0 + (10 + k) * min, 42.8415, -2.6726)], t0 + (10 + k) * min);
+  for (let k = 0; k <= 10; k++) s.anotar([tren(t0 + (16 + k) * min, 42.87, -2.40)], t0 + (16 + k) * min);
+  const ahora = t0 + 26.5 * min;
+  const p = detectarParadas(s.rastro("18061"), ahora);
+  assert.equal(p.length, 2);
+  assert.equal(p[0].estacion, "Vitoria-Gasteiz");
+  assert.equal(p[1].estacion, null);                                  // plena vía
+  assert.equal(p[1].sigue, true);
+  assert.ok(p[1].minutos >= 10, String(p[1].minutos));
+  assert.equal(s.paradoDesde("18061", ahora), t0 + 16 * min);
+  // velocidad con los primeros 10 min
+  const v = velocidad(s.rastro("18061").filter(x => x[0] <= t0 + 10 * min));
+  assert.ok(v! > 55 && v! < 75, String(v));
+  assert.equal(estacionCercana(42.8415, -2.6726), "Vitoria-Gasteiz");
+  // Parado se guarda un punto cada 2 min (no cada lectura): ocupa poco
+  assert.ok(s.rastro("18061").length < 24, String(s.rastro("18061").length));
+  // Se guarda y se recupera
+  const r = SeguimientoTrenes.deJson(s.aJson());
+  assert.equal(r.rastro("18061").length, s.rastro("18061").length);
+});
+
+test("Recorrido oficial de un tren por su número", async () => {
+  const { itinerarioDe } = await import("../src/lib/fuentes/itinerarios");
+  const it = { "18061": [{ inicio: "2026-11-01", fin: "2026-11-30", paradas: [["10000", 546, 546], ["11208", 877, 879]] as [string, number, number][] }] };
+  assert.equal(itinerarioDe(it, "18061", "2026-11-12")?.paradas[1][0], "11208");
+  assert.equal(itinerarioDe(it, "99999", "2026-11-12"), null);
 });

@@ -5,6 +5,12 @@
  */
 import type { Recorrido, EstadoTransporte, Vehiculo, ParadaTranvia, ParadaElegible } from "./fuentes/transporte";
 import type { Incidencia } from "./fuentes/trafico";
+import { FLOTA_DEMO, ITINERARIOS_DEMO } from "./demoTrenes";
+import type { Itinerarios } from "./fuentes/itinerarios";
+import { parsearFlota } from "./fuentes/trenes";
+import { distanciaKm } from "./fuentes/comun";
+import { VITORIA } from "./config";
+import { SeguimientoTrenes, type PuntoTren } from "./seguimientoTrenes";
 import type { Historial } from "./historial";
 import { inicioDiaMadrid } from "./formato";
 import type { Lectura } from "./tipos";
@@ -318,35 +324,28 @@ export const transporteDemo = {
   },
 };
 
-/** Trenes de ejemplo (basados en los reales del 12/11 por la tarde). */
+/** Trenes de ejemplo: la foto real de toda la red del 12/11 por la tarde, con la hora de ahora. */
 export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTrenes {
   const min = 60e3;
-  const t = (id: string, tipo: string, origen: string, destino: string, anterior: string, siguiente: string,
-    retrasoMin: number, lat: number, lon: number, distanciaKm: number, estado: "estacion" | "marcha" | "parado", llega = 10) => ({
-    id, operador: "Renfe" as const, tipo, origen, destino, anterior, siguiente, retrasoMin, lat, lon, distanciaKm, estado, t: ahora - 15e3,
-    llegadaSiguiente: ahora + llega * min, material: null, paradoDesde: estado === "parado" ? ahora - 12 * min : null,
-  });
+  const flota = { trenes: FLOTA_DEMO.map(([codComercial, codProduct, codOrigen, codDestino, codEstAnt, codEstSig, , ultRetraso, latitud, longitud, mat], i) => ({
+    codComercial, codProduct, codOrigen, codDestino, codEstAnt, codEstSig, ultRetraso: String(ultRetraso), latitud, longitud, mat,
+    horaLlegadaSigEst: new Date(ahora + (5 + (i % 25)) * min + 3600e3).toISOString().slice(0, 19),
+    time: Math.round((ahora - 10e3) / 1000),
+  })) };
+  const renfe = parsearFlota(flota, ahora, Infinity);
+  const eusko = ([["E1", "#005A8B", "Amara-Donostia", "Durango", "Zaldibar", 2, 43.1716, -2.5483],
+    ["E1", "#005A8B", "Matiko-Bilbao", "Euba-Amorebieta", "Amorebieta", 0, 43.1946, -2.6968],
+    ["E4", "#240078", "Bermeo", "Amorebieta Geralekua", "Zugaztieta-Muxika", 6, 43.2276, -2.7269],
+    ["E3", "#009FE4", "Lezama", "Sondika", "Lekunbiz-Zamudio", 0, 43.2867, -2.8746]] as const)
+    .map(([linea, color, destino, anterior, siguiente, retrasoMin, lat, lon], i) => ({
+      id: `${linea}-1544${i}`, operador: "Euskotren" as const, tipo: `Euskotren ${linea}`, estimada: true, color,
+      origen: "", destino, anterior, siguiente, retrasoMin, lat, lon, t: ahora,
+      distanciaKm: Math.round(distanciaKm(VITORIA.lat, VITORIA.lon, lat, lon) * 10) / 10,
+      llegadaSiguiente: ahora + 3 * min, material: null, estado: "marcha" as const, paradoDesde: null,
+    }));
   return {
     t: ahora, errores: [],
-    trenes: [
-      t("18029", "Regional", "Miranda de Ebro", "Zaragoza-Miraflores", "Vitoria-Gasteiz", "Vitoria-Gasteiz", 3, 42.8413, -2.6727, 0.6, "estacion"),
-      t("18061", "Media Distancia", "Madrid-Príncipe Pío", "San Sebastián-Donostia", "Miranda de Ebro", "Vitoria-Gasteiz", 65, 42.7652, -2.8302, 15.8, "parado"),
-      t("18014", "Media Distancia", "San Sebastián-Donostia", "Madrid-Príncipe Pío", "Altsasu", "Araia", 3, 42.9051, -2.1930, 39.5, "marcha"),
-      t("00437", "Alvia", "Bilbao-Abando", "Barcelona-Sants", "Miranda de Ebro", "Miranda de Ebro", -37, 42.6910, -2.9412, 28, "estacion"),
-      t("00622", "Alvia", "Barcelona-Sants", "Vigo Urzaiz", "Miranda de Ebro", "Burgos-Rosa Manzano", 43, 42.6250, -3.1825, 48.5, "marcha", 40),
-      t("00621", "Alvia", "Vigo Urzaiz", "Barcelona-Sants", "Burgos-Rosa Manzano", "Miranda de Ebro", -3, 42.6146, -3.2627, 54.7, "marcha", 20),
-      t("16071", "Regional", "Castejón de Ebro", "Logroño", "Alcanadre", "Agoncillo", 9, 42.4436, -2.2916, 54.5, "marcha"),
-      t("71872", "Media Distancia", "Bilbao la Concordia", "Santander", "Gibaja", "Gibaja", 32, 43.2820, -3.4383, 78.9, "estacion"),
-      // Euskotren (posición estimada con sus horarios en tiempo real)
-      ...([["E1", "#005A8B", "Amara-Donostia", "Durango", "Zaldibar", 2, 43.1716, -2.5483, 37.1],
-        ["E1", "#005A8B", "Matiko-Bilbao", "Euba-Amorebieta", "Amorebieta", 0, 43.1946, -2.6968, 38.7],
-        ["E4", "#240078", "Bermeo", "Amorebieta Geralekua", "Zugaztieta-Muxika", 6, 43.2276, -2.7269, 42.6],
-        ["E3", "#009FE4", "Lezama", "Sondika", "Lekunbiz-Zamudio", 0, 43.2867, -2.8746, 51.3]] as const)
-        .map(([linea, color, destino, anterior, siguiente, retraso, lat, lon, km], i) => ({
-          ...t(`${linea}-10${i}`, `Euskotren ${linea}`, "", destino, anterior, siguiente, retraso, lat, lon, km, "marcha", 3),
-          operador: "Euskotren" as const, estimada: true, color,
-        })),
-    ],
+    trenes: [...renfe, ...eusko].sort((a, b) => a.distanciaKm - b.distanciaKm),
     avisos: [
       { id: "adif-1", fuente: "Adif", ambito: "País Vasco", titulo: "Incidencia en Zorrotza", texto: "Línea de ancho métrico Bilbao-La Concordia - La Calzada: Se están registrando retrasos por una incidencia que afecta a la señalización en Zorrotza Zorrozgoiti. Se está trabajando para solucionarla a la mayor brevedad posible.", desde: null, hasta: null, ascensor: false },
       { id: "a1", texto: "Línea R3 Bilbao: por obras en la estación de Amurrio, los trenes circularán por vía única entre Llodio y Amurrio con posibles retrasos.", desde: ahora - 5 * 3600e3, hasta: null, ascensor: false },
@@ -354,4 +353,24 @@ export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTren
       { id: "a3", texto: "ORDIZIA. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 50 * 3600e3, hasta: null, ascensor: true },
     ],
   };
+}
+
+export function itinerariosDemo(): Itinerarios { return ITINERARIOS_DEMO; }
+
+/**
+ * Rastro de ejemplo: el MD 18061 Madrid → Donostia ha venido desde Miranda y lleva 12 min parado
+ * en plena vía antes de Vitoria; el Alvia 00622 y el AVE 03150 van en marcha.
+ */
+export function rastrosDemo(ahora: number): SeguimientoTrenes {
+  const s = new SeguimientoTrenes();
+  const min = 60e3;
+  const linea = (de: [number, number], a: [number, number], desde: number, n: number, paso = 1): PuntoTren[] =>
+    Array.from({ length: n + 1 }, (_, k) => [desde + k * paso * min, de[0] + ((a[0] - de[0]) * k) / n, de[1] + ((a[1] - de[1]) * k) / n]);
+  const miranda: [number, number] = [42.6910, -2.9404], aqui: [number, number] = [42.76522, -2.8302362];
+  const md = [...linea([42.5, -3.25], miranda, ahora - 52 * min, 18), ...linea(miranda, miranda, ahora - 33 * min, 2, 2).slice(1),
+    ...linea(miranda, aqui, ahora - 29 * min, 15).slice(1), ...linea(aqui, aqui, ahora - 12 * min, 6, 2).slice(1)];
+  s.rastros.set("18061", md);
+  s.rastros.set("00622", linea([42.6910, -2.9404], [42.624996, -3.1825302], ahora - 25 * min, 12, 2));
+  s.rastros.set("03150", linea([41.62, -0.98], [41.536686, -1.3676776], ahora - 12 * min, 12));
+  return s;
 }

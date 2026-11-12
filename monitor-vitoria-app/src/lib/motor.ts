@@ -204,12 +204,10 @@ export class Motor {
   }
 
   /**
-   * Trenes cerca de Vitoria (40 km): aviso si van con 30 min o más de retraso, o si llevan
-   * parados fuera de una estación desde la lectura anterior (≥ 10 min). Una vez por tren y día.
+   * Trenes: solo se avisa de las incidencias NUEVAS de Adif en la zona (una vez cada una).
+   * Retrasos y trenes parados no se notifican: se ven en la pestaña Trenes.
    */
   private async avisosTrenes(r: Resultado, ahora: number) {
-    const lista = (r.extra?.trenes as { trenes: Tren[] } | undefined)?.trenes ?? [];
-    const dia = fechaMadrid(ahora);
     // Incidencias nuevas de Adif en la zona (afectan a todos los operadores): una vez cada una
     for (const a of (r.extra?.incidenciasAdif as AvisoRenfe[] | undefined) ?? []) {
       if (a.ascensor) continue;
@@ -218,22 +216,6 @@ export class Motor {
       this.h.apuntarAlerta(clave, ahora);
       await this.o.notificar({ regla: "trenes", claves: [clave], titulo: `🚧 Adif · ${a.titulo || "Incidencia"}${a.ambito ? ` (${a.ambito})` : ""}`,
         cuerpo: a.texto.slice(0, 220) }).catch(() => undefined);
-    }
-    for (const t of lista.filter(x => x.distanciaKm <= 40)) {
-      const avisos: [string, string, string][] = [];
-      if (t.retrasoMin >= 30) {
-        avisos.push([`tren_retraso@${t.id}@${dia}`, `🚆 ${t.tipo} ${t.id} con ${t.retrasoMin} min de retraso`,
-          `${t.origen} → ${t.destino}. Próxima parada: ${t.siguiente}${t.llegadaSiguiente ? ` (${hora(t.llegadaSiguiente)})` : ""}.`]);
-      }
-      if (t.estado === "parado") {
-        avisos.push([`tren_parado@${t.id}@${dia}`, `🛑 ${t.tipo} ${t.id} parado fuera de estación`,
-          `Entre ${t.anterior} y ${t.siguiente}${t.paradoDesde ? ` desde las ${hora(t.paradoDesde)}` : ""}. Renfe no publica el motivo; mira los avisos en la pestaña Trenes.`]);
-      }
-      for (const [clave, titulo, cuerpo] of avisos) {
-        if (clave in this.h.alertasEnviadas) continue;
-        this.h.apuntarAlerta(clave, ahora);
-        await this.o.notificar({ regla: "trenes", titulo, cuerpo, claves: [clave] }).catch(() => undefined);
-      }
     }
   }
 
