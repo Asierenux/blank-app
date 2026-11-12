@@ -168,7 +168,8 @@ export default function Trenes() {
   const visibles = alcance === "vitoria" ? todos.filter(t => t.distanciaKm <= 100) : todos.filter(t => t.operador !== "Euskotren");
   const texto = buscar.trim().toLowerCase();
   const lista = useMemo(() => visibles.filter(t =>
-    (filtro === "todos" || (filtro === "alta" && ALTA.has(t.tipo)) || (filtro === "resto" && t.red === "ld" && !ALTA.has(t.tipo))
+    // "Todos" = alta velocidad, larga y media distancia y Ouigo; las Cercanías (cientos) con su filtro o buscando
+    ((filtro === "todos" && (t.red !== "cercanias" || !!texto)) || (filtro === "alta" && ALTA.has(t.tipo)) || (filtro === "resto" && t.red === "ld" && !ALTA.has(t.tipo))
       || (filtro === "cercanias" && t.red === "cercanias") || (filtro === "ouigo" && t.operador === "Ouigo")
       || (filtro === "retraso" && t.retrasoMin >= 15) || (filtro === "parados" && enVia(t)) || (filtro === "euskotren" && t.operador === "Euskotren"))
     && (!texto || [t.id, t.tipo, t.origen, t.destino, t.anterior, t.siguiente].some(x => x.toLowerCase().includes(texto))))
@@ -211,7 +212,7 @@ export default function Trenes() {
   };
 
   const chips: [Filtro, string][] = [
-    ["todos", `Todos · ${visibles.length}`],
+    ["todos", `Todos · ${visibles.filter(t => t.red !== "cercanias").length}`],
     ["alta", `Alta velocidad · ${visibles.filter(t => ALTA.has(t.tipo)).length}`],
     ["resto", `MD y regionales · ${visibles.filter(t => t.red === "ld" && !ALTA.has(t.tipo)).length}`],
     ["cercanias", `Cercanías · ${visibles.filter(t => t.red === "cercanias").length}`],
