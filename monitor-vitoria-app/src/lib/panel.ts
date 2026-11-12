@@ -7,7 +7,7 @@
 import type { Comparacion, InfoEmbalse, Pluviometro } from "./fuentes/embalses";
 import { cotaDesdePct } from "./curva";
 import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, VITORIA, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
-import { fechaMadrid, inicioDiaMadrid } from "./formato";
+import { fechaMadrid, inicioDiaMadrid, num } from "./formato";
 import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
 import { activa, ventanaMs } from "./fuentes/trafico";
 import { distanciaKm } from "./fuentes/comun";
@@ -242,6 +242,10 @@ export interface Embalse {
   /** La cota no se ha medido: se deduce del volumen con la curva cota-volumen */
   nivelEstimado: boolean; cotaCauce: number | null; cotaAnioPasado: number | null; cotaMedia10: number | null;
   entrada: number | null; salida: number | null; salidaMedidaEn: string | null;
+  /** La entrada no se mide: es la salida medida aguas abajo + lo que gana el embalse */
+  entradaEstimada: boolean;
+  balance: Balance | null;
+  compuertas: Compuertas | null;
   t: number | null; edadDias: number | null; antiguo: boolean;
   nivelEstado: Nivel; texto: string;
   varSemanaPct: number | null; varSemanaHm3: number | null; var24hCm: number | null; var24hPct: number | null;
@@ -275,6 +279,47 @@ function serieEmbalse(h: Historial, id: string, ahora: number): Punto[] {
   const directo = h.serie(`agua.${id}.porcentaje`, desde, ahora);
   const primero = directo[0]?.[0] ?? Infinity;
   return [...h.serie(`semanal.${id}.porcentaje`, desde, ahora).filter(p => p[0] < primero), ...directo];
+}
+
+export interface Balance {
+  /** Entra − sale, en m³/s (positivo = se llena) */
+  m3s: number; hm3Dia: number; cmDia: number | null; horas: number;
+  texto: "Llenándose" | "Vaciándose" | "Estable";
+}
+
+/**
+ * Si se llena o se vacía: con el cambio de volumen de las últimas ~24 h (lo más fiable que hay
+ * sin caudalímetros). Volumen en hm³ → m³/s: Δhm³ · 10⁶ / segundos.
+ */
+export function calcularBalance(serie: Punto[], ahora: number, cotaAhora: number | null, cotaAntes: (t: number) => number | null): Balance | null {
+  const ult = serie.at(-1);
+  if (!ult || ahora - ult[0] > 2 * 24 * H) return null;
+  // el dato más cercano a 24 h antes (entre 12 y 36 h)
+  const previos = serie.filter(p => ult[0] - p[0] >= 12 * H && ult[0] - p[0] <= 36 * H);
+  if (!previos.length) return null;
+  const antes = previos.reduce((a, p) => (Math.abs(ult[0] - p[0] - 24 * H) < Math.abs(ult[0] - a[0] - 24 * H) ? p : a));
+  const horas = (ult[0] - antes[0]) / H;
+  const m3s = ((ult[1] - antes[1]) * 1e6) / (horas * 3600);
+  const ca = cotaAntes(antes[0]);
+  return {
+    m3s: Math.round(m3s * 10) / 10, hm3Dia: Math.round(((ult[1] - antes[1]) / horas) * 24 * 100) / 100,
+    cmDia: cotaAhora != null && ca != null ? Math.round(((cotaAhora - ca) / horas) * 24 * 100) : null,
+    horas: Math.round(horas),
+    // por debajo de ~1,5 m³/s no se distingue del redondeo del volumen (0,01 hm³)
+    texto: Math.abs(m3s) < 1.5 ? "Estable" : m3s > 0 ? "Llenándose" : "Vaciándose",
+  };
+}
+
+export interface Compuertas { estado: "cerradas" | "posibles" | "abiertas"; texto: string }
+
+/** Lo que se puede afirmar de las compuertas del aliviadero con la cota y la salida. */
+export function estadoCompuertas(nivel: number | null, aliviadero: number | undefined, salida: number | null): Compuertas | null {
+  if (nivel == null || aliviadero == null) return null;
+  if (nivel < aliviadero) {
+    return { estado: "cerradas", texto: `Sin usar: el agua está ${num(aliviadero - nivel, 2)} m por debajo del aliviadero, así que no pueden soltar agua. Sale por la central y los desagües.` };
+  }
+  if (salida != null && salida >= 10) return { estado: "abiertas", texto: `Desembalsando: ${num(salida, 1)} m³/s aguas abajo con el agua sobre el aliviadero.` };
+  return { estado: "posibles", texto: "El agua está sobre el aliviadero: pueden abrirse para desembalsar (su posición no es pública)." };
 }
 
 function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number): Embalse {
@@ -314,19 +359,38 @@ function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number)
       salidaMedidaEn = h.extra<{ id: string; nombre: string }[]>("estacionesSaih")?.find(x => x.id === e.aforoSalida)?.nombre ?? "el aforo aguas abajo";
     }
   }
+  if (salida == null && e.aforoSalidaNombre) {
+    // El aforo de Euskalmet de justo debajo de la presa (p. ej. Zadorra en Arroiabe)
+    const est = h.extra<{ estaciones: { id: string; nombre: string }[] }>("estacionesHidro")?.estaciones
+      .find(x => x.nombre.toLowerCase().includes(e.aforoSalidaNombre!));
+    const abajo = est ? h.ultimo(`hidro.${est.id}.caudal`, ahora) : null;
+    if (est && abajo && ahora - abajo[0] < 6 * H) {
+      salida = abajo[1];
+      salidaMedidaEn = est.nombre;
+    }
+  }
+  const balance = deSaih ? calcularBalance(h.serie(`agua.${e.id}.volumen`, ahora - 3 * 24 * H, ahora), ahora, nivel,
+    tt => (nivelEstimado ? cotaDesdePct(e, h.valorEn(`agua.${e.id}.porcentaje`, tt, H)) : h.valorEn(`agua.${e.id}.nivel`, tt, H))) : null;
+  // Sin caudalímetro de entrada: lo que entra = lo que sale + lo que se queda
+  let entradaFinal = entrada, entradaEstimada = false;
+  if (entradaFinal == null && salida != null && balance) {
+    entradaFinal = Math.max(0, Math.round((salida + balance.m3s) * 10) / 10);
+    entradaEstimada = true;
+  }
   return {
     id: e.id, nombre: e.nombre, corto: e.corto, rio: e.rio, capacidadHm3: e.capacidadHm3,
     nivel, nivelEstimado, cotaCauce: e.curva?.cauce ?? e.cotaMinima ?? null,
     cotaAnioPasado: cotaDesdePct(e, info?.comparacion.anioPasadoPct ?? null),
     cotaMedia10: cotaDesdePct(e, info?.comparacion.media10Pct ?? null),
-    volumen, porcentaje, entrada, salida, salidaMedidaEn, origen: t == null ? null : deSaih ? "saih" : "semanal",
+    volumen, porcentaje, entrada: entradaFinal, entradaEstimada, salida, salidaMedidaEn, balance,
+    compuertas: estadoCompuertas(nivel, e.cotaAliviadero, salida), origen: t == null ? null : deSaih ? "saih" : "semanal",
     t, edadDias: t == null ? null : Math.floor((ahora - t) / (24 * H)), antiguo: t != null && ahora - t > 8 * 24 * H,
     nivelEstado, texto,
     varSemanaPct: porcentaje != null && pctAntes != null ? Math.round((porcentaje - pctAntes) * 10) / 10 : null,
     varSemanaHm3: volumen != null && volAntes != null ? r2(volumen - volAntes) : null,
     var24hCm: nivel != null && n24 != null ? Math.round((nivel - n24) * 100) : null,
     var24hPct: porcentaje != null && p24 != null ? Math.round((porcentaje - p24) * 10) / 10 : null,
-    maniobra: maniobra(entrada, salida),
+    maniobra: maniobra(entradaFinal, salida),
     cotas: { minima: e.cotaMinima, aliviadero: e.cotaAliviadero, nmn: e.cotaNmn, coronacion: e.cotaCoronacion },
     margenAliviadero: e.cotaAliviadero != null && nivel != null ? r2(e.cotaAliviadero - nivel) : null,
     margenNmn: e.cotaNmn != null && nivel != null ? r2(e.cotaNmn - nivel) : null,

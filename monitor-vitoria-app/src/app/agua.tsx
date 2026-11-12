@@ -40,6 +40,21 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
       </View>
       <Barra pct={e.porcentaje ?? 0} color={c.agua} marcas={[85]} />
       <DibujoEmbalse e={e} />
+      {e.balance && (
+        <View style={{ backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12, gap: 2 }}>
+          <Etiqueta>¿Se llena o se vacía? · últimas {e.balance.horas} h</Etiqueta>
+          <Text style={{ color: e.balance.texto === "Llenándose" ? c.ok : e.balance.texto === "Vaciándose" ? c.aviso : c.texto, fontSize: 20, fontWeight: "800" }}>
+            {e.balance.texto === "Llenándose" ? "▲ Se llena" : e.balance.texto === "Vaciándose" ? "▼ Se vacía" : "= Estable"}
+            {e.balance.texto !== "Estable" ? ` · ${num(Math.abs(e.balance.m3s), 1)} m³/s` : ""}
+          </Text>
+          <Etiqueta>
+            {`${signo(e.balance.hm3Dia, 2)} hm³/día${e.balance.cmDia != null ? ` · ${signo(e.balance.cmDia, 0)} cm/día` : ""} · es lo que entra menos lo que sale (por el cambio de volumen)`}
+          </Etiqueta>
+        </View>
+      )}
+      {e.compuertas && (
+        <Aviso nivel={e.compuertas.estado === "cerradas" ? "info" : "aviso"} texto={`Compuertas del aliviadero · ${e.compuertas.texto}`} />
+      )}
       {e.comparacion && (e.comparacion.anioPasadoPct != null || e.comparacion.media10Pct != null) && (
         <View style={{ flexDirection: "row", gap: 10 }}>
           {([[`Hace un año${e.comparacion.anioPasado ? ` (${e.comparacion.anioPasado})` : ""}`, e.comparacion.anioPasadoPct],
@@ -77,7 +92,7 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
       )}
       {(e.entrada != null || e.salida != null) && (
         <View style={{ flexDirection: "row", gap: 10 }}>
-          {([["Entra", e.entrada], ["Sale", e.salida]] as const).map(([t, v]) => (
+          {([[e.entradaEstimada ? "Entra (calculado)" : "Entra", e.entrada], ["Sale", e.salida]] as const).map(([t, v]) => (
             <View key={t} style={{ flex: 1, backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12, gap: 2 }}>
               <Etiqueta>{t}</Etiqueta>
               <Cifra valor={num(v, 2)} unidad="m³/s" tam={22} />
@@ -86,7 +101,8 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
         </View>
       )}
       {e.salidaMedidaEn && <Etiqueta>La salida se mide en {e.salidaMedidaEn}, justo aguas abajo de la presa.</Etiqueta>}
-      {e.maniobra && (
+      {e.entradaEstimada && <Etiqueta>Lo que entra se calcula: lo que sale + lo que gana el embalse.</Etiqueta>}
+      {e.maniobra && !e.balance && (
         <Aviso nivel={e.maniobra.texto === "Equilibrio" ? "info" : "aviso"}
           texto={`${e.maniobra.texto}: balance ${signo(e.maniobra.balanceM3s, 2)} m³/s (${signo(e.maniobra.balanceHm3Dia, 3)} hm³/día). La posición de las compuertas no es pública: se deduce de lo que entra y sale.`} />
       )}

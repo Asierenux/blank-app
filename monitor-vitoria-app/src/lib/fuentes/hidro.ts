@@ -16,7 +16,7 @@ export interface EstacionHidro { id: string; nombre: string; medidas: Medida[] }
 export interface CacheHidro { t: number; estaciones: EstacionHidro[] }
 
 /** Palabras que delatan una estación de la zona (ríos y embalses del Zadorra). */
-const CLAVES = ["zadorra", "ullibarri", "ullivarri", "gamboa", "urrunaga", "santa engracia", "abetxuko", "arce",
+const CLAVES = ["zadorra", "arroiabe", "ullibarri", "ullivarri", "gamboa", "urrunaga", "santa engracia", "abetxuko", "arce",
   "mendibil", "mendivil", "alegria", "albina", "vitoria", "gasteiz", "audikana", "durana", "trespuentes",
   "arrazua", "ubarrundia", "legutio", "zigoitia", "barrundia", "elburgo", "iruña", "kuartango", "zuia", "nanclares"];
 const MAX_ESTACIONES = 12;

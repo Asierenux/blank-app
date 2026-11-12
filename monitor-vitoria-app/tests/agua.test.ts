@@ -194,6 +194,21 @@ test("Panel: con datos al momento, el embalse sale como SAIH y con la comparaci�
   assert.equal(e.var24hPct, -0.2);                       // 56,41 → 56,19
   assert.equal(e.comparacion?.media10Pct, 63.15);
   assert.ok(e.serie.length >= 7);
+  // 82,63 hm³ (11/11 06:45) → 82,30 hm³ (12/11 07:15): se vacía a unos 3,7 m³/s
+  assert.equal(e.balance?.texto, "Vaciándose");
+  assert.ok(Math.abs(e.balance!.m3s - -3.7) < 0.15, String(e.balance?.m3s));
+  assert.equal(e.balance?.horas, 25);
+  assert.ok(e.balance!.cmDia! < 0);
+  // A 541,7 m, casi 3 m por debajo del aliviadero: las compuertas no pueden soltar agua
+  assert.equal(e.compuertas?.estado, "cerradas");
+  // Con la salida medida en Arroiabe, la entrada se deduce: sale 5 − se pierde 3,7 = entra 1,3
+  h.ponerExtra("estacionesHidro", { t: 0, estaciones: [{ id: "C0AR", nombre: "Zadorra en Arroiabe", medidas: [] }] });
+  h.guardar([{ fuente: "hidro", metrica: "C0AR.caudal", t: Date.UTC(2026, 10, 12, 7), valor: 5, unidad: "m³/s" }]);
+  const e2 = construirPanel(h, UMBRALES_DEFECTO, {}, Date.UTC(2026, 10, 12, 8)).agua.embalses.find(x => x.id === "ullibarri")!;
+  assert.equal(e2.salida, 5);
+  assert.equal(e2.salidaMedidaEn, "Zadorra en Arroiabe");
+  assert.equal(e2.entradaEstimada, true);
+  assert.ok(Math.abs(e2.entrada! - 1.3) < 0.15, String(e2.entrada));
 });
 
 test("Curva cota-volumen: reproduce las lecturas reales", async () => {
