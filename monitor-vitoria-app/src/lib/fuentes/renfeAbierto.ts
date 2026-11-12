@@ -63,7 +63,9 @@ export function parsearRenfeAbierto(
 
   // ---- Alta velocidad, larga y media distancia
   const retrasosLD = leerRetrasos(fuentes.retrasosLD);
-  const tLD = Number(fuentes.posicionesLD?.header?.timestamp) * 1000 || ahora;
+  // La hora de la cabecera de Renfe a veces no se actualiza en horas, y las posiciones no traen la
+  // suya: la posición es la de AHORA (la que acaba de dar Renfe).
+  const tLD = ahora;
   for (const e of fuentes.posicionesLD?.entity ?? []) {
     const v = e?.vehicle;
     const lat = Number(v?.position?.latitude), lon = Number(v?.position?.longitude);
@@ -80,9 +82,12 @@ export function parsearRenfeAbierto(
     const i = sig ? cods.indexOf(sig) : -1;
     const ant = enEstacion ? sig : i > 0 ? cods[i - 1] : null;
     const retrasoMin = r?.delay != null ? Math.round(r.delay / 60) : 0;
-    // Llegada a la siguiente: la de Renfe en directo o, si no, la del horario + el retraso
+    // Llegada a la siguiente: la del horario + el retraso actual. La hora que trae trip_updates_LD
+    // no es fiable (a veces es de horas antes): solo se usa si es futura y no hay horario.
     const prevista = i >= 0 ? it!.paradas[i][1] : null;
-    const llegada = (sig && r?.llegadas.get(sig)) || (prevista != null ? medianoche + (prevista + retrasoMin) * 60e3 : null);
+    const enDirecto = sig ? r?.llegadas.get(sig) : undefined;
+    const llegada = prevista != null ? medianoche + (prevista + retrasoMin) * 60e3
+      : enDirecto && enDirecto > ahora - 5 * 60e3 && enDirecto < ahora + 12 * 3600e3 ? enDirecto : null;
     salida.push({
       id, operador: "Renfe", red: "ld", tipo: tipoDeHorario(it?.tipo ?? tipos?.[id]),
       origen: it ? nombreEstacion(cods[0]) : "", destino: it ? nombreEstacion(cods.at(-1)) : "—",

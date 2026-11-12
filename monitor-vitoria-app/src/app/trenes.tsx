@@ -70,6 +70,15 @@ const nombreTren = (t: Tren) => (t.operador === "Renfe" ? `${t.tipo} ${t.id}` : 
 const hm = (min: number) => `${Math.floor(min / 60) % 24}:${String(Math.round(min) % 60).padStart(2, "0")}`;
 const duracion = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`);
 
+/** Avanza `seg` segundos desde el último punto, con la velocidad (km/h) y el rumbo de los dos últimos. */
+function avanzar(a: [number, number, number], b: [number, number, number], kmh: number, seg: number) {
+  const kx = 111.32 * Math.cos((b[1] * Math.PI) / 180), ky = 110.54;
+  const dx = (b[2] - a[2]) * kx, dy = (b[1] - a[1]) * ky, d = Math.hypot(dx, dy);
+  if (d < 0.05 || seg <= 0) return { latitude: b[1], longitude: b[2] };
+  const km = (kmh * seg) / 3600;
+  return { latitude: b[1] + ((dy / d) * km) / ky, longitude: b[2] + ((dx / d) * km) / kx };
+}
+
 function colorRetraso(c: Colores, m: number, t?: Tren) {
   if (t?.cortadoPor) return "#8E8E93";        // su línea está cortada según Adif
   if (t?.sinRetraso) return "#E6007E";      // Ouigo (según horario): su color, sin semáforo
@@ -139,7 +148,8 @@ export default function Trenes() {
 
   useFocusEffect(useCallback(() => {
     void refrescar();
-    const reloj = setInterval(refrescar, 15000);
+    // Renfe renueva las posiciones cada ~15 s: preguntando cada 10 s se recoge cada una enseguida
+    const reloj = setInterval(refrescar, 10000);
     const segundero = setInterval(() => setTic(x => x + 1), 30000);   // los "hace X min" se mueven solos
     return () => { clearInterval(reloj); clearInterval(segundero); };
   }, [refrescar]));
@@ -194,6 +204,17 @@ export default function Trenes() {
   const vel = tren && !tren.estimada ? velocidad(rastro) : null;
   const sig = tren && it ? situarEnRecorrido(it, tren) : -1;
   const parado = tren ? paradoAhora(tren) : null;
+  // reloj de 1 s mientras hay un tren elegido (para moverlo entre lecturas)
+  useEffect(() => {
+    if (!elegido) return;
+    const r = setInterval(() => setTic(x => x + 1), 1000);
+    return () => clearInterval(r);
+  }, [elegido]);
+  // Entre dos lecturas de Renfe, el tren elegido avanza cada segundo con su velocidad y su rumbo
+  // (como un navegador en un túnel); al llegar la siguiente posición real, se corrige sola.
+  const animado = tren && !tren.estimada && vel != null && vel > 5 && !parado && rastro.length >= 2
+    ? avanzar([...rastro].reverse().find(p => p[0] < tren.t) ?? rastro.at(-2)!, [tren.t, tren.lat, tren.lon], vel,
+      Math.min(20, (ahora - tren.t) / 1000)) : null;
 
   const elegir = (t: Tren) => {
     setElegido(t.id);
@@ -272,7 +293,7 @@ export default function Trenes() {
           </Marker>
         ))}
         {enMapa.map(t => (
-          <Marker key={t.id} coordinate={{ latitude: t.lat, longitude: t.lon }} anchor={{ x: 0.5, y: 0.5 }}
+          <Marker key={t.id} coordinate={t.id === elegido && animado ? animado : { latitude: t.lat, longitude: t.lon }} anchor={{ x: 0.5, y: 0.5 }}
             onPress={() => elegir(t)} zIndex={t.id === elegido ? 10 : 1} tracksViewChanges={t.id === elegido}>
             <Chapa t={t} c={c} grande={t.id === elegido} parado={enVia(t)} />
           </Marker>
@@ -320,7 +341,7 @@ export default function Trenes() {
                   ? "Posición SEGÚN HORARIO: Ouigo no publica el GPS ni los retrasos de sus trenes. Si va con retraso o está parado, no se puede saber."
                   : tren.estimada
                   ? "Posición estimada: Euskotren no publica el GPS de sus trenes (se calcula con su horario en tiempo real)."
-                  : `Posición GPS ${hace(tren.t)}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
+                  : `Posición GPS ${hace(tren.t)}${animado ? " (entre lecturas se mueve con su velocidad)" : ""}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
               </Etiqueta>
             </Tarjeta>
 
