@@ -173,6 +173,16 @@ export function rellenarDemo(h: Historial, ahora = Date.now()) {
     add("ciudad", "congestion_pct", t, Math.max(2, 6 + 22 * Math.exp(-(((hd - 8.3) / 1.2) ** 2)) + 18 * Math.exp(-(((hd - 18.5) / 1.6) ** 2)) + r() * 3), "%");
   }
   h.guardar(l.splice(0));
+  // embalses.net: comparación con el año pasado / media de 10 años y pluviómetros cercanos (datos reales del 12/11)
+  const pluvios = [
+    { nombre: "Agurain/Salvatierra", h1: 0.8, h6: 5.2, h12: 9.6, h24: 10.2 },
+    { nombre: "Vitoria Gasteiz Aeropuerto", h1: 0.8, h6: 4.5, h12: 7.8, h24: 7.8 },
+    { nombre: "Aramaio", h1: 2, h6: 5.6, h12: 6.2, h24: 6.2 },
+  ];
+  h.ponerExtra("infoEmbalses", {
+    ullibarri: { comparacion: { semanaAnteriorPct: -1.37, anioPasadoPct: 61.64, media10Pct: 63.15, anioPasado: 2025 }, pluviometros: pluvios, url: "https://www.embalses.net/" },
+    urrunaga: { comparacion: { semanaAnteriorPct: -2.78, anioPasadoPct: 78.33, media10Pct: 79.72, anioPasado: 2025 }, pluviometros: pluvios, url: "https://www.embalses.net/" },
+  });
   h.ponerExtra("obrasCiudad", { t: ahora, lista: [
     { id: "o1", nombre: "Ocupación de carril derecho sentido este en c/ Alto de Armentia entre Camino de Armentia y rotonda de La Antonia",
       direccion: "ARMENTIA, ALTO DE", desde: ahora - 70 * 86400e3, hasta: ahora + 48 * 86400e3, lat: 42.837162, lon: -2.699084, url: null },

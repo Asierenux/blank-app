@@ -32,7 +32,7 @@ export const INTERVALOS_MIN: Record<string, number> = {
   waqi: 30,
   euskalmet: 30,
   saih: 20,
-  embalses: 360,
+  embalses: 60,
   hidro: 30,
   generacion: 360,
   trafico: 10,

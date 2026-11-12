@@ -4,6 +4,7 @@
  *
  * Niveles: "ok" (verde), "aviso" (ámbar), "critico" (rojo), "info" (neutro), "sin_datos" (gris).
  */
+import type { Comparacion, InfoEmbalse, Pluviometro } from "./fuentes/embalses";
 import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, VITORIA, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
 import { fechaMadrid, inicioDiaMadrid } from "./formato";
 import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
@@ -247,6 +248,11 @@ export interface Embalse {
   cotas: { minima?: number; aliviadero?: number; nmn?: number; coronacion?: number };
   margenAliviadero: number | null; margenNmn: number | null;
   serie: Punto[];
+  /** Boletín semanal: variación, y cómo estaba la misma semana el año pasado y de media en 10 años */
+  comparacion: Comparacion | null;
+  /** Lluvia en los pluviómetros cercanos (embalses.net) */
+  pluviometros: Pluviometro[];
+  url: string | null;
 }
 
 export interface Rio {
@@ -260,7 +266,16 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 /** Los embalses llegan una vez por semana: un dato vale 10 días. */
 const VIGENCIA_EMBALSE = 10 * 24 * H;
 
+/** 3 meses: el boletín semanal hasta donde empiezan los datos al momento, y desde ahí estos (más detalle). */
+function serieEmbalse(h: Historial, id: string, ahora: number): Punto[] {
+  const desde = ahora - 90 * 24 * H;
+  const directo = h.serie(`agua.${id}.porcentaje`, desde, ahora);
+  const primero = directo[0]?.[0] ?? Infinity;
+  return [...h.serie(`semanal.${id}.porcentaje`, desde, ahora).filter(p => p[0] < primero), ...directo];
+}
+
 function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number): Embalse {
+  const info = h.extra<Record<string, InfoEmbalse>>("infoEmbalses")?.[e.id];
   // Primero el SAIH (al momento); si no hay, el boletín semanal
   const s = (senal: string) => {
     const saih = h.ultimo(`agua.${e.id}.${senal}`, ahora);
@@ -305,7 +320,10 @@ function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number)
     cotas: { minima: e.cotaMinima, aliviadero: e.cotaAliviadero, nmn: e.cotaNmn, coronacion: e.cotaCoronacion },
     margenAliviadero: e.cotaAliviadero != null && nivel != null ? r2(e.cotaAliviadero - nivel) : null,
     margenNmn: e.cotaNmn != null && nivel != null ? r2(e.cotaNmn - nivel) : null,
-    serie: h.serie(`${fuenteSerie}.${e.id}.porcentaje`, ahora - (deSaih ? 7 : 90) * 24 * H, ahora),
+    serie: serieEmbalse(h, e.id, ahora),
+    comparacion: info?.comparacion ?? null,
+    pluviometros: info?.pluviometros ?? [],
+    url: info?.url ?? null,
   };
 }
 
@@ -420,7 +438,7 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   pvpc: "Precio de la luz (REE)",
   euskalmet: "Euskalmet · Kapildui",
   hidro: "Euskalmet · ríos (nivel y caudal)",
-  embalses: "Embalses · dato semanal",
+  embalses: "Embalses (embalses.net)",
   generacion: "Generación hidráulica (REE)",
   trafico: "Tráfico (Gobierno Vasco)",
 };

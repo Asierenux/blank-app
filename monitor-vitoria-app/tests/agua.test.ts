@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import { test } from "node:test";
 
-import { ESTACIONES } from "../src/lib/config";
+import { ESTACIONES, UMBRALES_DEFECTO } from "../src/lib/config";
+import { Historial, almacenEnMemoria } from "../src/lib/historial";
 import { enlaceCuenca, enlaceEmbalse, parsearFicha, recogerEmbalses } from "../src/lib/fuentes/embalses";
 import { candidatas, recogerHidro } from "../src/lib/fuentes/hidro";
 import { internetFalsa } from "./fuentes.test";
@@ -154,4 +155,43 @@ test("Ríos: lista solo con códigos → revisa las fichas por tandas y guarda p
   const r = await recogerHidro(d, "yo@x.eus", pem, undefined, ahora + 300e3, progreso);
   assert.deepEqual([...new Set(r.lecturas.map(l => l.metrica))], ["B090.caudal"]);
   assert.equal((r.extra!.estacionesHidro as any).estaciones[0].nombre, "Zadorra (Abetxuko)");
+});
+
+test("Datos reales de embalses.net: tiempo real del SAIH, comparación y pluviómetros", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearTiempoReal, parsearComparacion, parsearPluviometros } = await import("../src/lib/fuentes/embalses");
+  const html = readFileSync(new URL("./datos/embalsesnet_ullivarri.html", import.meta.url), "utf-8");
+  const ull = ESTACIONES.find(e => e.id === "ullibarri")!;
+  const l = parsearTiempoReal(ull, html);
+  const pct = l.filter(x => x.metrica === "ullibarri.porcentaje").sort((a, b) => b.t - a.t);
+  assert.equal(pct.length, 7);
+  assert.equal(new Date(pct[0].t).toISOString(), "2026-11-12T06:15:00.000Z");     // 07:15 en Madrid
+  assert.equal(pct[0].valor, 56.19);
+  assert.equal(pct[0].fuente, "agua");                                              // cuenta como dato al momento
+  assert.equal(l.find(x => x.metrica === "ullibarri.volumen" && x.t === pct[0].t)!.valor, 82.3);
+  assert.deepEqual(parsearComparacion(html), { semanaAnteriorPct: -1.37, anioPasadoPct: 61.64, media10Pct: 63.15, anioPasado: 2025 });
+  const p = parsearPluviometros(html);
+  assert.equal(p.length, 6);
+  assert.deepEqual(p.find(x => x.nombre === "Vitoria Gasteiz Aeropuerto"), { nombre: "Vitoria Gasteiz Aeropuerto", h1: 0.8, h6: 4.5, h12: 7.8, h24: 7.8 });
+  // Urrunaga también
+  const urr = readFileSync(new URL("./datos/embalsesnet_urrunaga.html", import.meta.url), "utf-8");
+  const lu = parsearTiempoReal(ESTACIONES.find(e => e.id === "urrunaga")!, urr);
+  assert.ok(lu.some(x => x.metrica === "urrunaga.porcentaje" && x.valor === 51.99));
+});
+
+test("Panel: con datos al momento, el embalse sale como SAIH y con la comparación", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearTiempoReal, parsearFicha, parsearComparacion, parsearPluviometros } = await import("../src/lib/fuentes/embalses");
+  const { construirPanel } = await import("../src/lib/panel");
+  const html = readFileSync(new URL("./datos/embalsesnet_ullivarri.html", import.meta.url), "utf-8");
+  const ull = ESTACIONES.find(e => e.id === "ullibarri")!;
+  const h = new Historial(almacenEnMemoria());
+  h.guardar([...parsearFicha(ull, html), ...parsearTiempoReal(ull, html)]);
+  h.ponerExtra("infoEmbalses", { ullibarri: { comparacion: parsearComparacion(html), pluviometros: parsearPluviometros(html), url: "x" } });
+  const e = construirPanel(h, UMBRALES_DEFECTO, {}, Date.UTC(2026, 10, 12, 8)).agua.embalses.find(x => x.id === "ullibarri")!;
+  assert.equal(e.origen, "saih");
+  assert.equal(e.porcentaje, 56.19);
+  assert.equal(e.var24hPct, -0.2);                       // 56,41 → 56,19
+  assert.equal(e.comparacion?.media10Pct, 63.15);
+  assert.ok(e.serie.length >= 7);
 });
