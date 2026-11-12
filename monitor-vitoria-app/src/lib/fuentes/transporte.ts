@@ -202,9 +202,14 @@ export interface Vehiculo {
   retrasoS?: number;
   desde?: PuntoTiempo | null;
   hacia?: PuntoTiempo;
+  viaje?: string;
 }
 export interface PuntoTiempo { lat: number; lon: number; t: number; nombre: string }
-export interface Llegada { linea: string; color: string | null; destino: string; enS: number; retrasoS: number }
+export interface Llegada {
+  linea: string; color: string | null; destino: string; enS: number; retrasoS: number;
+  /** El vehículo y el viaje, para poder seguirlo en el mapa */
+  vehiculo?: string; viaje?: string;
+}
 
 const tiene = (o: object | null | undefined, campo: string) => !!o && Object.prototype.hasOwnProperty.call(o, campo);
 /** Los enteros de 64 bits llegan como número o como objeto "Long". */
@@ -228,7 +233,7 @@ export function posiciones(feed: Feed, h: Horario, operador: Operador, ahoraS: n
       linea: linea?.nombre || lineaId || "?", color: linea?.color ?? null, destino: viaje?.destino ?? "",
       lat: redondear(v.position.latitude), lon: redondear(v.position.longitude),
       rumbo: tiene(v.position, "bearing") ? Math.round(v.position.bearing ?? 0) : null,
-      haceS: ts ? Math.round(ahoraS - ts) : null, estimada: false,
+      haceS: ts ? Math.round(ahoraS - ts) : null, estimada: false, viaje: v.trip?.tripId || undefined,
     });
   }
   return salida;
@@ -322,6 +327,7 @@ export function llegadas(
       const ll: Llegada = {
         linea: linea?.nombre || "?", color: linea?.color ?? null, destino: viaje?.destino ?? "",
         enS: Math.round(horaStu - ahoraS), retrasoS: stu.arrival ? stu.arrival.delay ?? 0 : 0,
+        vehiculo: tu.vehicle?.id || tu.trip?.tripId || e.id, viaje: tu.trip?.tripId || undefined,
       };
       (porParada[parada.id] ??= []).push(ll);
       if (!proxima) proxima = [parada, ll];
@@ -335,7 +341,7 @@ export function llegadas(
       vehiculos.push({
         id: tu.vehicle?.id || tu.trip?.tripId || e.id, operador, tipo: OPERADORES[operador].tipo,
         linea: ll.linea, color: ll.color, destino: ll.destino, lat, lon, rumbo: null, haceS: null,
-        estimada: true, parada: parada.nombre, llegaEnS: ll.enS, retrasoS: ll.retrasoS, desde, hacia,
+        estimada: true, parada: parada.nombre, llegaEnS: ll.enS, retrasoS: ll.retrasoS, desde, hacia, viaje: tu.trip?.tripId || undefined,
       });
     }
   }

@@ -6,7 +6,7 @@
  *  - ⛽ Gasolina: precios en el mapa y en lista.
  */
 import * as Location from "expo-location";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from "react-native";
 import MapView, { Circle, Marker, Polyline } from "react-native-maps";
@@ -37,13 +37,13 @@ const NOMBRE_TIPO: Record<string, string> = {
   averia: "Avería", peligro: "Peligro", evento: "Evento", otro: "Otros", puerto: "Puerto",
 };
 
-function Chapa({ v, c }: { v: Vehiculo; c: ReturnType<typeof useColores> }) {
+function Chapa({ v, c, grande = false }: { v: Vehiculo; c: ReturnType<typeof useColores>; grande?: boolean }) {
   const fondo = v.color ?? (v.tipo === "bus" ? c.bus : c.tranvia);
   return (
-    <View style={{ minWidth: 26, height: 26, paddingHorizontal: 5, borderRadius: 13, backgroundColor: fondo,
-      alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "#fff",
+    <View style={{ minWidth: grande ? 40 : 26, height: grande ? 40 : 26, paddingHorizontal: 5, borderRadius: 20, backgroundColor: fondo,
+      alignItems: "center", justifyContent: "center", borderWidth: grande ? 4 : 2, borderColor: grande ? c.acento : "#fff",
       shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
-      <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{v.linea.replace(/^TG/, "T")}</Text>
+      <Text style={{ color: "#fff", fontSize: grande ? 14 : 11, fontWeight: "800" }}>{v.linea.replace(/^TG/, "T")}</Text>
     </View>
   );
 }
@@ -85,6 +85,9 @@ export default function Movilidad() {
   const [recorridos, setRecorridos] = useState<Recorrido[]>([]);
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
+  // Seguir un tranvía o autobús concreto (se llega aquí tocándolo en "Mis paradas" de Inicio)
+  const params = useLocalSearchParams<{ seguir?: string; viaje?: string; tipo?: string; parada?: string; linea?: string; destino?: string; llega?: string; t?: string }>();
+  const [siguiendo, setSiguiendo] = useState<{ id: string; viaje: string; parada: string; linea: string; destino: string; llega: number } | null>(null);
   const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
   const [camaraVista, setCamaraVista] = useState<Camara | null>(null);
   const [filtroInc, setFiltroInc] = useState<string>("importantes");
@@ -157,6 +160,13 @@ export default function Movilidad() {
   }, [verTranvia]);
 
   useEffect(() => { setLinea(null); }, [modo, vehiculo]);
+  useEffect(() => {
+    if (!params.t || (!params.seguir && !params.viaje)) return;
+    setModo("transporte");
+    setVehiculo(params.tipo === "bus" ? "bus" : "tranvia");
+    setSiguiendo({ id: params.seguir ?? "", viaje: params.viaje ?? "", parada: params.parada ?? "", linea: params.linea ?? "",
+      destino: params.destino ?? "", llega: Number(params.llega) || 0 });
+  }, [params.t]);
   const amplio = modo === "gasolina" || (modo === "trafico" && zona === "carreteras");
   useEffect(() => {
     mapa.current?.animateToRegion(amplio ? REGION_AMPLIA : REGION, 400);
@@ -174,6 +184,22 @@ export default function Movilidad() {
         return { ...v, lat, lon };
       });
   }, [estado, verTransporte, vehiculo, linea, ahora, recorridos]);
+
+  const seguido = siguiendo && verTransporte
+    ? vehiculos.find(v => (siguiendo.id && v.id === siguiendo.id) || (siguiendo.viaje && v.viaje === siguiendo.viaje)) ?? null : null;
+  // El mapa va detrás del vehículo seguido (como mucho cada 3 s, para que no maree)
+  const ultimoCentrado = useRef(0);
+  useEffect(() => {
+    if (!seguido || Date.now() - ultimoCentrado.current < 3000) return;
+    ultimoCentrado.current = Date.now();
+    mapa.current?.animateToRegion({ latitude: seguido.lat, longitude: seguido.lon, latitudeDelta: 0.014, longitudeDelta: 0.014 }, 700);
+  }, [seguido?.lat, seguido?.lon]);
+  // Mientras se sigue un tranvía, el reloj de 1 s también corre aunque se mire el autobús
+  useEffect(() => {
+    if (!siguiendo || verTranvia) return;
+    const r = setInterval(() => setAhora(Date.now()), 1000);
+    return () => clearInterval(r);
+  }, [siguiendo, verTranvia]);
 
   const lineas = (estado?.lineasActivas ?? []).filter(l => l.tipo === vehiculo);
   const trazos = verTransporte ? recorridos.filter(r => r.tipo === vehiculo && (!linea || r.linea === linea)) : [];
@@ -243,9 +269,10 @@ export default function Movilidad() {
           ))}
           {vehiculos.map(v => (
             <Marker key={`${v.operador}-${v.id}`} coordinate={{ latitude: v.lat, longitude: v.lon }} anchor={{ x: 0.5, y: 0.5 }}
+              zIndex={v === seguido ? 10 : 1}
               title={`Línea ${v.linea}${v.destino ? ` → ${v.destino}` : ""}`}
               description={v.estimada ? `Próxima parada: ${v.parada} (${enMinutos(v.llegaEnS ?? 0)})` : v.haceS != null ? `Posición GPS de hace ${v.haceS} s` : "Posición GPS"}>
-              <Chapa v={v} c={c} />
+              <Chapa v={v} c={c} grande={v === seguido} />
             </Marker>
           ))}
           {modo === "trafico" && zona === "ciudad" && panel?.traficoCiudad?.sensores.filter(x => x.estado === "denso" || x.estado === "retenciones").map(x => (
@@ -285,6 +312,26 @@ export default function Movilidad() {
         {/* ------------------------------ Transporte ------------------------------ */}
         {verTransporte && (
           <>
+            {siguiendo && (
+              <Tarjeta>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  <Text style={{ color: c.texto, fontSize: 17, fontWeight: "800", flex: 1 }}>
+                    {`🎯 ${vehiculo === "bus" ? "🚌" : "🚋"} ${siguiendo.linea}${siguiendo.destino ? ` → ${siguiendo.destino}` : ""}`}
+                  </Text>
+                  <Pressable onPress={() => setSiguiendo(null)} hitSlop={10}><Text style={{ color: c.acento, fontSize: 15 }}>Dejar de seguir</Text></Pressable>
+                </View>
+                {siguiendo.llega > 0 && siguiendo.parada ? (
+                  <Text style={{ color: c.texto, fontSize: 15 }}>
+                    {siguiendo.llega - ahora > 30e3 ? `Llega a ${siguiendo.parada} en ${enMinutos(Math.round((siguiendo.llega - ahora) / 1000))}` : `Llegando a ${siguiendo.parada}`}
+                  </Text>
+                ) : null}
+                <Etiqueta>
+                  {seguido
+                    ? `${seguido.estimada ? "Posición estimada con el horario en tiempo real (Euskotren no publica GPS)" : "Posición GPS"} · ahora hacia ${seguido.parada ?? "—"}`
+                    : "Todavía no aparece en el mapa: aún no ha salido de su cabecera. Saldrá aquí en cuanto empiece el viaje."}
+                </Etiqueta>
+              </Tarjeta>
+            )}
             {estado?.errores.filter(e => (vehiculo === "bus" && e.includes("Tuvisa")) || (vehiculo === "tranvia" && e.includes("Tranvía")))
               .map(e => <Aviso key={e} nivel="aviso" texto={e} />)}
             {lineas.length > 0 && (

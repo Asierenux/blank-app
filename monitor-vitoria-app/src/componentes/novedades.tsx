@@ -1,5 +1,5 @@
 /** Piezas de las funciones nuevas: avisos, previsión, mis paradas, gasolineras y aire oficial. */
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { FlatList, Linking, Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -56,7 +56,7 @@ export function PrevisionHoras({ prevision, horas = 24 }: { prevision: Prevision
       {lista.map((h, i) => (
         <View key={h.t} style={{ width: 52, alignItems: "center", gap: 4, paddingVertical: 8, borderRadius: 14,
           backgroundColor: i === 0 ? c.tarjetaAlta : "transparent" }}>
-          <Text style={{ color: c.suave, fontSize: 12, fontWeight: "600" }}>{i === 0 ? "Ahora" : hora(h.t).slice(0, 2) + "h"}</Text>
+          <Text style={{ color: c.suave, fontSize: 12, fontWeight: "600" }}>{i === 0 ? "Ahora" : hora(h.t).split(":")[0] + "h"}</Text>
           <Text style={{ fontSize: 22 }}>{iconoCielo(h.cielo)}</Text>
           <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700" }}>{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</Text>
           <Text style={{ color: c.agua, fontSize: 11, fontWeight: "600", minHeight: 14 }}>
@@ -222,7 +222,12 @@ export function MisParadas() {
             {lista.length ? (
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {lista.map((l, i) => (
-                  <View key={i} style={{ backgroundColor: c.tarjetaAlta, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, minWidth: 92, gap: 2 }}>
+                  // Al tocarlo: Movilidad, con el mapa siguiendo a ESE tranvía o autobús
+                  <Pressable key={i} onPress={() => router.navigate({ pathname: "/movilidad", params: {
+                    seguir: l.vehiculo ?? "", viaje: l.viaje ?? "", tipo: p.operador === "tuvisa" ? "bus" : "tranvia",
+                    parada: p.nombre, linea: l.linea, destino: l.destino, llega: String(Date.now() + Math.max(0, l.enS - pasado) * 1000), t: String(Date.now()),
+                  } })}
+                    style={({ pressed }) => ({ backgroundColor: c.tarjetaAlta, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, minWidth: 92, gap: 2, opacity: pressed ? 0.6 : 1 })}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <View style={{ backgroundColor: l.color ?? c.bus, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>
                         <Text style={{ color: "#fff", fontWeight: "800", fontSize: 12 }}>{l.linea}</Text>
@@ -230,7 +235,7 @@ export function MisParadas() {
                       <Text style={{ color: c.texto, fontWeight: "800", fontVariant: ["tabular-nums"] }}>{enMinutos(Math.max(0, l.enS - pasado))}</Text>
                     </View>
                     <Text numberOfLines={1} style={{ color: c.suave, fontSize: 12, maxWidth: 120 }}>{l.destino || " "}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </ScrollView>
             ) : <Etiqueta>{error ? "" : "Sin llegadas previstas ahora mismo"}</Etiqueta>}
