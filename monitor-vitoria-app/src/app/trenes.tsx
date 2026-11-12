@@ -193,11 +193,14 @@ export default function Trenes() {
   const enVia = (t: Tren) => { const p = paradoAhora(t); return !!p && !p.estacion && t.estado !== "estacion"; };
   const visibles = alcance === "vitoria" ? todos.filter(t => t.distanciaKm <= 100) : todos.filter(t => t.operador !== "Euskotren");
   const texto = buscar.trim().toLowerCase();
-  const lista = useMemo(() => visibles.filter(t =>
-    // "Todos" = alta velocidad, larga y media distancia y Ouigo; las Cercanías (cientos) con su filtro o buscando
-    ((filtro === "todos" && (t.red !== "cercanias" || !!texto)) || (filtro === "alta" && ALTA.has(t.tipo)) || (filtro === "resto" && t.red === "ld" && !ALTA.has(t.tipo))
-      || (filtro === "cercanias" && t.red === "cercanias") || (filtro === "ouigo" && t.operador === "Ouigo")
-      || (filtro === "retraso" && t.retrasoMin >= 15) || (filtro === "parados" && enVia(t)) || (filtro === "euskotren" && t.operador === "Euskotren"))
+  // "Todos", "+15 min" y "Parados" = alta velocidad, larga y media distancia y Ouigo (como el resumen);
+  // las Cercanías (cientos) con su filtro o buscando
+  const cumple = (t: Tren, f: Filtro) =>
+    (f === "todos" && (t.red !== "cercanias" || !!texto)) || (f === "alta" && ALTA.has(t.tipo)) || (f === "resto" && t.red === "ld" && !ALTA.has(t.tipo))
+    || (f === "cercanias" && t.red === "cercanias") || (f === "ouigo" && t.operador === "Ouigo")
+    || (f === "retraso" && t.red !== "cercanias" && !t.sinRetraso && t.retrasoMin >= 15) || (f === "parados" && t.red !== "cercanias" && enVia(t))
+    || (f === "euskotren" && t.operador === "Euskotren");
+  const lista = useMemo(() => visibles.filter(t => cumple(t, filtro)
     && (!texto || [t.id, t.tipo, t.origen, t.destino, t.anterior, t.siguiente].some(x => x.toLowerCase().includes(texto))))
     .sort((a, b) => (alcance === "vitoria" ? a.distanciaKm - b.distanciaKm : b.retrasoMin - a.retrasoMin)),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +281,18 @@ export default function Trenes() {
       mapa.current?.animateToRegion({ latitude: t.lat, longitude: t.lon, latitudeDelta: 0.6, longitudeDelta: 0.6 }, 400);
     }
   };
+  /** Elegir un filtro (chip o recuadro del resumen): la lista y el mapa se quedan con esos trenes. */
+  const aplicarFiltro = (f: Filtro) => {
+    setFiltro(f); setElegido(null); setVerMas(false);
+    const puntos = visibles.filter(t => cumple(t, f)).slice(0, 500).map(t => ({ latitude: t.lat, longitude: t.lon }));
+    if (puntos.length > 1 && mapa.current?.fitToCoordinates) {
+      mapa.current.fitToCoordinates(puntos, { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true });
+    } else if (puntos.length === 1) {
+      mapa.current?.animateToRegion({ ...puntos[0], latitudeDelta: 0.8, longitudeDelta: 0.8 }, 400);
+    } else {
+      mapa.current?.animateToRegion(alcance === "espana" ? ESPANA : ZONA, 400);
+    }
+  };
   const cambiarAlcance = (a: Alcance) => {
     setAlcance(a); setElegido(null); setFiltro("todos");
     mapa.current?.animateToRegion(a === "espana" ? ESPANA : ZONA, 500);
@@ -289,8 +304,8 @@ export default function Trenes() {
     ["resto", `MD y regionales · ${visibles.filter(t => t.red === "ld" && !ALTA.has(t.tipo)).length}`],
     ["cercanias", `Cercanías · ${visibles.filter(t => t.red === "cercanias").length}`],
     ["ouigo", `Ouigo (horario) · ${visibles.filter(t => t.operador === "Ouigo").length}`],
-    ["retraso", `+15 min · ${visibles.filter(t => t.retrasoMin >= 15).length}`],
-    ["parados", `Parados en vía · ${visibles.filter(enVia).length}`],
+    ["retraso", `+15 min · ${visibles.filter(t => cumple(t, "retraso")).length}`],
+    ["parados", `Parados en vía · ${visibles.filter(t => cumple(t, "parados")).length}`],
     ...(alcance === "vitoria" ? [["euskotren", `Euskotren · ${visibles.filter(t => t.operador === "Euskotren").length}`] as [Filtro, string]] : []),
   ];
   const avisos = estado?.avisos ?? [];
@@ -376,7 +391,7 @@ export default function Trenes() {
                   <Text style={{ color: c.texto, fontSize: 20, fontWeight: "800" }}>{nombreTren(tren)}</Text>
                   <Etiqueta>{`${tren.operador} · ${tren.origen ? `${tren.origen} → ${tren.destino}` : `hacia ${tren.destino}`}`}</Etiqueta>
                 </View>
-                <Pressable onPress={() => setElegido(null)} hitSlop={10}><Text style={{ color: c.acento, fontSize: 16 }}>Cerrar</Text></Pressable>
+                <Pressable onPress={() => aplicarFiltro(filtro)} hitSlop={10}><Text style={{ color: c.acento, fontSize: 16 }}>Cerrar</Text></Pressable>
               </View>
               {tren.cortadoPor && (
                 <Aviso nivel="critico" texto={`Adif: «${tren.cortadoPor}». Este tren va por esa línea, así que probablemente no circula (Ouigo no publica si lo ha suprimido).`} />
@@ -460,18 +475,23 @@ export default function Trenes() {
         ) : (
           /* ---------------- Resumen de la red ---------------- */
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {[
-              ["AV, larga y media distancia", String(renfe.length), c.texto],
-              ["Cercanías", String(cercanias.length), c.texto],
-              ["Con +15 min", String(conRetraso), conRetraso ? c.aviso : c.ok],
-              ["Parados en vía", String(parados.length), parados.length ? c.critico : c.ok],
-              ["Retraso medio", `${medio} min`, medio >= 10 ? c.aviso : c.ok],
-            ].map(([t, v, col]) => (
-              <View key={t} style={{ flexGrow: 1, flexBasis: "30%", backgroundColor: c.tarjeta, borderRadius: 14, padding: 10, gap: 2 }}>
-                <Text style={{ color: col, fontSize: 19, fontWeight: "800" }} numberOfLines={1} adjustsFontSizeToFit>{v}</Text>
-                <Text style={{ color: c.suave, fontSize: 11, lineHeight: 13 }} numberOfLines={2}>{t}</Text>
-              </View>
-            ))}
+            {([
+              ["AV, larga y media distancia", String(renfe.length), c.texto, "todos"],
+              ["Cercanías", String(cercanias.length), c.texto, "cercanias"],
+              ["Con +15 min", String(conRetraso), conRetraso ? c.aviso : c.ok, "retraso"],
+              ["Parados en vía", String(parados.length), parados.length ? c.critico : c.ok, "parados"],
+              ["Retraso medio", `${medio} min`, medio >= 10 ? c.aviso : c.ok, "todos"],
+            ] as [string, string, string, Filtro][]).map(([t, v, col, f]) => {
+              const activo = filtro === f && t !== "Retraso medio";
+              return (
+                <Pressable key={t} onPress={() => aplicarFiltro(f)}
+                  style={({ pressed }) => ({ flexGrow: 1, flexBasis: "30%", backgroundColor: c.tarjeta, borderRadius: 14, padding: 10, gap: 2,
+                    borderWidth: 2, borderColor: activo ? c.acento : "transparent", opacity: pressed ? 0.6 : 1 })}>
+                  <Text style={{ color: col, fontSize: 19, fontWeight: "800" }} numberOfLines={1} adjustsFontSizeToFit>{v}</Text>
+                  <Text style={{ color: c.suave, fontSize: 11, lineHeight: 13 }} numberOfLines={2}>{t}{activo ? " ✓" : ""}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
 
@@ -482,7 +502,7 @@ export default function Trenes() {
               style={{ backgroundColor: c.tarjeta, color: c.texto, borderRadius: 12, paddingHorizontal: 14, height: 42, fontSize: 16 }} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }} style={{ flexGrow: 0, flexShrink: 0 }}>
               {chips.map(([f, t]) => (
-                <Pressable key={f} onPress={() => setFiltro(f)} style={{ paddingHorizontal: 14, height: 34, justifyContent: "center", borderRadius: 99,
+                <Pressable key={f} onPress={() => aplicarFiltro(f)} style={{ paddingHorizontal: 14, height: 34, justifyContent: "center", borderRadius: 99,
                   backgroundColor: filtro === f ? c.texto : c.tarjeta }}>
                   <Text style={{ color: filtro === f ? c.fondo : c.texto, fontWeight: "700" }}>{t}</Text>
                 </Pressable>
