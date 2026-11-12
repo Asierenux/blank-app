@@ -267,6 +267,35 @@ export interface Rio {
   caudal: number | null; nivel: number | null; t: number | null; edadMin: number | null; antiguo: boolean;
   caudalNormal: number | null; ratio: number | null; tendencia3h: number | null;
   nivelEstado: Nivel; texto: string; serie: Punto[]; serieNivel: Punto[];
+  /** Para el dibujo: lo que se mide (nivel si hay; si no, caudal), comparado con la última semana */
+  escala: EscalaRio | null;
+}
+
+export interface EscalaRio {
+  magnitud: "nivel" | "caudal"; valor: number; unidad: string;
+  normal: number | null; max7: number; min7: number;
+  /** cambio en 3 h (en la unidad de la magnitud) */
+  tend3h: number | null;
+}
+
+/** Nombres que llegaron con las tildes rotas (latin1 leído como UTF-8) antes de arreglarlo. */
+const NOMBRES_ROTOS: [RegExp, string][] = [[/Alegr\uFFFDa/g, "Alegría"], [/Ull\uFFFDbarri/g, "Ullíbarri"], [/\uFFFD/g, "·"]];
+const arreglarNombre = (n: string) => NOMBRES_ROTOS.reduce((s, [re, por]) => s.replace(re, por), n);
+
+function escalaRio(h: Historial, id: string, ahora: number): EscalaRio | null {
+  for (const [magnitud, unidad] of [["nivel", "m"], ["caudal", "m³/s"]] as const) {
+    const ult = h.ultimo(`${id}.${magnitud}`, ahora);
+    if (!ult || ahora - ult[0] > 48 * H) continue;
+    const semana = h.serie(`${id}.${magnitud}`, ahora - 7 * 24 * H, ahora).map(p => p[1]);
+    const antes = h.valorEn(`${id}.${magnitud}`, ult[0] - 3 * H);
+    return {
+      magnitud, unidad, valor: ult[1],
+      normal: semana.length >= 12 ? r2(mediana(semana)) : null,
+      max7: Math.max(ult[1], ...semana), min7: Math.min(ult[1], ...semana),
+      tend3h: antes != null ? Math.round((ult[1] - antes) * 1000) / 1000 : null,
+    };
+  }
+  return null;
 }
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -313,10 +342,10 @@ export function calcularBalance(serie: Punto[], ahora: number, cotaAhora: number
 export interface Compuertas { estado: "cerradas" | "posibles" | "abiertas"; texto: string }
 
 /** Lo que se puede afirmar de las compuertas del aliviadero con la cota y la salida. */
-export function estadoCompuertas(nivel: number | null, aliviadero: number | undefined, salida: number | null): Compuertas | null {
+export function estadoCompuertas(nivel: number | null, aliviadero: number | undefined, salida: number | null, salidas?: string): Compuertas | null {
   if (nivel == null || aliviadero == null) return null;
   if (nivel < aliviadero) {
-    return { estado: "cerradas", texto: `Sin usar: el agua está ${num(aliviadero - nivel, 2)} m por debajo del aliviadero, así que no pueden soltar agua. Sale por la central y los desagües.` };
+    return { estado: "cerradas", texto: `Sin usar: el agua está ${num(aliviadero - nivel, 2)} m por debajo del aliviadero, así que no pueden soltar agua. El agua que pierde sale ${salidas ?? "por los desagües de fondo"}.` };
   }
   if (salida != null && salida >= 10) return { estado: "abiertas", texto: `Desembalsando: ${num(salida, 1)} m³/s aguas abajo con el agua sobre el aliviadero.` };
   return { estado: "posibles", texto: "El agua está sobre el aliviadero: pueden abrirse para desembalsar (su posición no es pública)." };
@@ -425,7 +454,7 @@ function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number)
     cotaAnioPasado: cotaDesdePct(e, info?.comparacion.anioPasadoPct ?? null),
     cotaMedia10: cotaDesdePct(e, info?.comparacion.media10Pct ?? null),
     volumen, porcentaje, entrada: entradaFinal, entradaEstimada, salida, salidaMedidaEn, balance,
-    compuertas: estadoCompuertas(nivel, e.cotaAliviadero, salida), origen: t == null ? null : deSaih ? "saih" : "semanal",
+    compuertas: estadoCompuertas(nivel, e.cotaAliviadero, salida, e.salidas), origen: t == null ? null : deSaih ? "saih" : "semanal",
     t, edadDias: t == null ? null : Math.floor((ahora - t) / (24 * H)), antiguo: t != null && ahora - t > 8 * 24 * H,
     nivelEstado, texto,
     varSemanaPct: porcentaje != null && pctAntes != null ? Math.round((porcentaje - pctAntes) * 10) / 10 : null,
@@ -449,7 +478,7 @@ function construirRio(h: Historial, u: Umbrales, est: { id: string; nombre: stri
   const caudalP = h.ultimo(`${id}.caudal`, ahora);
   const nivelP = h.ultimo(`${id}.nivel`, ahora);
   const vigentes = [caudalP, nivelP].filter((p): p is Punto => !!p && ahora - p[0] < 48 * H);
-  const base = { id: est.id, nombre: est.nombre };
+  const base = { id: est.id, nombre: arreglarNombre(est.nombre), escala: escalaRio(h, id, ahora) };
   if (!vigentes.length) {
     return { ...base, caudal: null, nivel: null, t: null, edadMin: null, antiguo: false, caudalNormal: null, ratio: null,
       tendencia3h: null, nivelEstado: "sin_datos", texto: "Sin datos", serie: [], serieNivel: [] };
@@ -462,7 +491,13 @@ function construirRio(h: Historial, u: Umbrales, est: { id: string; nombre: stri
   const hace3 = h.valorEn(`${id}.caudal`, t - 3 * H);
   const factor = u.crecidaFactor || 3;
   let estado: Clasificacion;
-  if (q == null) estado = ["info", ""];
+  const esc = base.escala;
+  if (q == null && esc?.magnitud === "nivel") {
+    // Solo nivel: subida rápida o muy por encima de lo normal de la semana
+    if (esc.tend3h != null && esc.tend3h >= 0.15) estado = ["aviso", "Subiendo deprisa"];
+    else if (esc.normal != null && esc.valor >= esc.normal + Math.max(0.3, esc.normal)) estado = ["aviso", "Nivel alto"];
+    else estado = ["ok", esc.tend3h != null && esc.tend3h >= 0.03 ? "Sube" : esc.tend3h != null && esc.tend3h <= -0.03 ? "Baja" : "Normal"];
+  } else if (q == null) estado = ["info", ""];
   else if (ratio && ratio >= factor && q >= CAUDAL_MINIMO_CRECIDA) estado = ["critico", "Crecida"];
   else if (ratio && ratio >= factor / 2 && q >= CAUDAL_MINIMO_CRECIDA) estado = ["aviso", "Caudal alto"];
   else if (hace3 != null && q - hace3 > Math.max(1, 0.3 * hace3)) estado = ["aviso", "Subiendo"];

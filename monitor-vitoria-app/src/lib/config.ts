@@ -72,6 +72,8 @@ export interface Estacion {
   cotaCoronacion?: number;
   aforoSalida?: string;        // aforo justo aguas abajo: su caudal = lo que suelta la presa
   aforoSalidaNombre?: string;  // lo mismo, buscando por nombre entre las estaciones de Euskalmet
+  /** Por dónde sale el agua cuando no es por las compuertas (para explicarlo en la app) */
+  salidas?: string;
   /**
    * Curva cota-volumen: % = 100·((cota − cauce) / (NMN − cauce))^k. Sirve para deducir la cota
    * cuando solo se sabe el volumen (embalses.net no da la cota). Ajustada con lecturas reales.
@@ -85,12 +87,14 @@ export const ESTACIONES: Estacion[] = [
     capacidadHm3: 147.2, aforoSalida: "SAIH-A315", aforoSalidaNombre: "arroiabe",
     // NMN 546,5 m y coronación 548 m (CHE); compuertas a partir de 544,5 m (79,51 %).
     // Curva: cauce a 511 m (548 − 37 m de presa); con k = 3,97 reproduce 79,51 % a 544,5 m (±1 % en 545,15 y 546,04 m)
-    cotaAliviadero: 544.5, cotaNmn: 546.5, cotaCoronacion: 548, curva: { cauce: 511, k: 3.97 } },
+    cotaAliviadero: 544.5, cotaNmn: 546.5, cotaCoronacion: 548, curva: { cauce: 511, k: 3.97 },
+    salidas: "por el túnel a Urrunaga y de ahí al salto de Barazar (la central de Iberdrola, que genera luz y manda el agua a Bilbao), a la potabilizadora de Araka (agua de Vitoria) y por los desagües de fondo al Zadorra (el caudal ecológico del río)" },
   { id: "urrunaga", nombre: "Embalse de Urrunaga", corto: "Urrunaga", tipo: "embalse",
     rio: "Santa Engracia", codigo: "E028", claves: ["urrunaga"], slug: "urrunaga",
     capacidadHm3: 71.77, cotaMinima: 530, cotaAliviadero: 544.5, cotaNmn: 546.5, cotaCoronacion: 548,
     // Curva ajustada con lecturas reales del SAIH: 541,95 m = 54,27 % (31/10/2026) y 543,99 m = 73,1 % (2024)
-    curva: { cauce: 529.5, k: 1.962 } },
+    curva: { cauce: 529.5, k: 1.962 },
+    salidas: "por el salto de Barazar (la central de Iberdrola, que genera luz y manda el agua a Bilbao) y por los desagües de fondo al río Santa Engracia (su caudal ecológico)" },
 ];
 
 export const SENALES = {

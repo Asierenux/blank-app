@@ -152,6 +152,7 @@ export function DibujoEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | 
           <Path d={`M ${presaX - 26} ${SUELO - 5} L ${pieX - 10} ${SUELO - 5}`} stroke={turbina ? "#7DD3FC" : (oscuro ? "#374151" : "#94A3B8")}
             strokeWidth={3} strokeLinecap="round" strokeDasharray={turbina ? "6 3" : undefined} />
           <Rect x={presaX - 30} y={SUELO - 10} width={6} height={10} rx={1} fill={oscuro ? "#1F2937" : "#475569"} />
+          <SvgText x={presaX - 34} y={SUELO - 9} fontSize={9} fontWeight="700" fill={alfa("#FFFFFF", 0.85)} textAnchor="end">túnel → Barazar</SvgText>
           {/* La central */}
           <Rect x={pieX - 18} y={SUELO - 22} width={24} height={14} rx={2} fill={hormigonOsc} />
           <Polygon points={`${pieX - 20},${SUELO - 22} ${pieX + 8},${SUELO - 22} ${pieX - 6},${SUELO - 30}`} fill={c.suave} />

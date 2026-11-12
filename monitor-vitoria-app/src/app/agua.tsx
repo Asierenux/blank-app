@@ -5,6 +5,7 @@
 import { Linking, Text, View } from "react-native";
 
 import { DibujoEmbalse } from "../componentes/embalse";
+import { DibujoRio } from "../componentes/rio";
 import { Barra, GraficaLinea } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
@@ -132,19 +133,17 @@ function TarjetaRio({ r }: { r: Rio }) {
           <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700" }}>{r.nombre}</Text>
           <Etiqueta>Euskalmet · {r.id}{r.t ? ` · ${hace(r.t)}` : ""}</Etiqueta>
         </View>
-        <Insignia nivel={r.nivelEstado} texto={r.texto || undefined} />
       </View>
-      <View style={{ flexDirection: "row", gap: 20, alignItems: "flex-end" }}>
-        {r.caudal != null && <Cifra valor={num(r.caudal, 2)} unidad="m³/s" />}
-        {r.nivel != null && (r.caudal != null ? <Etiqueta>Nivel {num(r.nivel, 2)} m</Etiqueta> : <Cifra valor={num(r.nivel, 2)} unidad="m" />)}
-      </View>
+      <DibujoRio r={r} />
+      {r.caudal != null && r.nivel != null && <Etiqueta>{`Caudal ${num(r.caudal, 2)} m³/s · nivel ${num(r.nivel, 2)} m`}</Etiqueta>}
       {r.caudal != null && (
         <Etiqueta>
           {r.caudalNormal != null ? `Normal esta semana: ${num(r.caudalNormal, 1)} m³/s${r.ratio ? ` (×${num(r.ratio)})` : ""}` : "Calculando lo normal (hace falta un día de datos)"}
-          {r.tendencia3h != null ? ` · ${signo(r.tendencia3h, 1)} en 3 h` : ""}
+          {r.tendencia3h != null ? (Math.abs(r.tendencia3h) < 0.05 ? " · estable en 3 h" : ` · ${signo(r.tendencia3h, 1)} m³/s en 3 h`) : ""}
         </Etiqueta>
       )}
-      <GraficaLinea serie={r.serie.length ? r.serie : r.serieNivel} color={c.agua} decimales={r.serie.length ? 1 : 2} />
+      <Etiqueta>Últimas 48 h</Etiqueta>
+      <GraficaLinea serie={r.serie.length ? r.serie : r.serieNivel} color={c.agua} decimales={r.serie.length ? 1 : 2} alto={80} />
     </Tarjeta>
   );
 }
@@ -178,7 +177,10 @@ export default function Agua() {
         {agua.rios.length === 0 && (!ejHidro || ejHidro.ok) && (
           <Aviso texto="Buscando las estaciones de ríos de Euskalmet cerca de Vitoria… (necesita la clave de Euskalmet)" />
         )}
-        {agua.rios.map(r => <TarjetaRio key={r.id} r={r} />)}
+        {agua.rios.filter(r => r.escala).map(r => <TarjetaRio key={r.id} r={r} />)}
+        {agua.rios.some(r => !r.escala) && (
+          <Etiqueta>{`Sin datos ahora: ${agua.rios.filter(r => !r.escala).map(r => r.nombre).join(", ")} (Euskalmet no ha dado medidas de río en 48 h).`}</Etiqueta>
+        )}
       </Seccion>
 
       <Seccion titulo="Embalses">

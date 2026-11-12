@@ -1,3 +1,5 @@
+import { strFromU8 } from "fflate";
+
 import { ErrorFuente, type Descargar, type Lectura } from "../tipos";
 
 export interface Resultado {
@@ -38,12 +40,30 @@ export async function bajar(descargar: Descargar, url: string, opciones: Request
 
 export async function bajarJson<T = any>(descargar: Descargar, url: string, opciones: RequestInit = {}): Promise<T> {
   const r = await bajar(descargar, url, { ...opciones, headers: { Accept: "application/json", ...(opciones.headers ?? {}) } });
-  const texto = await r.text();
+  const texto = textoDe(new Uint8Array(await r.arrayBuffer()));
   try {
     return JSON.parse(texto) as T;
   } catch {
     throw new ErrorFuente("La respuesta no es JSON (¿la web ha cambiado?)");
   }
+}
+
+/** ¿Son bytes UTF-8 válidos? (algunas webs mandan latin1 y las tildes salen como "�") */
+export function esUtf8(b: Uint8Array): boolean {
+  for (let i = 0; i < b.length; i++) {
+    const x = b[i];
+    if (x < 0x80) continue;
+    const n = x >= 0xf0 && x < 0xf8 ? 3 : x >= 0xe0 ? 2 : x >= 0xc2 && x < 0xe0 ? 1 : -1;
+    if (n < 0) return false;
+    for (let k = 1; k <= n; k++) if ((b[i + k] & 0xc0) !== 0x80) return false;
+    i += n;
+  }
+  return true;
+}
+
+/** Texto de una respuesta: UTF-8 si lo es; si no, latin1 (así "Alegría" no sale "Alegr�a"). */
+export function textoDe(b: Uint8Array): string {
+  return strFromU8(b, !esUtf8(b));
 }
 
 export async function bajarBytes(descargar: Descargar, url: string): Promise<Uint8Array> {
