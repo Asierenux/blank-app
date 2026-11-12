@@ -23,7 +23,7 @@ import { recogerGasolina } from "./fuentes/gasolina";
 import { recogerAgenda } from "./fuentes/agenda";
 import { recogerCamarasVitoria, recogerObras, recogerTraficoCiudad } from "./fuentes/vitoria";
 import { recogerAireOficial, type EstacionAire } from "./fuentes/aireOficial";
-import { recogerTrenes, type Tren } from "./fuentes/trenes";
+import { recogerTrenes, type AvisoRenfe, type Tren } from "./fuentes/trenes";
 import { construirPanel, construirPvpc } from "./panel";
 import { avisoPreciosManana, proximas730, resumenDelDia } from "./resumen";
 import { fechaMadrid } from "./formato";
@@ -210,6 +210,15 @@ export class Motor {
   private async avisosTrenes(r: Resultado, ahora: number) {
     const lista = (r.extra?.trenes as { trenes: Tren[] } | undefined)?.trenes ?? [];
     const dia = fechaMadrid(ahora);
+    // Incidencias nuevas de Adif en la zona (afectan a todos los operadores): una vez cada una
+    for (const a of (r.extra?.incidenciasAdif as AvisoRenfe[] | undefined) ?? []) {
+      if (a.ascensor) continue;
+      const clave = `adif@${a.id}`;
+      if (clave in this.h.alertasEnviadas) continue;
+      this.h.apuntarAlerta(clave, ahora);
+      await this.o.notificar({ regla: "trenes", claves: [clave], titulo: `🚧 Adif · ${a.titulo || "Incidencia"}${a.ambito ? ` (${a.ambito})` : ""}`,
+        cuerpo: a.texto.slice(0, 220) }).catch(() => undefined);
+    }
     for (const t of lista.filter(x => x.distanciaKm <= 40)) {
       const avisos: [string, string, string][] = [];
       if (t.retrasoMin >= 30) {

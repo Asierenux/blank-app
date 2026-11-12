@@ -47,7 +47,7 @@ interface ValorDatos {
   listo: boolean;
   actualizando: boolean;
   actualizar: (forzar?: boolean, solo?: Fuente[]) => Promise<void>;
-  transporte: Pick<Transporte, "estado" | "recorridos" | "todasLasParadas" | "proximas">;
+  transporte: Pick<Transporte, "estado" | "recorridos" | "todasLasParadas" | "proximas" | "trenesEuskotren" | "avisosEuskotren">;
   historial: Historial;
   claves: Claves;
   ponerClave: (campo: keyof Claves, valor: string) => Promise<void>;

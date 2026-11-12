@@ -404,3 +404,33 @@ test("Motor: avisa una vez de un tren cercano con mucho retraso", async () => {
   // 18061 va con 65 min a 16 km de Vitoria (el 00437 va adelantado y el 00622 está a 48 km: no avisan)
   assert.deepEqual(enviados.filter(x => x.startsWith("🚆")), ["🚆 Media Distancia 18061 con 65 min de retraso"]);
 });
+
+test("Datos reales de Adif: incidencias de la zona con su causa (todos los operadores)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearIncidenciasAdif } = await import("../src/lib/fuentes/trenes");
+  const html = readFileSync(new URL("./datos/adif_estado_red.html", import.meta.url), "utf-8");
+  const a = parsearIncidenciasAdif(html);
+  const zorrotza = a.find(x => x.titulo === "Incidencia en Zorrotza")!;
+  assert.equal(zorrotza.ambito, "País Vasco");
+  assert.equal(zorrotza.fuente, "Adif");
+  assert.match(zorrotza.texto, /incidencia que afecta a la señalización en Zorrotza/);
+  assert.ok(!zorrotza.texto.includes("<"));
+  assert.ok(a.every(x => !/^Asturias$/.test(x.ambito ?? "")));     // lo de Asturias no interesa
+});
+
+test("Euskotren: tren estimado al formato común con su retraso", async () => {
+  const { deEuskotren } = await import("../src/lib/fuentes/trenes");
+  const ahora = Date.UTC(2026, 10, 12, 15);
+  const t = deEuskotren({ id: "ES:Euskotren:VehicleJourney:123456", operador: "euskotren", tipo: "tren", linea: "E1", color: "#005A8B",
+    destino: "Amara-Donostia", lat: 43.17, lon: -2.55, rumbo: null, haceS: null, estimada: true, parada: "Zaldibar",
+    llegaEnS: 99, retrasoS: 150, desde: { lat: 43.16, lon: -2.56, t: 0, nombre: "Durango" } }, ahora);
+  assert.equal(t.operador, "Euskotren");
+  assert.equal(t.tipo, "Euskotren E1");
+  assert.equal(t.id, "E1-123456");
+  assert.equal(t.retrasoMin, 3);
+  assert.equal(t.anterior, "Durango");
+  assert.equal(t.siguiente, "Zaldibar");
+  assert.equal(t.estado, "marcha");
+  assert.equal(t.llegadaSiguiente, ahora + 99e3);
+  assert.ok(t.distanciaKm > 30 && t.distanciaKm < 45);
+});

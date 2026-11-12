@@ -1,7 +1,9 @@
 /**
- * Trenes: los de Renfe de larga y media distancia a menos de 100 km de Vitoria, en un mapa y en
- * lista, con su retraso y si están en una estación, en marcha o parados en plena vía.
- * Se actualiza cada 20 s mientras la pestaña está a la vista. Debajo, los avisos de Renfe de la zona.
+ * Trenes a menos de 100 km de Vitoria, en un mapa y en lista, con su retraso y estado:
+ *  - Renfe (larga y media distancia): posición real del Visor de trenes.
+ *  - Euskotren (E1 Bilbao–Donostia, E3, E4…): posición estimada con sus horarios en tiempo real.
+ * Debajo, las incidencias de Adif (afectan a todos los operadores, con su causa) y los avisos de
+ * Renfe y Euskotren. Iryo y Ouigo no pasan por Vitoria ni publican datos en tiempo real.
  */
 import { useFocusEffect } from "expo-router";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -10,7 +12,7 @@ import MapView, { Marker } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Aviso, Etiqueta, Insignia, Tarjeta } from "../componentes/ui";
-import { DEMO } from "../datos";
+import { DEMO, useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
 import { trenesDemo } from "../lib/demo";
 import { ESTACIONES_RENFE } from "../lib/estacionesRenfe";
@@ -25,11 +27,13 @@ const CORTO: Record<string, string> = {
   Regional: "R", Proximidad: "P", AVLO: "AVLO", Tren: "T",
 };
 
-type Filtro = "todos" | "retraso" | "parados" | "vitoria";
+type Filtro = "todos" | "retraso" | "parados" | "vitoria" | "renfe" | "euskotren";
 
 const nivelRetraso = (m: number): Nivel => (m >= 30 ? "critico" : m >= 10 ? "aviso" : "ok");
 const textoRetraso = (m: number) => (m >= 2 ? `+${m} min` : m <= -2 ? `${m} min` : "En hora");
 const pasaPorVitoria = (t: Tren) => [t.origen, t.destino, t.anterior, t.siguiente].some(x => /vitoria/i.test(x));
+const etiqueta = (t: Tren) => (t.operador === "Euskotren" ? t.tipo.replace("Euskotren ", "") : CORTO[t.tipo] ?? "T");
+const ruta = (t: Tren) => (t.origen ? `${t.origen} → ${t.destino}` : `${t.tipo} → ${t.destino}`);
 
 function colorRetraso(c: Colores, m: number) {
   const n = nivelRetraso(m);
@@ -39,11 +43,11 @@ function colorRetraso(c: Colores, m: number) {
 function Chapa({ t, c, grande = false }: { t: Tren; c: Colores; grande?: boolean }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 3, paddingHorizontal: grande ? 8 : 5, height: grande ? 28 : 24,
-      borderRadius: 12, backgroundColor: colorRetraso(c, t.retrasoMin), borderWidth: 2,
-      borderColor: t.estado === "parado" ? "#111827" : "#fff",
+      borderRadius: t.operador === "Euskotren" ? 6 : 12, backgroundColor: colorRetraso(c, t.retrasoMin), borderWidth: 2,
+      borderColor: t.estado === "parado" ? "#111827" : t.operador === "Euskotren" ? (t.color ?? "#fff") : "#fff",
       shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
       <Text style={{ color: "#fff", fontSize: grande ? 13 : 11, fontWeight: "800" }}>
-        {t.estado === "parado" ? "⏸ " : "🚆 "}{CORTO[t.tipo] ?? "T"}
+        {t.estado === "parado" ? "⏸ " : t.operador === "Euskotren" ? "🚈 " : "🚆 "}{etiqueta(t)}
       </Text>
       {t.retrasoMin >= 2 && <Text style={{ color: "#fff", fontSize: grande ? 12 : 10, fontWeight: "700" }}>+{t.retrasoMin}</Text>}
     </View>
@@ -51,15 +55,16 @@ function Chapa({ t, c, grande = false }: { t: Tren; c: Colores; grande?: boolean
 }
 
 function textoEstado(t: Tren) {
-  if (t.estado === "estacion") return `En la estación de ${t.siguiente}`;
+  if (t.estado === "estacion") return `${t.estimada ? "≈ " : ""}En la estación de ${t.siguiente}`;
   if (t.estado === "parado") return `⏸ Parado entre ${t.anterior} y ${t.siguiente}${t.paradoDesde ? ` desde las ${hora(t.paradoDesde)}` : ""}`;
-  return `${t.anterior} → ${t.siguiente}${t.llegadaSiguiente ? ` · llega ${hora(t.llegadaSiguiente)}` : ""}`;
+  return `${t.estimada ? "≈ " : ""}${t.anterior} → ${t.siguiente}${t.llegadaSiguiente ? ` · llega ${hora(t.llegadaSiguiente)}` : ""}`;
 }
 
 export default function Trenes() {
   const c = useColores();
   const ins = useSafeAreaInsets();
   const { height } = useWindowDimensions();
+  const { transporte } = useDatos();
   const [estado, setEstado] = useState<EstadoTrenes | null>(null);
   const [cargando, setCargando] = useState(false);
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -71,13 +76,15 @@ export default function Trenes() {
   const refrescar = useCallback(async () => {
     setCargando(true);
     try {
-      const e = DEMO ? trenesDemo(Date.now()) : await estadoTrenes((u, o) => fetch(u, o), previos.current);
+      const e = DEMO ? trenesDemo(Date.now()) : await estadoTrenes((u, o) => fetch(u, o), previos.current, Date.now(), {
+        euskotren: () => transporte.trenesEuskotren(), avisosEuskotren: () => transporte.avisosEuskotren(),
+      });
       if (e.trenes.length) previos.current = e.trenes;
       setEstado(e);
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [transporte]);
 
   useFocusEffect(useCallback(() => {
     void refrescar();
@@ -88,12 +95,13 @@ export default function Trenes() {
   const trenes = estado?.trenes ?? [];
   const lista = useMemo(() => trenes.filter(t =>
     filtro === "todos" || (filtro === "retraso" && t.retrasoMin >= 10) || (filtro === "parados" && t.estado === "parado")
-    || (filtro === "vitoria" && pasaPorVitoria(t))), [trenes, filtro]);
+    || (filtro === "vitoria" && pasaPorVitoria(t)) || (filtro === "renfe" && t.operador === "Renfe")
+    || (filtro === "euskotren" && t.operador === "Euskotren")), [trenes, filtro]);
   const tren = trenes.find(t => t.id === elegido) ?? null;
   const cerca = trenes.filter(t => t.distanciaKm <= 40);
   const alertas = [
     ...cerca.filter(t => t.estado === "parado").map(t => `⏸ ${t.tipo} ${t.id} parado entre ${t.anterior} y ${t.siguiente}${t.paradoDesde ? ` desde las ${hora(t.paradoDesde)}` : ""}`),
-    ...cerca.filter(t => t.retrasoMin >= 30).map(t => `🕒 ${t.tipo} ${t.id} (${t.origen} → ${t.destino}) va con ${t.retrasoMin} min de retraso`),
+    ...cerca.filter(t => t.retrasoMin >= 30).map(t => `🕒 ${t.operador === "Renfe" ? `${t.tipo} ${t.id}` : t.tipo} (${ruta(t)}) va con ${t.retrasoMin} min de retraso`),
   ];
   // Estaciones que se ven: Vitoria y las anteriores/siguientes de los trenes
   const estaciones = useMemo(() => {
@@ -111,6 +119,7 @@ export default function Trenes() {
   const chips: [Filtro, string][] = [
     ["todos", `Todos · ${trenes.length}`], ["vitoria", `Por Vitoria · ${trenes.filter(pasaPorVitoria).length}`],
     ["retraso", `Con retraso · ${trenes.filter(t => t.retrasoMin >= 10).length}`], ["parados", `Parados · ${trenes.filter(t => t.estado === "parado").length}`],
+    ["renfe", `Renfe · ${trenes.filter(t => t.operador === "Renfe").length}`], ["euskotren", `Euskotren · ${trenes.filter(t => t.operador === "Euskotren").length}`],
   ];
 
   return (
@@ -148,14 +157,16 @@ export default function Trenes() {
           <Tarjeta>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.texto, fontSize: 19, fontWeight: "800" }}>{tren.tipo} {tren.id}</Text>
-                <Etiqueta>{tren.origen} → {tren.destino}</Etiqueta>
+                <Text style={{ color: c.texto, fontSize: 19, fontWeight: "800" }}>{tren.operador === "Renfe" ? `${tren.tipo} ${tren.id}` : tren.tipo}</Text>
+                <Etiqueta>{`${tren.operador} · ${tren.origen ? `${tren.origen} → ${tren.destino}` : `hacia ${tren.destino}`}`}</Etiqueta>
               </View>
               <Insignia nivel={nivelRetraso(tren.retrasoMin)} texto={textoRetraso(tren.retrasoMin)} />
             </View>
             <Text style={{ color: c.texto, fontSize: 15 }}>{textoEstado(tren)}</Text>
             <Etiqueta>
-              {`A ${tren.distanciaKm} km de Vitoria · posición ${hace(tren.t)}${tren.material ? ` · tren ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""}`}
+              {tren.estimada
+                ? `A ${tren.distanciaKm} km de Vitoria · posición estimada (Euskotren no publica el GPS de sus trenes; se calcula con su horario en tiempo real)`
+                : `A ${tren.distanciaKm} km de Vitoria · posición ${hace(tren.t)}${tren.material ? ` · tren ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""}`}
             </Etiqueta>
             {tren.estado === "parado" && (
               <Etiqueta>Renfe no publica el motivo de cada parada. Si hay una incidencia, suele aparecer en los avisos de abajo.</Etiqueta>
@@ -181,7 +192,7 @@ export default function Trenes() {
                 backgroundColor: t.id === elegido ? alfa(c.acento, 0.08) : "transparent", borderRadius: 8 })}>
               <Chapa t={t} c={c} />
               <View style={{ flex: 1, gap: 1 }}>
-                <Text numberOfLines={1} style={{ color: c.texto, fontSize: 15, fontWeight: "600" }}>{t.origen} → {t.destino}</Text>
+                <Text numberOfLines={1} style={{ color: c.texto, fontSize: 15, fontWeight: "600" }}>{ruta(t)}</Text>
                 <Text numberOfLines={1} style={{ color: c.suave, fontSize: 13 }}>{textoEstado(t)}</Text>
               </View>
               <View style={{ alignItems: "flex-end" }}>
@@ -192,11 +203,18 @@ export default function Trenes() {
           ))}
         </Tarjeta>
 
-        <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Avisos de Renfe en la zona</Text>
+        <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Incidencias y avisos</Text>
         <Tarjeta>
-          {importantes.length === 0 && <Etiqueta>Sin incidencias publicadas por Renfe en la zona.</Etiqueta>}
+          {importantes.length === 0 && <Etiqueta>Sin incidencias publicadas por Adif, Renfe ni Euskotren en la zona.</Etiqueta>}
           {importantes.map((a, i) => (
-            <View key={a.id} style={{ paddingVertical: 8, gap: 2, borderBottomWidth: i === importantes.length - 1 ? 0 : 0.5, borderBottomColor: c.linea }}>
+            <View key={a.id} style={{ paddingVertical: 8, gap: 3, borderBottomWidth: i === importantes.length - 1 ? 0 : 0.5, borderBottomColor: c.linea }}>
+              <View style={{ flexDirection: "row", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                <View style={{ backgroundColor: a.fuente === "Adif" ? c.critico : a.fuente === "Euskotren" ? "#005A8B" : c.acento, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 1 }}>
+                  <Text style={{ color: "#fff", fontSize: 11, fontWeight: "800" }}>{a.fuente ?? "Renfe"}</Text>
+                </View>
+                {a.titulo ? <Text style={{ color: c.texto, fontSize: 14, fontWeight: "700", flexShrink: 1 }}>{a.titulo}</Text> : null}
+                {a.ambito ? <Text style={{ color: c.tenue, fontSize: 12 }}>{a.ambito}</Text> : null}
+              </View>
               <Text style={{ color: c.texto, fontSize: 14 }}>{a.texto}</Text>
               {a.desde && <Text style={{ color: c.tenue, fontSize: 12 }}>Desde {hace(a.desde)}</Text>}
             </View>
@@ -212,7 +230,9 @@ export default function Trenes() {
         </Tarjeta>
 
         <Etiqueta>
-          Trenes de larga y media distancia de Renfe a menos de 100 km (posición y retraso del Visor de trenes de Renfe, cada 20 s).
+          Trenes a menos de 100 km, cada 20 s: Renfe larga y media distancia (posición real del Visor de trenes) y Euskotren
+          (posición estimada, ≈). Las incidencias de Adif son de la red y afectan a todos los operadores (Renfe, Iryo, Ouigo…);
+          Iryo y Ouigo no pasan por Vitoria ni publican datos en tiempo real.
           Colores: verde en hora, naranja 10–29 min, rojo 30 min o más. Con las alertas activadas, avisa si un tren a menos de 40 km
           lleva 30 min de retraso o está parado fuera de estación.
         </Etiqueta>

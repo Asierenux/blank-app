@@ -17,7 +17,7 @@ import { bajarBytes, distanciaKm, redondear } from "./comun";
 const { transit_realtime } = GtfsRealtime;
 const MOVEUSKADI = "https://opendata.euskadi.eus/transport/moveuskadi";
 
-export type TipoVehiculo = "bus" | "tranvia";
+export type TipoVehiculo = "bus" | "tranvia" | "tren";
 
 export const OPERADORES = {
   tuvisa: {
@@ -36,6 +36,7 @@ export const OPERADORES = {
 export type Operador = keyof typeof OPERADORES;
 
 const RADIO_VITORIA_KM = 12;
+export const URL_AVISOS_EUSKOTREN = `${MOVEUSKADI}/euskotren/gtfsrt_euskotren_alerts.pb`;
 const MARGEN_INICIO_S = 180;
 
 // --------------------------------------------------------------------------
@@ -115,6 +116,12 @@ export function lineasTranviaVitoria(h: Horario): Set<string> {
   const deVitoria = tranvias.filter(l => /^TG/i.test(l.nombre) || /gasteiz|vitoria/i.test(l.largo));
   return new Set((deVitoria.length ? deVitoria : tranvias).map(l => l.id));
 }
+
+/** Trenes de Euskotren (E1 Bilbao–Donostia, E3, E4, L3…): líneas de tipo 2 (ferrocarril). */
+export function lineasTrenEuskotren(h: Horario): Set<string> {
+  return new Set(Object.values(h.lineas).filter(l => l.tipoRuta === "2").map(l => l.id));
+}
+const RADIO_TRENES_EUSKOTREN_KM = 100;
 
 export function leerGtfs(
   zip: Uint8Array,
@@ -341,8 +348,9 @@ export function llegadas(
 // --------------------------------------------------------------------------
 
 export interface CacheHorarios {
-  leer(operador: Operador): Promise<{ t: number; h: Horario } | null>;
-  guardar(operador: Operador, dato: { t: number; h: Horario }): Promise<void>;
+  /** Clave: el operador, o "euskotren-tren" para los trenes de Euskotren */
+  leer(operador: string): Promise<{ t: number; h: Horario } | null>;
+  guardar(operador: string, dato: { t: number; h: Horario }): Promise<void>;
 }
 
 export interface ParadaTranvia extends Parada { proximos: Llegada[] }
@@ -417,6 +425,57 @@ export class Transporte {
   }
 
   private ultimoFeed: Partial<Record<Operador, { t: number; feed: Feed }>> = {};
+  private horarioTrenEusko: { t: number; h: Horario } | null = null;
+
+  /** Horario de los trenes de Euskotren a menos de 100 km (del mismo GTFS que el tranvía; se guarda un día). */
+  private async horarioTrenes(ahora: number): Promise<Horario> {
+    if (this.horarioTrenEusko && ahora - this.horarioTrenEusko.t < 86400e3) return this.horarioTrenEusko.h;
+    const cache = this.cache;
+    const guardado = await cache?.leer("euskotren-tren").catch(() => null);
+    if (guardado && ahora - guardado.t < 86400e3) return (this.horarioTrenEusko = guardado).h;
+    try {
+      const zip = await bajarBytes(this.descargar, OPERADORES.euskotren.gtfs);
+      const h = leerGtfs(zip, (la, lo) => distanciaKm(VITORIA.lat, VITORIA.lon, la, lo) <= RADIO_TRENES_EUSKOTREN_KM, lineasTrenEuskotren);
+      this.horarioTrenEusko = { t: ahora, h };
+      await cache?.guardar("euskotren-tren", this.horarioTrenEusko).catch(() => undefined);
+      return h;
+    } catch (e) {
+      if (guardado) return (this.horarioTrenEusko = guardado).h;
+      throw e;
+    }
+  }
+
+  /**
+   * Trenes de Euskotren en circulación, con su retraso. Euskotren no publica GPS: la posición
+   * se estima entre la parada anterior y la siguiente según la hora prevista (como el tranvía).
+   */
+  async trenesEuskotren(ahora = Date.now()): Promise<Vehiculo[]> {
+    const h = await this.horarioTrenes(ahora);
+    const feed = leerFeed(await bajarBytes(this.descargar, OPERADORES.euskotren.llegadas!));
+    const porNombre = new Map<string, [number, number][][]>();
+    for (const [id, formas] of Object.entries(h.recorridos)) {
+      const n = h.lineas[id]?.nombre ?? id;
+      porNombre.set(n, [...(porNombre.get(n) ?? []), ...formas]);
+    }
+    return llegadas(feed, h, "euskotren", ahora / 1000, lineasTrenEuskotren(h)).vehiculos.map(v => {
+      // siguiendo la vía, no en línea recta entre estaciones
+      const [lat, lon] = v.hacia ? interpolarEnVia(porNombre.get(v.linea) ?? [], v.desde, v.hacia, ahora / 1000) : [v.lat, v.lon];
+      return { ...v, lat, lon, tipo: "tren" as TipoVehiculo };
+    });
+  }
+
+  /** Avisos oficiales de Euskotren (GTFS-RT "alerts"; casi siempre vacío). */
+  async avisosEuskotren(): Promise<string[]> {
+    const feed = leerFeed(await bajarBytes(this.descargar, URL_AVISOS_EUSKOTREN));
+    const textos: string[] = [];
+    for (const e of feed.entity) {
+      const a = e.alert;
+      const tr = [...(a?.headerText?.translation ?? []), ...(a?.descriptionText?.translation ?? [])];
+      const es = tr.filter(t => !t.language || /^es/i.test(t.language)).map(t => t.text).filter(Boolean);
+      if (es.length) textos.push([...new Set(es)].join(". "));
+    }
+    return textos;
+  }
 
   /** Próximas llegadas a las paradas elegidas. Clave del resultado: "operador:idParada". */
   async proximas(favoritas: { operador: Operador; id: string }[], ahora = Date.now()): Promise<Record<string, Llegada[]>> {

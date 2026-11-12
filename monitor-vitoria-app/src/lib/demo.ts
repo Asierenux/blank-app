@@ -255,6 +255,8 @@ function puntoEn(ruta: [number, number][], f: number): [number, number] {
 }
 
 export const transporteDemo = {
+  async trenesEuskotren() { return []; },
+  async avisosEuskotren() { return [] as string[]; },
   async recorridos(): Promise<{ recorridos: Recorrido[]; errores: string[] }> {
     return {
       errores: [],
@@ -321,7 +323,7 @@ export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTren
   const min = 60e3;
   const t = (id: string, tipo: string, origen: string, destino: string, anterior: string, siguiente: string,
     retrasoMin: number, lat: number, lon: number, distanciaKm: number, estado: "estacion" | "marcha" | "parado", llega = 10) => ({
-    id, tipo, origen, destino, anterior, siguiente, retrasoMin, lat, lon, distanciaKm, estado, t: ahora - 15e3,
+    id, operador: "Renfe" as const, tipo, origen, destino, anterior, siguiente, retrasoMin, lat, lon, distanciaKm, estado, t: ahora - 15e3,
     llegadaSiguiente: ahora + llega * min, material: null, paradoDesde: estado === "parado" ? ahora - 12 * min : null,
   });
   return {
@@ -335,8 +337,18 @@ export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTren
       t("00621", "Alvia", "Vigo Urzaiz", "Barcelona-Sants", "Burgos-Rosa Manzano", "Miranda de Ebro", -3, 42.6146, -3.2627, 54.7, "marcha", 20),
       t("16071", "Regional", "Castejón de Ebro", "Logroño", "Alcanadre", "Agoncillo", 9, 42.4436, -2.2916, 54.5, "marcha"),
       t("71872", "Media Distancia", "Bilbao la Concordia", "Santander", "Gibaja", "Gibaja", 32, 43.2820, -3.4383, 78.9, "estacion"),
+      // Euskotren (posición estimada con sus horarios en tiempo real)
+      ...([["E1", "#005A8B", "Amara-Donostia", "Durango", "Zaldibar", 2, 43.1716, -2.5483, 37.1],
+        ["E1", "#005A8B", "Matiko-Bilbao", "Euba-Amorebieta", "Amorebieta", 0, 43.1946, -2.6968, 38.7],
+        ["E4", "#240078", "Bermeo", "Amorebieta Geralekua", "Zugaztieta-Muxika", 6, 43.2276, -2.7269, 42.6],
+        ["E3", "#009FE4", "Lezama", "Sondika", "Lekunbiz-Zamudio", 0, 43.2867, -2.8746, 51.3]] as const)
+        .map(([linea, color, destino, anterior, siguiente, retraso, lat, lon, km], i) => ({
+          ...t(`${linea}-10${i}`, `Euskotren ${linea}`, "", destino, anterior, siguiente, retraso, lat, lon, km, "marcha", 3),
+          operador: "Euskotren" as const, estimada: true, color,
+        })),
     ],
     avisos: [
+      { id: "adif-1", fuente: "Adif", ambito: "País Vasco", titulo: "Incidencia en Zorrotza", texto: "Línea de ancho métrico Bilbao-La Concordia - La Calzada: Se están registrando retrasos por una incidencia que afecta a la señalización en Zorrotza Zorrozgoiti. Se está trabajando para solucionarla a la mayor brevedad posible.", desde: null, hasta: null, ascensor: false },
       { id: "a1", texto: "Línea R3 Bilbao: por obras en la estación de Amurrio, los trenes circularán por vía única entre Llodio y Amurrio con posibles retrasos.", desde: ahora - 5 * 3600e3, hasta: null, ascensor: false },
       { id: "a2", texto: "AMURRIO. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 30 * 3600e3, hasta: null, ascensor: true },
       { id: "a3", texto: "ORDIZIA. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 50 * 3600e3, hasta: null, ascensor: true },
