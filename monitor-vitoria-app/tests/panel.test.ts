@@ -84,7 +84,10 @@ test("Panel completo", async () => {
   assert.equal(urr.porcentaje, 80);
   assert.equal(urr.varSemanaPct, 1.5);
   assert.equal(urr.edadDias, 2);
-  assert.equal(urr.nivelEstado, "ok");
+  // Sin cota medida, se deduce con la curva: al 80 % (≈ 544,67 m) ya está sobre el aliviadero (544,5 m)
+  assert.equal(urr.nivelEstimado, true);
+  assert.ok(Math.abs(urr.nivel! - 544.67) < 0.05, String(urr.nivel));
+  assert.equal(urr.nivelEstado, "aviso");
   const ull = p.agua.embalses.find(e => e.id === "ullibarri")!;
   assert.equal(ull.nivelEstado, "sin_datos");
   assert.equal(p.agua.rios.length, 0);                            // sin estaciones descubiertas, no hay ríos

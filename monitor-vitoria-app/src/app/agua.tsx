@@ -4,6 +4,7 @@
  */
 import { Linking, Text, View } from "react-native";
 
+import { DibujoEmbalse } from "../componentes/embalse";
 import { Barra, GraficaLinea } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
@@ -38,6 +39,7 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
         </View>
       </View>
       <Barra pct={e.porcentaje ?? 0} color={c.agua} marcas={[85]} />
+      <DibujoEmbalse e={e} />
       {e.comparacion && (e.comparacion.anioPasadoPct != null || e.comparacion.media10Pct != null) && (
         <View style={{ flexDirection: "row", gap: 10 }}>
           {([[`Hace un año${e.comparacion.anioPasado ? ` (${e.comparacion.anioPasado})` : ""}`, e.comparacion.anioPasadoPct],
@@ -60,8 +62,9 @@ function TarjetaEmbalse({ e }: { e: Embalse }) {
 
       {e.nivel != null && (
         <View style={{ gap: 2 }}>
-          <Fila izquierda="Cota del agua" derecha={`${num(e.nivel, 2)} m`}
-            detalle={e.var24hCm != null ? `${signo(e.var24hCm, 0)} cm en 24 h` : undefined} />
+          <Fila izquierda="Cota del agua" derecha={`${e.nivelEstimado ? "≈ " : ""}${num(e.nivel, 2)} m`}
+            detalle={[e.var24hCm != null ? `${signo(e.var24hCm, 0)} cm en 24 h` : null,
+              e.nivelEstimado ? "calculada con el volumen y la curva del embalse (± 0,3 m)" : null].filter(Boolean).join(" · ") || undefined} />
           {e.margenAliviadero != null && (
             <Fila izquierda="Hasta el aliviadero" derecha={e.margenAliviadero > 0 ? `${num(e.margenAliviadero, 2)} m` : "Superado"}
               detalle={`Labio a ${num(e.cotas.aliviadero!, 1)} m · NMN ${num(e.cotas.nmn ?? null, 1)} m`} ultima={e.margenNmn == null} />

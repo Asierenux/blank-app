@@ -195,3 +195,14 @@ test("Panel: con datos al momento, el embalse sale como SAIH y con la comparaciÃ
   assert.equal(e.comparacion?.media10Pct, 63.15);
   assert.ok(e.serie.length >= 7);
 });
+
+test("Curva cota-volumen: reproduce las lecturas reales", async () => {
+  const { cotaDesdePct, pctDesdeCota } = await import("../src/lib/curva");
+  const urr = ESTACIONES.find(e => e.id === "urrunaga")!, ull = ESTACIONES.find(e => e.id === "ullibarri")!;
+  assert.ok(Math.abs(cotaDesdePct(urr, 54.27)! - 541.95) < 0.05);     // SAIH 31/10/2026
+  assert.ok(Math.abs(cotaDesdePct(urr, 73.1)! - 543.99) < 0.05);      // SAIH 2024
+  assert.equal(cotaDesdePct(urr, 100), 546.5);                         // lleno = NMN
+  assert.ok(Math.abs(cotaDesdePct(ull, 79.51)! - 544.5) < 0.05);       // nivel de abrir compuertas
+  assert.ok(Math.abs(pctDesdeCota(ull, 544.5)! - 79.51) < 0.5);
+  assert.equal(cotaDesdePct(ull, null), null);
+});

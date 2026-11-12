@@ -5,6 +5,7 @@
  * Niveles: "ok" (verde), "aviso" (ámbar), "critico" (rojo), "info" (neutro), "sin_datos" (gris).
  */
 import type { Comparacion, InfoEmbalse, Pluviometro } from "./fuentes/embalses";
+import { cotaDesdePct } from "./curva";
 import { CAUDAL_MINIMO_CRECIDA, ESTACIONES, VITORIA, INTERVALOS_MIN, type Estacion, type Umbrales } from "./config";
 import { fechaMadrid, inicioDiaMadrid } from "./formato";
 import type { CamarasGuardadas, Incidencia, TipoIncidencia } from "./fuentes/trafico";
@@ -238,6 +239,8 @@ export function maniobra(entrada: number | null, salida: number | null) {
 export interface Embalse {
   id: string; nombre: string; corto: string; rio: string; capacidadHm3?: number;
   nivel: number | null; volumen: number | null; porcentaje: number | null;
+  /** La cota no se ha medido: se deduce del volumen con la curva cota-volumen */
+  nivelEstimado: boolean; cotaCauce: number | null; cotaAnioPasado: number | null; cotaMedia10: number | null;
   entrada: number | null; salida: number | null; salidaMedidaEn: string | null;
   t: number | null; edadDias: number | null; antiguo: boolean;
   nivelEstado: Nivel; texto: string;
@@ -288,13 +291,17 @@ function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number)
   const pPct = s("porcentaje"), pVol = s("volumen"), pNivel = s("nivel");
   const vigentes = [pPct, pVol, pNivel].filter((p): p is Punto => !!p);
   const t = vigentes.length ? Math.max(...vigentes.map(p => p[0])) : null;
-  const porcentaje = pPct?.[1] ?? null, volumen = pVol?.[1] ?? null, nivel = pNivel?.[1] ?? null;
+  const porcentaje = pPct?.[1] ?? null, volumen = pVol?.[1] ?? null;
+  // Sin cota medida (embalses.net no la da): se deduce del % con la curva del embalse
+  const nivelEstimado = pNivel == null && cotaDesdePct(e, porcentaje) != null;
+  const nivel = pNivel?.[1] ?? cotaDesdePct(e, porcentaje);
   const [nivelEstado, texto] = t == null ? (["sin_datos", "Sin datos"] as Clasificacion) : estadoEmbalse(porcentaje, u, nivel, e);
   // Variación respecto al dato de hace una semana (el anterior del boletín)
   const anterior = (senal: string) => (t == null ? null
     : h.valorEn(`${fuenteSerie}.${e.id}.${senal}`, t - 6 * 24 * H, 3 * 24 * H) ?? h.valorEn(`semanal.${e.id}.${senal}`, t - 6 * 24 * H, 3 * 24 * H));
   const hace24 = (senal: string) => (t == null || !deSaih ? null : h.valorEn(`agua.${e.id}.${senal}`, t - 24 * H));
-  const n24 = hace24("nivel"), p24 = hace24("porcentaje");
+  const p24 = hace24("porcentaje");
+  const n24 = nivelEstimado ? cotaDesdePct(e, p24) : hace24("nivel");
   const pctAntes = anterior("porcentaje"), volAntes = anterior("volumen");
   const entrada = s("entrada")?.[1] ?? null;
   let salida = s("salida")?.[1] ?? null;
@@ -309,7 +316,10 @@ function construirEmbalse(h: Historial, u: Umbrales, e: Estacion, ahora: number)
   }
   return {
     id: e.id, nombre: e.nombre, corto: e.corto, rio: e.rio, capacidadHm3: e.capacidadHm3,
-    nivel, volumen, porcentaje, entrada, salida, salidaMedidaEn, origen: t == null ? null : deSaih ? "saih" : "semanal",
+    nivel, nivelEstimado, cotaCauce: e.curva?.cauce ?? e.cotaMinima ?? null,
+    cotaAnioPasado: cotaDesdePct(e, info?.comparacion.anioPasadoPct ?? null),
+    cotaMedia10: cotaDesdePct(e, info?.comparacion.media10Pct ?? null),
+    volumen, porcentaje, entrada, salida, salidaMedidaEn, origen: t == null ? null : deSaih ? "saih" : "semanal",
     t, edadDias: t == null ? null : Math.floor((ahora - t) / (24 * H)), antiguo: t != null && ahora - t > 8 * 24 * H,
     nivelEstado, texto,
     varSemanaPct: porcentaje != null && pctAntes != null ? Math.round((porcentaje - pctAntes) * 10) / 10 : null,
