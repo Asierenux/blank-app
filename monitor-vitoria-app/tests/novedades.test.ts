@@ -516,3 +516,25 @@ test("Ouigo por horario: dónde debería estar y aviso si Adif corta su línea",
   const bcn = t.filter(x => x.recorrido!.every(p => !p[0].startsWith("5")) && x.recorrido!.some(p => p[0] === "71801"));
   assert.ok(bcn.every(x => !x.cortadoPor));                                // Madrid-Barcelona no se ve afectado
 });
+
+test("Horario de Renfe: tipo de cada tren y recorrido, con las líneas rellenas de espacios del archivo real", async () => {
+  const { zipSync, strToU8 } = await import("fflate");
+  const { leerTipos, leerItinerarios, HorarioRenfe } = await import("../src/lib/fuentes/itinerarios");
+  const relleno = (t: string) => t.split("\n").map(l => l.padEnd(300, " ")).join("\n");
+  const zip = zipSync({
+    "routes.txt": strToU8(relleno("route_id,agency_id,route_short_name,route_long_name\n7180160000AV006,1071,AVE,\n1000011511MD,1071,MD,")),
+    "trips.txt": strToU8(relleno("route_id,service_id,trip_id,trip_headsign,trip_short_name\n7180160000AV006,2026-11-112026-12-06031501,0315012026-11-11,,03150\n1000011511MD,2026-11-012026-11-30180611,1806112026-11-01,,18061")),
+    "stop_times.txt": strToU8(relleno("trip_id,arrival_time,departure_time,stop_id,stop_sequence\n0315012026-11-11,15:25:00,15:25:00,71801,01\n0315012026-11-11,18:27:00,18:27:00,60000,02\n1806112026-11-01,9:06:00,9:06:00,10000,01\n1806112026-11-01,14:37:00,14:39:00,11208,13")),
+  });
+  assert.deepEqual(leerTipos(zip), { "03150": "AVE", "18061": "MD" });
+  const it = leerItinerarios(zip, "2026-11-12");
+  assert.deepEqual(it["03150"][0].paradas, [["71801", 925, 925], ["60000", 1107, 1107]]);
+  assert.equal(it["18061"][0].tipo, "MD");
+  assert.deepEqual(it["18061"][0].paradas[1], ["11208", 877, 879]);
+  // Una sola descarga para las dos cosas
+  let descargas = 0;
+  const h = new HorarioRenfe(async () => { descargas++; return new Response(zip); });
+  assert.equal((await h.tipos())["03150"], "AVE");
+  assert.ok((await h.itinerarios())["18061"]);
+  assert.equal(descargas, 1);
+});

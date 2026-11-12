@@ -56,7 +56,7 @@ const dentro = (lat: number, lon: number, radioKm: number) =>
 
 export function parsearRenfeAbierto(
   fuentes: { posicionesLD?: any; retrasosLD?: any; posicionesCercanias?: any; retrasosCercanias?: any },
-  itinerarios: Itinerarios | null, ahora = Date.now(), radioKm = Infinity,
+  itinerarios: Itinerarios | null, ahora = Date.now(), radioKm = Infinity, tipos: Record<string, string> | null = null,
 ): Tren[] {
   const salida: Tren[] = [];
   const hoy = fechaMadrid(ahora), medianoche = inicioDiaMadrid(ahora);
@@ -84,7 +84,7 @@ export function parsearRenfeAbierto(
     const prevista = i >= 0 ? it!.paradas[i][1] : null;
     const llegada = (sig && r?.llegadas.get(sig)) || (prevista != null ? medianoche + (prevista + retrasoMin) * 60e3 : null);
     salida.push({
-      id, operador: "Renfe", red: "ld", tipo: tipoDeHorario(it?.tipo),
+      id, operador: "Renfe", red: "ld", tipo: tipoDeHorario(it?.tipo ?? tipos?.[id]),
       origen: it ? nombreEstacion(cods[0]) : "", destino: it ? nombreEstacion(cods.at(-1)) : "—",
       anterior: ant ? nombreEstacion(ant) : "—", siguiente: sig ? nombreEstacion(sig) : "—",
       codAnterior: ant, codSiguiente: sig, llegadaSiguiente: llegada ?? null,

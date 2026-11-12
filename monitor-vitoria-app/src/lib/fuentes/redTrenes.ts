@@ -21,6 +21,8 @@ export interface OpcionesRed {
   radioKm?: number;
   /** Horario oficial de Renfe: tipo de tren, origen, destino y recorrido */
   itinerarios?: Itinerarios | null;
+  /** Solo el tipo de cada tren (llega antes que los itinerarios) */
+  tipos?: Record<string, string> | null;
   euskotren?: () => Promise<Vehiculo[]>;
   avisosEuskotren?: () => Promise<string[]>;
   ouigo?: () => Promise<Tren[]>;
@@ -62,7 +64,7 @@ export async function estadoTrenes(descargar: Descargar, ahora = Date.now(), o: 
     o.ouigo ? o.ouigo().catch(falla("Ouigo")) : null,
   ]);
   const trenes: Tren[] = [
-    ...parsearRenfeAbierto({ posicionesLD: posLD, retrasosLD: retLD, posicionesCercanias: posC, retrasosCercanias: retC }, o.itinerarios ?? null, ahora, radio),
+    ...parsearRenfeAbierto({ posicionesLD: posLD, retrasosLD: retLD, posicionesCercanias: posC, retrasosCercanias: retC }, o.itinerarios ?? null, ahora, radio, o.tipos ?? null),
     ...((ouigo ?? []) as Tren[]).filter(t => t.distanciaKm <= radio),
     ...((eusko ?? []) as Vehiculo[]).map(v => deEuskotren(v, ahora)).filter(t => t.distanciaKm <= radio),
   ].sort((a, b) => a.distanciaKm - b.distanciaKm);

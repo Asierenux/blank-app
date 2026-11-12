@@ -33,7 +33,7 @@ const ESPANA = { latitude: 40.2, longitude: -3.6, latitudeDelta: 10.5, longitude
 const ZONA = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 1.5, longitudeDelta: 1.5 };
 const CORTO: Record<string, string> = {
   AVE: "AVE", Avant: "AVT", Alvia: "ALV", Intercity: "IC", "Media Distancia": "MD", "Regional Exprés": "RX",
-  Regional: "R", Proximidad: "P", AVLO: "AVLO", Tren: "T",
+  Regional: "R", Proximidad: "P", AVLO: "AVLO", Euromed: "EM", Trencelta: "TC", "Larga distancia": "LD", Tren: "T",
 };
 const ALTA = new Set(["AVE", "AVLO", "Avant", "Alvia", "Euromed"]);
 const ouigo = new Ouigo((u, o) => fetch(u, o));
@@ -57,8 +57,8 @@ function guardarSeguimiento() {
   void AsyncStorage.setItem(CLAVE_RASTROS, seguimiento.aJson()).catch(() => undefined);
 }
 const horario = new HorarioRenfe((u, o) => fetch(u, o), {
-  leer: async () => JSON.parse((await AsyncStorage.getItem("mv1:itinerariosRenfe")) ?? "null"),
-  guardar: async d => AsyncStorage.setItem("mv1:itinerariosRenfe", JSON.stringify(d)),
+  leer: async clave => JSON.parse((await AsyncStorage.getItem(`mv1:horarioRenfe:${clave}`)) ?? "null"),
+  guardar: async (clave, d) => AsyncStorage.setItem(`mv1:horarioRenfe:${clave}`, JSON.stringify(d)),
 });
 
 const nivelRetraso = (m: number): Nivel => (m >= 30 ? "critico" : m >= 10 ? "aviso" : "ok");
@@ -115,6 +115,8 @@ export default function Trenes() {
   const [verAvisos, setVerAvisos] = useState(false);
   const [, setTic] = useState(0);
   const itRef = useRef<Itinerarios | null>(null);
+  const tiposRef = useRef<Record<string, string> | null>(null);
+  const [estadoHorario, setEstadoHorario] = useState<string | null>("Cargando el horario oficial de Renfe (tipo de tren y recorridos)…");
   const mapa = useRef<MapView>(null);
 
   const refrescar = useCallback(async () => {
@@ -123,7 +125,7 @@ export default function Trenes() {
       const seg = await cargarSeguimiento();
       const ahora = Date.now();
       const e = DEMO ? trenesDemo(ahora) : await estadoTrenes((u, o) => fetch(u, o), ahora, {
-        radioKm: Infinity, itinerarios: itRef.current,
+        radioKm: Infinity, itinerarios: itRef.current, tipos: tiposRef.current,
         euskotren: () => transporte.trenesEuskotren(), avisosEuskotren: () => transporte.avisosEuskotren(),
         ouigo: () => ouigo.trenes(ahora),
       });
@@ -145,7 +147,13 @@ export default function Trenes() {
   // El horario oficial (recorridos) se baja una vez al día, al entrar en la pestaña
   useEffect(() => {
     if (DEMO) { setItinerarios(itinerariosDemo()); return; }
-    horario.itinerarios().then(it => { itRef.current = it; setItinerarios(it); void refrescar(); }).catch(() => undefined);
+    // Primero el tipo de cada tren (rápido) y después los recorridos (más pesados)
+    horario.tipos()
+      .then(t => { tiposRef.current = t; setEstadoHorario("Cargando los recorridos…"); void refrescar(); })
+      .catch(e => setEstadoHorario(`No se pudo cargar el horario de Renfe (sin él no se sabe qué tren es AVE, Alvia…): ${(e as Error).message}`))
+      .then(() => horario.itinerarios())
+      .then(it => { if (it) { itRef.current = it; setItinerarios(it); setEstadoHorario(null); void refrescar(); } })
+      .catch(e => setEstadoHorario(`No se pudieron cargar los recorridos de Renfe: ${(e as Error).message}`));
   }, [refrescar]);
 
   const ahora = Date.now();
@@ -272,6 +280,7 @@ export default function Trenes() {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
         {estado?.errores.map(e => <Aviso key={e} nivel="aviso" texto={e} />)}
+        {estadoHorario && !DEMO && <Aviso nivel={/No se pud/.test(estadoHorario) ? "aviso" : "info"} texto={estadoHorario} />}
 
         {/* ---------------- Ficha del tren elegido ---------------- */}
         {tren ? (

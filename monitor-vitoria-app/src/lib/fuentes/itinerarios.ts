@@ -6,7 +6,7 @@
  * inicio ("0315012026-11-11"), y el service_id empieza con las fechas en que vale
  * ("2026-11-112026-12-06…"). Se guarda solo lo que vale hoy (o ayer, para los que pasan de medianoche).
  */
-import { strFromU8, unzipSync } from "fflate";
+import { unzipSync } from "fflate";
 
 import { fechaMadrid } from "../formato";
 import type { Descargar } from "../tipos";
@@ -26,14 +26,34 @@ const minutos = (hhmmss: string) => {
   return Number.isFinite(v) ? v : NaN;
 };
 
-/** Recorre un CSV grande línea a línea sin crear una tabla entera en memoria. */
-function porLineas(texto: string, cada: (campos: string[]) => void) {
-  let i = texto.indexOf("\n") + 1;               // la cabecera no
-  while (i > 0 && i < texto.length) {
-    let fin = texto.indexOf("\n", i);
-    if (fin < 0) fin = texto.length;
-    const linea = texto.slice(i, fin).trimEnd();
-    if (linea) cada(linea.split(","));
+/**
+ * Recorre un CSV grande línea a línea directamente sobre los bytes (sin convertir todo el archivo
+ * en texto: el de Renfe pesa 18 MB, casi todo espacios de relleno al final de cada línea).
+ * Los campos que se usan son ASCII (códigos, horas, fechas), así que basta con fromCharCode.
+ */
+function porLineas(datos: Uint8Array | string, cada: (campos: string[]) => void) {
+  if (typeof datos === "string") {
+    let i = datos.indexOf("\n") + 1;               // la cabecera no
+    while (i > 0 && i < datos.length) {
+      let fin = datos.indexOf("\n", i);
+      if (fin < 0) fin = datos.length;
+      const linea = datos.slice(i, fin).trimEnd();
+      if (linea) cada(linea.split(","));
+      i = fin + 1;
+    }
+    return;
+  }
+  let i = datos.indexOf(10) + 1;
+  while (i > 0 && i < datos.length) {
+    let fin = datos.indexOf(10, i);
+    if (fin < 0) fin = datos.length;
+    let f = fin;
+    while (f > i && (datos[f - 1] === 32 || datos[f - 1] === 13)) f--;   // quita el relleno
+    if (f > i) {
+      let linea = "";
+      for (let k = i; k < f; k += 4096) linea += String.fromCharCode.apply(null, datos.subarray(k, Math.min(f, k + 4096)) as unknown as number[]);
+      cada(linea.split(","));
+    }
     i = fin + 1;
   }
 }
@@ -42,9 +62,9 @@ function porLineas(texto: string, cada: (campos: string[]) => void) {
 export function leerItinerarios(zip: Uint8Array, hoy: string): Itinerarios {
   const quiero = new Set(["trips.txt", "stop_times.txt", "routes.txt"]);
   const archivos = unzipSync(zip, { filter: f => quiero.has(f.name.split("/").pop()!) });
-  const texto = (n: string) => {
+  const texto = (n: string): Uint8Array => {
     const k = Object.keys(archivos).find(x => x.split("/").pop() === n);
-    return k ? strFromU8(archivos[k]) : "";
+    return k ? archivos[k] : new Uint8Array();
   };
   const ayer = fechaMadrid(Date.parse(`${hoy}T12:00:00Z`) - 86400e3);
   // routes.txt: route_id, agency_id, route_short_name…
@@ -82,34 +102,75 @@ export function itinerarioDe(it: Itinerarios, cod: string, hoy: string): Itinera
   return lista.find(x => x.inicio <= hoy && x.fin >= hoy) ?? lista[0] ?? null;
 }
 
-export interface CacheItinerarios {
-  leer(): Promise<{ dia: string; it: Itinerarios } | null>;
-  guardar(d: { dia: string; it: Itinerarios }): Promise<void>;
+/**
+ * Solo el tipo de cada tren (AVE, ALVIA, MD…): lee trips.txt y routes.txt, que son ligeros.
+ * Así el tipo está enseguida aunque el recorrido completo (stop_times, 18 MB) tarde o falle.
+ */
+export function leerTipos(zip: Uint8Array): Record<string, string> {
+  const quiero = new Set(["trips.txt", "routes.txt"]);
+  const archivos = unzipSync(zip, { filter: f => quiero.has(f.name.split("/").pop()!) });
+  const texto = (n: string): Uint8Array => {
+    const k = Object.keys(archivos).find(x => x.split("/").pop() === n);
+    return k ? archivos[k] : new Uint8Array();
+  };
+  const rutas = new Map<string, string>();
+  porLineas(texto("routes.txt"), c => { if (c[0] && c[2]) rutas.set(c[0], c[2].trim()); });
+  const tipos: Record<string, string> = {};
+  porLineas(texto("trips.txt"), c => {
+    const cod = (c[4] ?? "").trim() || (c[2] ?? "").slice(0, 5);
+    const tipo = rutas.get(c[0]);
+    if (cod && tipo) tipos[cod] = tipo;
+  });
+  return tipos;
 }
 
-/** Descarga el horario una vez al día (y lo guarda en el móvil). */
-export class HorarioRenfe {
-  private dato: { dia: string; it: Itinerarios } | null = null;
-  private enCurso: Promise<Itinerarios> | null = null;
-  constructor(private descargar: Descargar, private cache?: CacheItinerarios) {}
+export interface CacheHorario {
+  leer(clave: "tipos" | "itinerarios"): Promise<{ dia: string; d: any } | null>;
+  guardar(clave: "tipos" | "itinerarios", dato: { dia: string; d: any }): Promise<void>;
+}
 
+/**
+ * El horario oficial de Renfe, una vez al día (y guardado en el móvil):
+ *  - tipos(): el tipo de cada tren, rápido;
+ *  - itinerarios(): el recorrido completo con horas, más pesado.
+ * Las dos cosas salen de la misma descarga.
+ */
+export class HorarioRenfe {
+  private zip: { dia: string; p: Promise<Uint8Array> } | null = null;
+  private memo: Partial<Record<"tipos" | "itinerarios", { dia: string; d: any }>> = {};
+  private enCurso: Partial<Record<"tipos" | "itinerarios", Promise<any>>> = {};
+  constructor(private descargar: Descargar, private cache?: CacheHorario) {}
+
+  tipos(ahora = Date.now()): Promise<Record<string, string>> { return this.obtener("tipos", leerTipos, ahora); }
   itinerarios(ahora = Date.now()): Promise<Itinerarios> {
-    const hoy = fechaMadrid(ahora);
-    if (this.dato?.dia === hoy) return Promise.resolve(this.dato.it);
-    return (this.enCurso ??= this.cargar(hoy).finally(() => { this.enCurso = null; }));
+    return this.obtener("itinerarios", (z, hoy) => leerItinerarios(z, hoy), ahora);
   }
 
-  private async cargar(hoy: string): Promise<Itinerarios> {
-    const guardado = await this.cache?.leer().catch(() => null);
-    if (guardado?.dia === hoy) return (this.dato = guardado).it;
-    try {
-      const it = leerItinerarios(await bajarBytes(this.descargar, URL_GTFS_RENFE_LD), hoy);
-      this.dato = { dia: hoy, it };
-      await this.cache?.guardar(this.dato).catch(() => undefined);
-      return it;
-    } catch (e) {
-      if (guardado) return (this.dato = guardado).it;   // sin internet: el de otro día
-      throw e;
+  private bajarZip(hoy: string): Promise<Uint8Array> {
+    if (this.zip?.dia !== hoy) {
+      const p = bajarBytes(this.descargar, URL_GTFS_RENFE_LD);
+      p.catch(() => { this.zip = null; });
+      this.zip = { dia: hoy, p };
     }
+    return this.zip.p;
+  }
+
+  private obtener<T>(clave: "tipos" | "itinerarios", leer: (zip: Uint8Array, hoy: string) => T, ahora: number): Promise<T> {
+    const hoy = fechaMadrid(ahora);
+    const m = this.memo[clave];
+    if (m?.dia === hoy) return Promise.resolve(m.d as T);
+    return (this.enCurso[clave] ??= (async () => {
+      const guardado = await this.cache?.leer(clave).catch(() => null);
+      if (guardado?.dia === hoy) return (this.memo[clave] = guardado).d as T;
+      try {
+        const d = leer(await this.bajarZip(hoy), hoy);
+        this.memo[clave] = { dia: hoy, d };
+        await this.cache?.guardar(clave, { dia: hoy, d }).catch(() => undefined);
+        return d;
+      } catch (e) {
+        if (guardado) return (this.memo[clave] = guardado).d as T;   // sin internet: el de otro día
+        throw e;
+      }
+    })().finally(() => { delete this.enCurso[clave]; }));
   }
 }
