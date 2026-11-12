@@ -538,3 +538,22 @@ test("Horario de Renfe: tipo de cada tren y recorrido, con las líneas rellenas 
   assert.ok((await h.itinerarios())["18061"]);
   assert.equal(descargas, 1);
 });
+
+test("Vías: los trenes van por la vía real (red de la IDEE)", async () => {
+  const { pegarAVia, rutaPorVias, proyectar, puntoEn, distKm } = await import("../src/lib/vias");
+  // La estación de Vitoria está encima de una vía
+  assert.ok(pegarAVia(42.84152, -2.6726)!.km < 0.1);
+  // Zumarraga → Beasain por la vía (≈ 14 km; en línea recta son 10,6)
+  const zb = rutaPorVias([[43.08708, -2.32023], [43.04627, -2.2023]]);
+  assert.ok(zb.acum.at(-1)! > 12 && zb.acum.at(-1)! < 17, String(zb.acum.at(-1)));
+  assert.ok(zb.puntos.length > 10);
+  // Barcelona-Sants → Madrid-Atocha por la alta velocidad (≈ 620 km; recta ≈ 505)
+  const bm = rutaPorVias([[41.3798632, 2.14101688], [40.40638, -3.69083]]);
+  assert.ok(bm.acum.at(-1)! > 580 && bm.acum.at(-1)! < 660, String(bm.acum.at(-1)));
+  assert.equal(bm.estaciones.length, 2);
+  // Ir y volver: el punto a 300 km cae sobre la ruta
+  const [la, lo] = puntoEn(bm, 300);
+  const p = proyectar(bm, la, lo);
+  assert.ok(Math.abs(p.km - 300) < 0.5 && p.error < 0.01);
+  assert.ok(distKm(bm.puntos[0], [41.3798632, 2.14101688]) < 1);
+});

@@ -20,12 +20,13 @@ import { DEMO, useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
 import { itinerariosDemo, rastrosDemo, trenesDemo } from "../lib/demo";
 import { ESTACIONES_RENFE } from "../lib/estacionesRenfe";
-import { fechaMadrid, hace, hora } from "../lib/formato";
+import { fechaMadrid, hace, hora, inicioDiaMadrid } from "../lib/formato";
 import { HorarioRenfe, itinerarioDe, type Itinerario, type Itinerarios } from "../lib/fuentes/itinerarios";
 import { Ouigo } from "../lib/fuentes/ouigo";
 import { estadoTrenes } from "../lib/fuentes/redTrenes";
 import type { EstadoTrenes, Tren } from "../lib/fuentes/trenes";
 import { detectarParadas, SeguimientoTrenes, velocidad, type ParadaDetectada } from "../lib/seguimientoTrenes";
+import { pegarAVia, proyectar, puntoEn, rutaPorVias, trozoDeRuta, type LatLon, type Ruta } from "../lib/vias";
 import { alfa, useColores, type Colores } from "../lib/tema";
 import type { Nivel } from "../lib/tipos";
 
@@ -65,10 +66,25 @@ const nivelRetraso = (m: number): Nivel => (m >= 30 ? "critico" : m >= 10 ? "avi
 const textoRetraso = (m: number, t?: Tren) => (t?.cortadoPor ? "¿Suprimido?" : t?.sinRetraso ? "Horario" : m >= 2 ? `+${m} min` : m <= -2 ? `${m} min` : "En hora");
 const etiqueta = (t: Tren) => (t.operador === "Euskotren" ? t.tipo.replace("Euskotren ", "") : t.red === "cercanias" ? t.linea ?? "C"
   : t.operador === "Ouigo" ? "OUIGO" : CORTO[t.tipo] ?? "T");
-const ruta = (t: Tren) => (t.origen ? `${t.origen} → ${t.destino}` : `${t.tipo} → ${t.destino}`);
+const rutaTexto = (t: Tren) => (t.origen ? `${t.origen} → ${t.destino}` : `${t.tipo} → ${t.destino}`);
 const nombreTren = (t: Tren) => (t.operador === "Renfe" ? `${t.tipo} ${t.id}` : t.tipo);
 const hm = (min: number) => `${Math.floor(min / 60) % 24}:${String(Math.round(min) % 60).padStart(2, "0")}`;
 const duracion = (min: number) => (min >= 60 ? `${Math.floor(min / 60)} h ${min % 60} min` : `${min} min`);
+
+/** Ouigo: km de su ruta en los que debería estar ahora según el horario (entre estaciones, a ritmo constante). */
+function kmPorHorario(it: Itinerario, ruta: Ruta, ahora: number): number | null {
+  let m = (ahora - inicioDiaMadrid(ahora)) / 60e3;
+  const p = it.paradas;
+  if (m < p[0][2] - 60) m += 1440;                    // salió ayer y pasa de medianoche
+  for (let i = 0; i < p.length; i++) {
+    if (m >= p[i][1] && m <= p[i][2]) return ruta.estaciones[i];
+    if (i < p.length - 1 && m > p[i][2] && m < p[i + 1][1]) {
+      const f = (m - p[i][2]) / (p[i + 1][1] - p[i][2]);
+      return ruta.estaciones[i] + (ruta.estaciones[i + 1] - ruta.estaciones[i]) * f;
+    }
+  }
+  return null;
+}
 
 /** Avanza `seg` segundos desde el último punto, con la velocidad (km/h) y el rumbo de los dos últimos. */
 function avanzar(a: [number, number, number], b: [number, number, number], kmh: number, seg: number) {
@@ -210,11 +226,46 @@ export default function Trenes() {
     const r = setInterval(() => setTic(x => x + 1), 1000);
     return () => clearInterval(r);
   }, [elegido]);
-  // Entre dos lecturas de Renfe, el tren elegido avanza cada segundo con su velocidad y su rumbo
-  // (como un navegador en un túnel); al llegar la siguiente posición real, se corrige sola.
-  const animado = tren && !tren.estimada && vel != null && vel > 5 && !parado && rastro.length >= 2
-    ? avanzar([...rastro].reverse().find(p => p[0] < tren.t) ?? rastro.at(-2)!, [tren.t, tren.lat, tren.lon], vel,
-      Math.min(20, (ahora - tren.t) / 1000)) : null;
+  // Ruta POR LA VÍA del tren elegido (camino por la red ferroviaria entre sus estaciones)
+  const ruta: Ruta | null = useMemo(() => {
+    if (!it) return null;
+    const pts = it.paradas.map(([s]) => ESTACIONES_RENFE[s]).filter(Boolean).map(([, la, lo]) => [la, lo] as LatLon);
+    return pts.length > 1 && pts.length === it.paradas.length ? rutaPorVias(pts) : null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tren?.id, itinerarios, it?.paradas.length]);
+  // Dónde está el tren en su ruta (km desde el origen) y, entre lecturas, cuánto ha avanzado:
+  // con su velocidad real, por la vía y sin pasarse de la siguiente estación.
+  let kmTren: number | null = null;
+  if (ruta && tren && it) {
+    if (tren.operador === "Ouigo") kmTren = kmPorHorario(it, ruta, ahora);
+    else {
+      const p = proyectar(ruta, tren.lat, tren.lon);
+      if (p.error < 1.5) {
+        kmTren = p.km;
+        if (vel != null && vel > 5 && !parado && tren.estado !== "estacion") {
+          const tope = sig >= 0 && sig < ruta.estaciones.length ? ruta.estaciones[sig] : Infinity;
+          kmTren = Math.min(Math.max(tope, p.km), p.km + (vel * Math.min(20, Math.max(0, (ahora - tren.t) / 1000))) / 3600);
+        }
+      }
+    }
+  }
+  const enVia_ = kmTren != null && ruta ? puntoEn(ruta, kmTren) : null;
+  // Sin ruta: avanza con su rumbo (como un navegador en un túnel); al llegar la siguiente lectura se corrige sola
+  const animado = enVia_ ? { latitude: enVia_[0], longitude: enVia_[1] }
+    : tren && !tren.estimada && vel != null && vel > 5 && !parado && rastro.length >= 2
+      ? avanzar([...rastro].reverse().find(p => p[0] < tren.t) ?? rastro.at(-2)!, [tren.t, tren.lat, tren.lon], vel,
+        Math.min(20, (ahora - tren.t) / 1000)) : null;
+  // Lo recorrido desde que lo sigues, por la vía
+  const recorridoVia = ruta && kmTren != null && rastro.length
+    ? (() => {
+      // desde el primer punto del rastro que cae sobre esta ruta
+      for (const [, la, lo] of rastro) {
+        const p0 = proyectar(ruta, la, lo);
+        if (p0.error < 1.5) return p0.km < kmTren ? trozoDeRuta(ruta, p0.km, kmTren) : null;
+      }
+      return null;
+    })()
+    : null;
 
   const elegir = (t: Tren) => {
     setElegido(t.id);
@@ -247,6 +298,16 @@ export default function Trenes() {
   const otros = avisos.filter(a => a.fuente !== "Adif" && !a.ascensor);
   // Las Cercanías (cientos) solo se pintan si se eligen o se buscan, para que el mapa se lea
   const enMapa = tren ? [tren] : filtro === "cercanias" || texto ? lista : lista.filter(t => t.red !== "cercanias");
+  // Cada tren encima de la vía más cercana (a menos de 600 m)
+  const sobreLaVia = useMemo(() => {
+    const m = new Map<string, { latitude: number; longitude: number }>();
+    for (const t of enMapa) {
+      const p = pegarAVia(t.lat, t.lon, 0.6)?.punto;
+      if (p) m.set(t.id, { latitude: p[0], longitude: p[1] });
+    }
+    return m;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [estado, filtro, texto, alcance, elegido]);
 
   return (
     <View style={{ flex: 1, backgroundColor: c.fondo }}>
@@ -267,8 +328,9 @@ export default function Trenes() {
         showsPointsOfInterests={false} pitchEnabled={false} onPress={() => setElegido(null)}>
         {/* Recorrido previsto del tren elegido: estaciones unidas, en gris */}
         {tren && it && (
-          <Polyline coordinates={it.paradas.map(([s]) => ESTACIONES_RENFE[s]).filter(Boolean).map(([, latitude, longitude]) => ({ latitude, longitude }))}
-            strokeColor={alfa(c.suave, 0.8)} strokeWidth={3} lineDashPattern={[6, 6]} />
+          <Polyline coordinates={(ruta?.puntos ?? it.paradas.map(([s]) => ESTACIONES_RENFE[s]).filter(Boolean).map(([, la, lo]) => [la, lo] as LatLon))
+            .map(([latitude, longitude]) => ({ latitude, longitude }))}
+            strokeColor={alfa(c.suave, 0.85)} strokeWidth={4} lineDashPattern={ruta ? undefined : [6, 6]} />
         )}
         {tren && it && it.paradas.map(([s], i) => {
           const e = ESTACIONES_RENFE[s];
@@ -281,8 +343,9 @@ export default function Trenes() {
           );
         })}
         {/* Rastro real por donde ha ido (desde que la app está abierta) */}
-        {tren && rastro.length > 1 && (
-          <Polyline coordinates={rastro.map(([, latitude, longitude]) => ({ latitude, longitude }))} strokeColor={c.acento} strokeWidth={5} />
+        {tren && (recorridoVia ? recorridoVia.length > 1 : rastro.length > 1) && (
+          <Polyline coordinates={(recorridoVia ?? rastro.map(([, la, lo]) => [la, lo] as LatLon)).map(([latitude, longitude]) => ({ latitude, longitude }))}
+            strokeColor={c.acento} strokeWidth={5} />
         )}
         {tren && paradas.map(p => (
           <Marker key={"q" + p.desde} coordinate={{ latitude: p.lat, longitude: p.lon }} anchor={{ x: 0.5, y: 1 }}
@@ -293,7 +356,7 @@ export default function Trenes() {
           </Marker>
         ))}
         {enMapa.map(t => (
-          <Marker key={t.id} coordinate={t.id === elegido && animado ? animado : { latitude: t.lat, longitude: t.lon }} anchor={{ x: 0.5, y: 0.5 }}
+          <Marker key={t.id} coordinate={t.id === elegido && animado ? animado : sobreLaVia.get(t.id) ?? { latitude: t.lat, longitude: t.lon }} anchor={{ x: 0.5, y: 0.5 }}
             onPress={() => elegir(t)} zIndex={t.id === elegido ? 10 : 1} tracksViewChanges={t.id === elegido}>
             <Chapa t={t} c={c} grande={t.id === elegido} parado={enVia(t)} />
           </Marker>
@@ -341,7 +404,7 @@ export default function Trenes() {
                   ? "Posición SEGÚN HORARIO: Ouigo no publica el GPS ni los retrasos de sus trenes. Si va con retraso o está parado, no se puede saber."
                   : tren.estimada
                   ? "Posición estimada: Euskotren no publica el GPS de sus trenes (se calcula con su horario en tiempo real)."
-                  : `Posición GPS ${hace(tren.t)}${animado ? " (entre lecturas se mueve con su velocidad)" : ""}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
+                  : `Posición GPS ${hace(tren.t)}${enVia_ ? " · sobre la vía" : ""}${animado && vel ? " (entre lecturas avanza con su velocidad)" : ""}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
               </Etiqueta>
             </Tarjeta>
 
@@ -435,7 +498,7 @@ export default function Trenes() {
                       borderBottomWidth: i === arr.length - 1 ? 0 : 0.5, borderBottomColor: c.linea })}>
                     <View style={{ width: 62, alignItems: "flex-start" }}><Chapa t={t} c={c} parado={enVia(t)} /></View>
                     <View style={{ flex: 1, gap: 1 }}>
-                      <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{ruta(t)}</Text>
+                      <Text numberOfLines={1} style={{ color: c.texto, fontSize: 14, fontWeight: "600" }}>{rutaTexto(t)}</Text>
                       <Text numberOfLines={1} style={{ color: p && !p.estacion ? c.critico : c.suave, fontSize: 12.5 }}>
                         {t.cortadoPor ? "⚠️ Línea cortada (Adif): probablemente no circula"
                           : p && !p.estacion ? `⏸ Parado en vía ${duracion(p.minutos)} · ${t.anterior} → ${t.siguiente}`

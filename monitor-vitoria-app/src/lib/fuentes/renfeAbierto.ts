@@ -7,6 +7,7 @@
  * El tipo de tren, el origen, el destino y el recorrido salen del horario oficial (itinerarios.ts).
  */
 import { VITORIA } from "../config";
+import { ESTACIONES_RENFE } from "../estacionesRenfe";
 import { inicioDiaMadrid, fechaMadrid } from "../formato";
 import { distanciaKm } from "./comun";
 import { itinerarioDe, type Itinerarios } from "./itinerarios";
@@ -78,7 +79,9 @@ export function parsearRenfeAbierto(
     const it = itinerarios ? itinerarioDe(itinerarios, id, hoy) : null;
     const cods = it?.paradas.map(p => p[0]) ?? [];
     const sig = v.stopId ? String(v.stopId) : null;
-    const enEstacion = v.currentStatus === "STOPPED_AT";
+    // Renfe a veces dice "parado en" la siguiente estación estando lejos: solo si está a menos de 1 km
+    const est = sig ? ESTACIONES_RENFE[sig] : null;
+    const enEstacion = v.currentStatus === "STOPPED_AT" && (!est || distanciaKm(lat, lon, est[1], est[2]) < 1);
     const i = sig ? cods.indexOf(sig) : -1;
     const ant = enEstacion ? sig : i > 0 ? cods[i - 1] : null;
     const retrasoMin = r?.delay != null ? Math.round(r.delay / 60) : 0;
