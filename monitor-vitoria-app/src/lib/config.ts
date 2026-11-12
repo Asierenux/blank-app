@@ -44,6 +44,7 @@ export const INTERVALOS_MIN: Record<string, number> = {
   camaras: 1440,
   traficociudad: 15,
   obras: 60,
+  trenes: 10,
 };
 
 export const RADIO_TRAFICO_KM = 25;

@@ -1,11 +1,13 @@
 /** Inicio: el estado de Vitoria de un vistazo. */
 import { router } from "expo-router";
-import { ActivityIndicator, Text, View } from "react-native";
+import { useState } from "react";
+import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 
 import { Barra, GraficaPvpc } from "../componentes/graficas";
 import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Tarjeta } from "../componentes/ui";
 import { MejorGasolina, MisParadas, ResumenHoy, TarjetasAvisos } from "../componentes/novedades";
 import { TarjetaAgenda } from "../componentes/agenda";
+import { Ajustes } from "../componentes/ajustes";
 import { useDatos } from "../datos";
 import { fechaMadrid, hora, num } from "../lib/formato";
 import type { Indicador } from "../lib/panel";
@@ -24,6 +26,7 @@ function fichaDe(i: Indicador | undefined, etiqueta?: string) {
 export default function Inicio() {
   const c = useColores();
   const { panel, listo } = useDatos();
+  const [ajustes, setAjustes] = useState(false);
   if (!listo || !panel) {
     return <View style={{ flex: 1, backgroundColor: c.fondo, justifyContent: "center" }}><ActivityIndicator /></View>;
   }
@@ -33,7 +36,16 @@ export default function Inicio() {
   const conProblemas = fuentes.filter(f => f.nivel === "aviso" && f.texto !== "Sin configurar");
 
   return (
-    <Pantalla titulo="Vitoria-Gasteiz">
+    <Pantalla titulo="Vitoria-Gasteiz" derecha={
+      <Pressable onPress={() => setAjustes(true)} hitSlop={10} accessibilityLabel="Ajustes"
+        style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, backgroundColor: c.tarjeta, alignItems: "center",
+          justifyContent: "center", marginBottom: 4, opacity: pressed ? 0.6 : 1 })}>
+        <Text style={{ fontSize: 20 }}>⚙️</Text>
+      </Pressable>
+    }>
+      <Modal visible={ajustes} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAjustes(false)}>
+        <Ajustes cerrar={() => setAjustes(false)} />
+      </Modal>
       <Tarjeta estilo={{ backgroundColor: alfa(color, 0.14) }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
           <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: color }} />
@@ -63,7 +75,7 @@ export default function Inicio() {
       <TarjetaAgenda eventos={panel.agenda} />
 
       {sinConfigurar.length > 0 && (
-        <Tarjeta onPress={() => router.navigate("/ajustes")}>
+        <Tarjeta onPress={() => setAjustes(true)}>
           <Text style={{ color: c.texto, fontWeight: "700", fontSize: 16 }}>Completa la configuración</Text>
           <Text style={{ color: c.suave, fontSize: 14 }}>
             Faltan claves de: {sinConfigurar.map(f => f.descripcion.split(" ·")[0].split(" (")[0]).join(", ")}. Toca para añadirlas →

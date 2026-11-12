@@ -352,3 +352,55 @@ test("Incidencias repetidas en la misma carretera se juntan en una fila", async 
   assert.deepEqual(g[1].municipios, ["Etxabarri", "Arlaban"]);
   assert.equal(lista.filter(esImportante).length, 4);
 });
+
+test("Datos reales de Renfe: trenes cerca de Vitoria con tipo, estaciones, retraso y estado", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { parsearFlota, parsearAvisosRenfe } = await import("../src/lib/fuentes/trenes");
+  const d = JSON.parse(readFileSync(new URL("./datos/renfe_flota.json", import.meta.url), "utf-8"));
+  const ahora = Date.parse("2026-11-12T14:32:00Z");
+  const t = parsearFlota(d, ahora);
+  assert.equal(t.length, 13);                                         // de 149 en toda España, 13 a menos de 100 km
+  const vit = t[0];
+  assert.equal(vit.id, "18029");
+  assert.equal(vit.tipo, "Regional");
+  assert.equal(vit.estado, "estacion");                                // parado en la estación de Vitoria
+  assert.equal(vit.siguiente, "Vitoria-Gasteiz");
+  const md = t.find(x => x.id === "18061")!;
+  assert.equal(md.tipo, "Media Distancia");
+  assert.equal(md.origen, "Madrid-Príncipe Pío");
+  assert.equal(md.retrasoMin, 65);
+  assert.equal(md.estado, "marcha");
+  assert.equal(new Date(md.llegadaSiguiente!).toISOString(), "2026-11-12T14:42:20.000Z");   // 15:42:20 en Madrid
+  assert.equal(t.find(x => x.id === "00622")!.tipo, "Alvia");
+  // Si en la siguiente lectura (10 min después) sigue en el mismo sitio fuera de estación → parado
+  const d2 = JSON.parse(JSON.stringify(d));
+  for (const x of d2.trenes) x.time = Number(x.time) + 600;
+  const t2 = parsearFlota(d2, ahora + 600e3, 100, t);
+  const md2 = t2.find(x => x.id === "18061")!;
+  assert.equal(md2.estado, "parado");
+  assert.equal(md2.paradoDesde, md.t);
+  assert.equal(t2.find(x => x.id === "18029")!.estado, "estacion");   // en estación no cuenta como parado
+  // Avisos: solo de la zona, en castellano, y sin "San Sebastián de los Reyes" (Madrid)
+  const a = parsearAvisosRenfe(JSON.parse(readFileSync(new URL("./datos/renfe_avisos.json", import.meta.url), "utf-8")), ahora);
+  assert.ok(a.length > 0);
+  assert.ok(a.every(x => !/San Sebasti[aá]n de los Reyes/i.test(x.texto)));
+  assert.ok(a.every(x => !x.texto.includes("//")));
+  assert.ok(a.some(x => x.texto.startsWith("AMURRIO") && x.ascensor));
+});
+
+test("Motor: avisa una vez de un tren cercano con mucho retraso", async () => {
+  const { Motor } = await import("../src/lib/motor");
+  const { readFileSync } = await import("node:fs");
+  const flota = readFileSync(new URL("./datos/renfe_flota.json", import.meta.url), "utf-8");
+  const h = new Historial(almacenEnMemoria());
+  const enviados: string[] = [];
+  const m = new Motor(h, {
+    descargar: async url => (url.includes("flotaLD") ? new Response(flota) : new Response("{}", { status: 500 })),
+    claves: async () => ({}), umbrales: () => U, alertasActivas: () => true,
+    diarios: () => ({ resumen: false, precios: false }), notificar: async a => { enviados.push(a.titulo); },
+  });
+  await m.actualizar(true, ["trenes"]);
+  await m.actualizar(true, ["trenes"]);
+  // 18061 va con 65 min a 16 km de Vitoria (el 00437 va adelantado y el 00622 está a 48 km: no avisan)
+  assert.deepEqual(enviados.filter(x => x.startsWith("🚆")), ["🚆 Media Distancia 18061 con 65 min de retraso"]);
+});

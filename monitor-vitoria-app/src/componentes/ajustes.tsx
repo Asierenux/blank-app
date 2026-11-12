@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { Alert, Linking, Pressable, Switch, Text, TextInput, View } from "react-native";
 
-import { Aviso, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
+import { Aviso, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "./ui";
 import { useDatos } from "../datos";
 import { UMBRALES_DEFECTO, type Umbrales } from "../lib/config";
 import { hace } from "../lib/formato";
@@ -97,11 +97,16 @@ function CampoUmbral({ campo, titulo, unidad }: { campo: keyof Umbrales; titulo:
   );
 }
 
-export default function Ajustes() {
+/** Ajustes: se abre como hoja desde el engranaje de Inicio. */
+export function Ajustes({ cerrar }: { cerrar?: () => void }) {
   const c = useColores();
   const { panel, preferencias, ponerPreferencias, actualizar, actualizando, vaciar } = useDatos();
   return (
-    <Pantalla titulo="Ajustes">
+    <Pantalla titulo="Ajustes" derecha={cerrar && (
+      <Pressable onPress={cerrar} hitSlop={10} style={{ paddingBottom: 8 }}>
+        <Text style={{ color: c.acento, fontSize: 17, fontWeight: "600" }}>Listo</Text>
+      </Pressable>
+    )}>
       <Seccion titulo="Claves de acceso">
         <Tarjeta>
           <Etiqueta>Se guardan cifradas en el llavero del iPhone y solo se envían a su propia web.</Etiqueta>

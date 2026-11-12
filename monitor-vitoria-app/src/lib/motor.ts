@@ -23,6 +23,7 @@ import { recogerGasolina } from "./fuentes/gasolina";
 import { recogerAgenda } from "./fuentes/agenda";
 import { recogerCamarasVitoria, recogerObras, recogerTraficoCiudad } from "./fuentes/vitoria";
 import { recogerAireOficial, type EstacionAire } from "./fuentes/aireOficial";
+import { recogerTrenes, type Tren } from "./fuentes/trenes";
 import { construirPanel, construirPvpc } from "./panel";
 import { avisoPreciosManana, proximas730, resumenDelDia } from "./resumen";
 import { fechaMadrid } from "./formato";
@@ -31,7 +32,7 @@ import type { Historial } from "./historial";
 import type { Claves, Descargar, ErrorFuente } from "./tipos";
 
 export const FUENTES = ["aemet", "prevision", "avisos", "waqi", "aireoficial", "pvpc", "euskalmet", "hidro", "embalses",
-  "generacion", "trafico", "gasolina", "agenda", "camaras", "traficociudad", "obras"] as const;
+  "generacion", "trafico", "gasolina", "agenda", "camaras", "traficociudad", "obras", "trenes"] as const;
 // "saih" (relevo, ver fuentes/saihRelevo.ts) queda desactivada: el SAIH no responde fuera de España
 export type Fuente = (typeof FUENTES)[number];
 
@@ -125,6 +126,7 @@ export class Motor {
       case "camaras": return recogerCamarasVitoria(d, ahora);
       case "traficociudad": return recogerTraficoCiudad(d, ahora);
       case "obras": return recogerObras(d, ahora);
+      case "trenes": return recogerTrenes(d, this.h.extra<{ t: number; trenes: Tren[] }>("trenes") ?? null, ahora);
       case "aireoficial":
         return recogerAireOficial(d, this.h.extra<{ t: number; estaciones: EstacionAire[] }>("estacionesAire"), ahora);
     }
@@ -145,6 +147,7 @@ export class Motor {
   private async alertas(r: Resultado, ahora: number) {
     if (!this.o.alertasActivas()) return;
     await this.avisosMeteo(r, ahora);
+    await this.avisosTrenes(r, ahora);
     await this.luzBarata(r, ahora);
     if (!r.lecturas.length) return;
     const u = this.o.umbrales();
@@ -197,6 +200,31 @@ export class Motor {
       await this.o.notificar({ regla: "aviso_meteo", claves: [clave],
         titulo: `${icono} Aviso ${a.nivel} por ${a.fenomeno.toLowerCase()}`,
         cuerpo: `${a.zona}${a.inicio ? ` · desde ${hora(a.inicio)}` : ""}${a.fin ? ` hasta ${hora(a.fin)}` : ""}\n${a.titular}` }).catch(() => undefined);
+    }
+  }
+
+  /**
+   * Trenes cerca de Vitoria (40 km): aviso si van con 30 min o más de retraso, o si llevan
+   * parados fuera de una estación desde la lectura anterior (≥ 10 min). Una vez por tren y día.
+   */
+  private async avisosTrenes(r: Resultado, ahora: number) {
+    const lista = (r.extra?.trenes as { trenes: Tren[] } | undefined)?.trenes ?? [];
+    const dia = fechaMadrid(ahora);
+    for (const t of lista.filter(x => x.distanciaKm <= 40)) {
+      const avisos: [string, string, string][] = [];
+      if (t.retrasoMin >= 30) {
+        avisos.push([`tren_retraso@${t.id}@${dia}`, `🚆 ${t.tipo} ${t.id} con ${t.retrasoMin} min de retraso`,
+          `${t.origen} → ${t.destino}. Próxima parada: ${t.siguiente}${t.llegadaSiguiente ? ` (${hora(t.llegadaSiguiente)})` : ""}.`]);
+      }
+      if (t.estado === "parado") {
+        avisos.push([`tren_parado@${t.id}@${dia}`, `🛑 ${t.tipo} ${t.id} parado fuera de estación`,
+          `Entre ${t.anterior} y ${t.siguiente}${t.paradoDesde ? ` desde las ${hora(t.paradoDesde)}` : ""}. Renfe no publica el motivo; mira los avisos en la pestaña Trenes.`]);
+      }
+      for (const [clave, titulo, cuerpo] of avisos) {
+        if (clave in this.h.alertasEnviadas) continue;
+        this.h.apuntarAlerta(clave, ahora);
+        await this.o.notificar({ regla: "trenes", titulo, cuerpo, claves: [clave] }).catch(() => undefined);
+      }
     }
   }
 

@@ -315,3 +315,31 @@ export const transporteDemo = {
     };
   },
 };
+
+/** Trenes de ejemplo (basados en los reales del 12/11 por la tarde). */
+export function trenesDemo(ahora: number): import("./fuentes/trenes").EstadoTrenes {
+  const min = 60e3;
+  const t = (id: string, tipo: string, origen: string, destino: string, anterior: string, siguiente: string,
+    retrasoMin: number, lat: number, lon: number, distanciaKm: number, estado: "estacion" | "marcha" | "parado", llega = 10) => ({
+    id, tipo, origen, destino, anterior, siguiente, retrasoMin, lat, lon, distanciaKm, estado, t: ahora - 15e3,
+    llegadaSiguiente: ahora + llega * min, material: null, paradoDesde: estado === "parado" ? ahora - 12 * min : null,
+  });
+  return {
+    t: ahora, errores: [],
+    trenes: [
+      t("18029", "Regional", "Miranda de Ebro", "Zaragoza-Miraflores", "Vitoria-Gasteiz", "Vitoria-Gasteiz", 3, 42.8413, -2.6727, 0.6, "estacion"),
+      t("18061", "Media Distancia", "Madrid-Príncipe Pío", "San Sebastián-Donostia", "Miranda de Ebro", "Vitoria-Gasteiz", 65, 42.7652, -2.8302, 15.8, "parado"),
+      t("18014", "Media Distancia", "San Sebastián-Donostia", "Madrid-Príncipe Pío", "Altsasu", "Araia", 3, 42.9051, -2.1930, 39.5, "marcha"),
+      t("00437", "Alvia", "Bilbao-Abando", "Barcelona-Sants", "Miranda de Ebro", "Miranda de Ebro", -37, 42.6910, -2.9412, 28, "estacion"),
+      t("00622", "Alvia", "Barcelona-Sants", "Vigo Urzaiz", "Miranda de Ebro", "Burgos-Rosa Manzano", 43, 42.6250, -3.1825, 48.5, "marcha", 40),
+      t("00621", "Alvia", "Vigo Urzaiz", "Barcelona-Sants", "Burgos-Rosa Manzano", "Miranda de Ebro", -3, 42.6146, -3.2627, 54.7, "marcha", 20),
+      t("16071", "Regional", "Castejón de Ebro", "Logroño", "Alcanadre", "Agoncillo", 9, 42.4436, -2.2916, 54.5, "marcha"),
+      t("71872", "Media Distancia", "Bilbao la Concordia", "Santander", "Gibaja", "Gibaja", 32, 43.2820, -3.4383, 78.9, "estacion"),
+    ],
+    avisos: [
+      { id: "a1", texto: "Línea R3 Bilbao: por obras en la estación de Amurrio, los trenes circularán por vía única entre Llodio y Amurrio con posibles retrasos.", desde: ahora - 5 * 3600e3, hasta: null, ascensor: false },
+      { id: "a2", texto: "AMURRIO. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 30 * 3600e3, hasta: null, ascensor: true },
+      { id: "a3", texto: "ORDIZIA. Ascensor de vía 1 se encuentra fuera de servicio.", desde: ahora - 50 * 3600e3, hasta: null, ascensor: true },
+    ],
+  };
+}

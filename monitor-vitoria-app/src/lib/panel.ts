@@ -549,6 +549,7 @@ export const NOMBRES_FUENTES: Record<string, string> = {
   agenda: "Agenda cultural de Vitoria",
   camaras: "Cámaras del Ayuntamiento",
   traficociudad: "Tráfico en la ciudad (sensores)",
+  trenes: "Trenes (Renfe)",
   obras: "Obras en las calles (Ayuntamiento)",
   waqi: "Calidad del aire (WAQI)",
   pvpc: "Precio de la luz (REE)",
