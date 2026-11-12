@@ -96,8 +96,8 @@ export function DibujoEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | 
 
           {/* Cielo, sol o luna, y montes al fondo */}
           <Rect x={0} y={0} width={W} height={ALTO} fill={`url(#cielo-${e.id})`} />
-          {dia ? <Circle cx={W * 0.68} cy={22} r={12} fill="#FFD25A" opacity={0.95} />
-            : <G><Circle cx={W * 0.68} cy={22} r={10} fill="#F1F3F8" /><Circle cx={W * 0.68 + 5} cy={19} r={9} fill={cieloA} /></G>}
+          {dia ? <Circle cx={W * 0.9} cy={20} r={11} fill="#FFD25A" opacity={0.95} />
+            : <G><Circle cx={W * 0.9} cy={20} r={9} fill="#F1F3F8" /><Circle cx={W * 0.9 + 4} cy={17} r={8} fill={cieloA} /></G>}
           <Path d={`M 0 ${yC + 6} L ${W * 0.12} ${yC - 26} L ${W * 0.26} ${yC - 4} L ${W * 0.4} ${yC - 34} L ${W * 0.58} ${yC - 2} L ${W * 0.74} ${yC - 22} L ${W} ${yC + 2} L ${W} ${ALTO} L 0 ${ALTO} Z`} fill={monte1} />
           <Path d={`M 0 ${yC + 14} L ${W * 0.2} ${yC - 8} L ${W * 0.34} ${yC + 8} L ${W * 0.52} ${yC - 14} L ${W * 0.68} ${yC + 6} L ${W} ${yC - 6} L ${W} ${ALTO} L 0 ${ALTO} Z`} fill={monte2} />
 
@@ -166,15 +166,15 @@ export function DibujoEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | 
           )}
           {barazar && (
             <G>
-              <Rect x={W * 0.26} y={8} width={W * 0.34} height={36} rx={10}
+              <Rect x={W * 0.2} y={8} width={W * 0.44} height={36} rx={10}
                 fill={turbina ? alfa("#FFD25A", 0.92) : alfa(oscuro ? "#000000" : "#FFFFFF", 0.55)} />
-              <SvgText x={W * 0.43} y={23} fontSize={11} fontWeight="800" textAnchor="middle"
+              <SvgText x={W * 0.42} y={23} fontSize={11} fontWeight="800" textAnchor="middle"
                 fill={turbina ? "#1F2937" : (oscuro ? "#E5E7EB" : "#1F2937")}>
                 {turbina ? `⚡ Genera ≈ ${num(barazar.potenciaMw, 0)} MW` : "¿Genera luz? No se sabe"}
               </SvgText>
-              <SvgText x={W * 0.43} y={37} fontSize={9.5} fontWeight="700" textAnchor="middle"
+              <SvgText x={W * 0.42} y={37} fontSize={9.5} fontWeight="700" textAnchor="middle"
                 fill={turbina ? "#374151" : (oscuro ? "#9CA3AF" : "#4B5563")}>
-                {barazar.estado === "probable" ? "central de Barazar · casi seguro" : barazar.estado === "posible" ? "central de Barazar · posible" : "central de Barazar"}
+                {barazar.estado === "probable" ? "en Barazar · casi seguro" : barazar.estado === "posible" ? "en Barazar · posible" : "central de Barazar"}
               </SvgText>
             </G>
           )}
@@ -191,14 +191,14 @@ export function DibujoEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | 
             e.cotaAnioPasado != null && e.cotaMedia10 != null && e.cotaAnioPasado <= e.cotaMedia10)}
 
           {/* Cota actual y si sube o baja */}
-          <SvgText x={presaX - 8} y={Math.max(yN + 34, SUELO - 38)} fontSize={15} fontWeight="800" fill="#FFFFFF" textAnchor="end">
+          <SvgText x={presaX - 8} y={Math.max(yN + 30, SUELO - 50)} fontSize={15} fontWeight="800" fill="#FFFFFF" textAnchor="end">
             {`${e.nivelEstimado ? "≈ " : ""}${num(nivel, 2)} m`}
           </SvgText>
           {e.balance && (
             <G>
-              <Rect x={presaX - 118} y={Math.max(yN + 42, SUELO - 30)} width={110} height={20} rx={10}
+              <Rect x={presaX - 118} y={Math.max(yN + 36, SUELO - 44)} width={110} height={20} rx={10}
                 fill={subiendo ? c.ok : bajando ? c.aviso : alfa("#FFFFFF", 0.25)} />
-              <SvgText x={presaX - 63} y={Math.max(yN + 42, SUELO - 30) + 14} fontSize={11} fontWeight="800" fill="#FFFFFF" textAnchor="middle">
+              <SvgText x={presaX - 63} y={Math.max(yN + 36, SUELO - 44) + 14} fontSize={11} fontWeight="800" fill="#FFFFFF" textAnchor="middle">
                 {`${subiendo ? "▲ Sube" : bajando ? "▼ Baja" : "= Estable"}${e.balance.cmDia != null && e.balance.texto !== "Estable" ? ` ${num(Math.abs(e.balance.cmDia), 0)} cm/día` : ""}`}
               </SvgText>
             </G>
