@@ -1,2 +1,2 @@
 /** Se cambia en cada publicación: así, en Ajustes, se ve si el iPhone ya tiene la última versión. */
-export const VERSION_APP = "13 nov · 22:30";
+export const VERSION_APP = "14 nov · 14:20";

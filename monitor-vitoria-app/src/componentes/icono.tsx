@@ -5,6 +5,8 @@
 import { SymbolView, type SFSymbol } from "expo-symbols";
 import { Platform, Text } from "react-native";
 
+import { useColores } from "../lib/tema";
+
 /** Nombre corto → [símbolo de Apple, emoji de reserva] */
 const ICONOS = {
   aviso: ["exclamationmark.triangle.fill", "⚠️"],
@@ -61,14 +63,29 @@ export function Icono({ n, color, tam = 18, peso = "semibold" }: {
     fallback={<Text style={{ fontSize: tam * 0.9 }}>{emoji}</Text>} />;
 }
 
-/** El cielo (emoji de la previsión) → símbolo de Apple a todo color. */
-const CIELO: Record<string, string> = {
-  "☀️": "sun.max.fill", "🌙": "moon.stars.fill", "🌤️": "cloud.sun.fill", "⛅": "cloud.sun.fill", "☁️": "cloud.fill",
-  "🌦️": "cloud.sun.rain.fill", "🌧️": "cloud.rain.fill", "❄️": "cloud.snow.fill", "⛈️": "cloud.bolt.rain.fill", "🌫️": "cloud.fog.fill",
+/**
+ * El cielo (emoji de la previsión) → símbolo de Apple en color. Se pinta por capas («palette»): la nube en gris y
+ * el sol, la lluvia o la nieve en su color. (Con «multicolor» la nube es blanca y no se ve sobre fondo blanco.)
+ */
+const SOL = "#FFB800", LLUVIA = "#3B9EFF", NIEVE = "#7DD3FC";
+const CIELO: Record<string, [string, (nube: string) => string[]]> = {
+  "☀️": ["sun.max.fill", () => [SOL]],
+  "🌙": ["moon.stars.fill", () => ["#F5C542", "#F5C542"]],
+  "🌤️": ["cloud.sun.fill", n => [n, SOL]],
+  "⛅": ["cloud.sun.fill", n => [n, SOL]],
+  "☁️": ["cloud.fill", n => [n]],
+  "🌦️": ["cloud.sun.rain.fill", n => [n, SOL, LLUVIA]],
+  "🌧️": ["cloud.rain.fill", n => [n, LLUVIA]],
+  "❄️": ["cloud.snow.fill", n => [n, NIEVE]],
+  "⛈️": ["cloud.bolt.rain.fill", n => [n, SOL, LLUVIA]],
+  "🌫️": ["cloud.fog.fill", n => [n, n]],
 };
 
 export function IconoCielo({ emoji, tam = 24 }: { emoji: string; tam?: number }) {
-  const sf = CIELO[emoji];
-  if (Platform.OS !== "ios" || !sf) return <Text style={{ fontSize: tam * 0.85, lineHeight: tam * 1.1 }}>{emoji}</Text>;
-  return <SymbolView name={sf as SFSymbol} size={tam} type="multicolor" fallback={<Text style={{ fontSize: tam * 0.85 }}>{emoji}</Text>} />;
+  const c = useColores();
+  const def = CIELO[emoji];
+  if (Platform.OS !== "ios" || !def) return <Text style={{ fontSize: tam * 0.85, lineHeight: tam * 1.1 }}>{emoji}</Text>;
+  const nube = c.fondo === "#000000" ? "#C7CED8" : "#8E9AAB";
+  return <SymbolView name={def[0] as SFSymbol} size={tam} type="palette" colors={def[1](nube)}
+    fallback={<Text style={{ fontSize: tam * 0.85 }}>{emoji}</Text>} />;
 }

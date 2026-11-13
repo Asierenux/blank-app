@@ -26,11 +26,11 @@ function Pestanas() {
         {marca(p?.agua) ? <NativeTabs.Trigger.Badge>{marca(p?.agua)}</NativeTabs.Trigger.Badge> : null}
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="movilidad">
-        <NativeTabs.Trigger.Icon sf={{ default: "tram", selected: "tram.fill" }} />
+        <NativeTabs.Trigger.Icon sf={{ default: "bus", selected: "bus.fill" }} />
         <NativeTabs.Trigger.Label>Movilidad</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="trenes">
-        <NativeTabs.Trigger.Icon sf={{ default: "train.side.front.car", selected: "train.side.front.car" }} />
+        <NativeTabs.Trigger.Icon sf={{ default: "tram", selected: "tram.fill" }} />
         <NativeTabs.Trigger.Label>Trenes</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="clima">
