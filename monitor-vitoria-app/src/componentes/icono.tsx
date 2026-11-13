@@ -3,9 +3,8 @@
  * En la vista previa web no existen: se enseña el emoji equivalente.
  */
 import { SymbolView, type SFSymbol } from "expo-symbols";
-import { Platform, Text } from "react-native";
-
-import { useColores } from "../lib/tema";
+import { Platform, Text, View } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 
 /** Nombre corto → [símbolo de Apple, emoji de reserva] */
 const ICONOS = {
@@ -64,28 +63,43 @@ export function Icono({ n, color, tam = 18, peso = "semibold" }: {
 }
 
 /**
- * El cielo (emoji de la previsión) → símbolo de Apple en color. Se pinta por capas («palette»): la nube en gris y
- * el sol, la lluvia o la nieve en su color. (Con «multicolor» la nube es blanca y no se ve sobre fondo blanco.)
+ * El cielo (emoji de la previsión) → símbolo de Apple a todo color sobre una «baldosa» con el color del cielo
+ * (azul de día, gris si está cubierto, azul noche…), como en la app Tiempo: así la nube blanca se ve bien.
  */
-const SOL = "#FFB800", LLUVIA = "#3B9EFF", NIEVE = "#7DD3FC";
-const CIELO: Record<string, [string, (nube: string) => string[]]> = {
-  "☀️": ["sun.max.fill", () => [SOL]],
-  "🌙": ["moon.stars.fill", () => ["#F5C542", "#F5C542"]],
-  "🌤️": ["cloud.sun.fill", n => [n, SOL]],
-  "⛅": ["cloud.sun.fill", n => [n, SOL]],
-  "☁️": ["cloud.fill", n => [n]],
-  "🌦️": ["cloud.sun.rain.fill", n => [n, SOL, LLUVIA]],
-  "🌧️": ["cloud.rain.fill", n => [n, LLUVIA]],
-  "❄️": ["cloud.snow.fill", n => [n, NIEVE]],
-  "⛈️": ["cloud.bolt.rain.fill", n => [n, SOL, LLUVIA]],
-  "🌫️": ["cloud.fog.fill", n => [n, n]],
+const CIELO: Record<string, [string, [string, string]]> = {
+  "☀️": ["sun.max.fill", ["#4FA3F7", "#2D7FD8"]],
+  "🌙": ["moon.stars.fill", ["#2B3B6E", "#18224A"]],
+  "🌤️": ["cloud.sun.fill", ["#5AA6EE", "#3580CC"]],
+  "⛅": ["cloud.sun.fill", ["#6BA1D8", "#3F78B4"]],
+  "☁️": ["cloud.fill", ["#8A9BB0", "#64758C"]],
+  "🌦️": ["cloud.sun.rain.fill", ["#6E93BC", "#466C97"]],
+  "🌧️": ["cloud.rain.fill", ["#6C809C", "#47596F"]],
+  "❄️": ["cloud.snow.fill", ["#93AFCF", "#6886AA"]],
+  "⛈️": ["cloud.bolt.rain.fill", ["#4E5570", "#2F344A"]],
+  "🌫️": ["cloud.fog.fill", ["#A1ABB8", "#7D8896"]],
 };
 
 export function IconoCielo({ emoji, tam = 24 }: { emoji: string; tam?: number }) {
-  const c = useColores();
   const def = CIELO[emoji];
-  if (Platform.OS !== "ios" || !def) return <Text style={{ fontSize: tam * 0.85, lineHeight: tam * 1.1 }}>{emoji}</Text>;
-  const nube = c.fondo === "#000000" ? "#C7CED8" : "#8E9AAB";
-  return <SymbolView name={def[0] as SFSymbol} size={tam} type="palette" colors={def[1](nube)}
-    fallback={<Text style={{ fontSize: tam * 0.85 }}>{emoji}</Text>} />;
+  const lado = Math.round(tam * 1.3);
+  const radio = Math.round(lado * 0.3);
+  const id = `cielo-${def?.[1][0].slice(1) ?? "x"}`;
+  return (
+    <View style={{ width: lado, height: lado, borderRadius: radio, overflow: "hidden", alignItems: "center", justifyContent: "center" }}>
+      {def && (
+        <Svg width={lado} height={lado} style={{ position: "absolute" }}>
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={def[1][0]} /><Stop offset="1" stopColor={def[1][1]} />
+            </LinearGradient>
+          </Defs>
+          <Rect x={0} y={0} width={lado} height={lado} fill={`url(#${id})`} />
+        </Svg>
+      )}
+      {Platform.OS === "ios" && def
+        ? <SymbolView name={def[0] as SFSymbol} size={Math.round(tam * 0.85)} type="multicolor"
+            fallback={<Text style={{ fontSize: tam * 0.7 }}>{emoji}</Text>} />
+        : <Text style={{ fontSize: tam * 0.7, lineHeight: tam * 0.95 }}>{emoji}</Text>}
+    </View>
+  );
 }

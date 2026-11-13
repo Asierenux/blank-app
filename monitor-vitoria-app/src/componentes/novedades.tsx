@@ -59,7 +59,7 @@ export function PrevisionHoras({ prevision, horas = 24 }: { prevision: Prevision
         <View key={h.t} style={{ width: 52, alignItems: "center", gap: 4, paddingVertical: 8, borderRadius: 14,
           backgroundColor: i === 0 ? c.tarjetaAlta : "transparent" }}>
           <Text style={{ color: c.suave, fontSize: 12, fontWeight: "600" }}>{i === 0 ? "Ahora" : hora(h.t).split(":")[0] + "h"}</Text>
-          <IconoCielo emoji={iconoCielo(h.cielo)} tam={26} />
+          <IconoCielo emoji={iconoCielo(h.cielo)} tam={25} />
           <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700" }}>{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</Text>
           <Text style={{ color: c.agua, fontSize: 11, fontWeight: "600", minHeight: 14 }}>
             {h.probLluvia != null && h.probLluvia >= 20 ? `${h.probLluvia}%` : ""}
@@ -85,7 +85,7 @@ export function PrevisionDias({ prevision }: { prevision: Prevision }) {
           <View key={d.fecha} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8,
             borderBottomWidth: i === dias.length - 1 ? 0 : 0.5, borderBottomColor: c.linea }}>
             <Text style={{ color: c.texto, width: 54, fontSize: 15, fontWeight: "600" }}>{i === 0 ? "Hoy" : dia(t)}</Text>
-            <View style={{ width: 30, alignItems: "center" }}><IconoCielo emoji={iconoCielo(d.cielo)} tam={22} /></View>
+            <View style={{ width: 30, alignItems: "center" }}><IconoCielo emoji={iconoCielo(d.cielo)} tam={21} /></View>
             <Text style={{ color: c.agua, width: 38, fontSize: 12, fontWeight: "600" }}>{d.probLluvia ? `${d.probLluvia}%` : ""}</Text>
             <Text style={{ color: c.suave, width: 30, textAlign: "right", fontVariant: ["tabular-nums"] }}>{d.min != null ? `${d.min}°` : ""}</Text>
             <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.tarjetaAlta }}>
@@ -113,7 +113,7 @@ export function ResumenHoy({ prevision }: { prevision: Prevision }) {
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <IconoCielo emoji={iconoCielo(ahora?.cielo ?? hoy?.cielo ?? "")} tam={46} />
+        <IconoCielo emoji={iconoCielo(ahora?.cielo ?? hoy?.cielo ?? "")} tam={42} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>{ahora?.desc || hoy?.desc || "Previsión"}</Text>
           <Etiqueta>
