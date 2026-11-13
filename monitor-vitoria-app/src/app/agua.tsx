@@ -7,7 +7,8 @@ import { Linking, Text, View } from "react-native";
 import { DibujoEmbalse } from "../componentes/embalse";
 import { DibujoRio } from "../componentes/rio";
 import { Barra, GraficaLinea } from "../componentes/graficas";
-import { Aviso, Cifra, Etiqueta, Fila, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
+import { Icono } from "../componentes/icono";
+import { Aviso, Cifra, Etiqueta, Fila, Info, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
 import { hace, num } from "../lib/formato";
 import type { Barazar, Embalse, Rio } from "../lib/panel";
@@ -43,18 +44,30 @@ function TarjetaEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | null }
       <DibujoEmbalse e={e} barazar={barazar} />
       {e.balance && (
         <View style={{ backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12, gap: 2 }}>
-          <Etiqueta>¿Se llena o se vacía? · últimas {e.balance.horas} h</Etiqueta>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <Etiqueta>¿Se llena o se vacía? · últimas {e.balance.horas} h</Etiqueta>
+            <Info titulo="¿Se llena o se vacía?" texto="Es lo que entra menos lo que sale, calculado con el cambio de volumen del embalse en las últimas ~24 h (dato del SAIH Ebro cada pocas horas). Por debajo de 1,5 m³/s se considera estable, porque el volumen viene redondeado." />
+          </View>
           <Text style={{ color: e.balance.texto === "Llenándose" ? c.ok : e.balance.texto === "Vaciándose" ? c.aviso : c.texto, fontSize: 20, fontWeight: "800" }}>
             {e.balance.texto === "Llenándose" ? "▲ Se llena" : e.balance.texto === "Vaciándose" ? "▼ Se vacía" : "= Estable"}
             {e.balance.texto !== "Estable" ? ` · ${num(Math.abs(e.balance.m3s), 1)} m³/s` : ""}
           </Text>
           <Etiqueta>
-            {`${signo(e.balance.hm3Dia, 2)} hm³/día${e.balance.cmDia != null ? ` · ${signo(e.balance.cmDia, 0)} cm/día` : ""} · es lo que entra menos lo que sale (por el cambio de volumen)`}
+            {`${signo(e.balance.hm3Dia, 2)} hm³/día${e.balance.cmDia != null ? ` · ${signo(e.balance.cmDia, 0)} cm/día` : ""}`}
           </Etiqueta>
         </View>
       )}
       {e.compuertas && (
-        <Aviso nivel={e.compuertas.estado === "cerradas" ? "info" : "aviso"} texto={`Compuertas del aliviadero · ${e.compuertas.texto}`} />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: c.tarjetaAlta, borderRadius: 14, padding: 12 }}>
+          <Icono n={e.compuertas.estado === "cerradas" ? "pausa" : "aviso"} color={e.compuertas.estado === "cerradas" ? c.suave : c.aviso} tam={20} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.texto, fontSize: 15, fontWeight: "700" }}>
+              {e.compuertas.estado === "cerradas" ? "Compuertas sin usar" : e.compuertas.estado === "abiertas" ? "Compuertas abiertas" : "Compuertas: pueden abrirse"}
+            </Text>
+            {e.margenAliviadero != null && e.margenAliviadero > 0 && <Etiqueta>{`El agua está ${num(e.margenAliviadero, 2)} m por debajo del aliviadero`}</Etiqueta>}
+          </View>
+          <Info titulo="Compuertas del aliviadero" texto={e.compuertas.texto} />
+        </View>
       )}
       {e.comparacion && (e.comparacion.anioPasadoPct != null || e.comparacion.media10Pct != null) && (
         <View style={{ flexDirection: "row", gap: 10 }}>
@@ -80,7 +93,7 @@ function TarjetaEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | null }
         <View style={{ gap: 2 }}>
           <Fila izquierda="Cota del agua" derecha={`${e.nivelEstimado ? "≈ " : ""}${num(e.nivel, 2)} m`}
             detalle={[e.var24hCm != null ? `${signo(e.var24hCm, 0)} cm en 24 h` : null,
-              e.nivelEstimado ? "calculada con el volumen y la curva del embalse (± 0,3 m)" : null].filter(Boolean).join(" · ") || undefined} />
+              e.nivelEstimado ? "estimada (± 0,3 m)" : null].filter(Boolean).join(" · ") || undefined} />
           {e.margenAliviadero != null && (
             <Fila izquierda="Hasta el aliviadero" derecha={e.margenAliviadero > 0 ? `${num(e.margenAliviadero, 2)} m` : "Superado"}
               detalle={`Labio a ${num(e.cotas.aliviadero!, 1)} m · NMN ${num(e.cotas.nmn ?? null, 1)} m`} ultima={e.margenNmn == null} />
@@ -101,8 +114,13 @@ function TarjetaEmbalse({ e, barazar }: { e: Embalse; barazar?: Barazar | null }
           ))}
         </View>
       )}
-      {e.salidaMedidaEn && <Etiqueta>La salida se mide en {e.salidaMedidaEn}, justo aguas abajo de la presa.</Etiqueta>}
-      {e.entradaEstimada && <Etiqueta>Lo que entra se calcula: lo que sale + lo que gana el embalse.</Etiqueta>}
+      {(e.salidaMedidaEn || e.entradaEstimada) && (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <Etiqueta>Cómo se miden la entrada y la salida</Etiqueta>
+          <Info titulo="Entrada y salida" texto={[e.salidaMedidaEn ? `La salida se mide en ${e.salidaMedidaEn}, justo aguas abajo de la presa.` : "",
+            e.entradaEstimada ? "Lo que entra no se mide: se calcula como lo que sale más lo que gana (o pierde) el embalse." : ""].filter(Boolean).join(" ")} />
+        </View>
+      )}
       {e.maniobra && !e.balance && (
         <Aviso nivel={e.maniobra.texto === "Equilibrio" ? "info" : "aviso"}
           texto={`${e.maniobra.texto}: balance ${signo(e.maniobra.balanceM3s, 2)} m³/s (${signo(e.maniobra.balanceHm3Dia, 3)} hm³/día). La posición de las compuertas no es pública: se deduce de lo que entra y sale.`} />
@@ -172,7 +190,8 @@ export default function Agua() {
         <GraficaLinea serie={lluvia7d} color={c.agua} decimales={1} alto={80} />
       </Tarjeta>
 
-      <Seccion titulo="Ríos · en directo">
+      <Seccion titulo="Ríos · en directo" icono="rio"
+        info="Estaciones de aforo de Euskalmet (URA) cerca de Vitoria: nivel y/o caudal cada 10 minutos. «Normal» es la mediana de la última semana.">
         {ejHidro && !ejHidro.ok && <Aviso nivel="aviso" texto={ejHidro.error ?? "Error"} />}
         {agua.rios.length === 0 && (!ejHidro || ejHidro.ok) && (
           <Aviso texto="Buscando las estaciones de ríos de Euskalmet cerca de Vitoria… (necesita la clave de Euskalmet)" />
@@ -183,30 +202,32 @@ export default function Agua() {
         )}
       </Seccion>
 
-      <Seccion titulo="Embalses">
+      <Seccion titulo="Embalses" icono="embalse"
+        info="Volumen y llenado del SAIH Ebro cada pocas horas (sin confirmar) y del boletín semanal oficial, vía embalses.net. La cota se calcula con el volumen y la curva cota-volumen de cada embalse, ajustada con lecturas reales.">
         {ejEmb && !ejEmb.ok && <Aviso nivel="aviso" texto={`Embalses: ${ejEmb.error}`} />}
         {erroresEmb.length > 0 && <Aviso nivel="aviso" texto={erroresEmb.join(" · ")} />}
         {agua.barazar && (
           <Tarjeta>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-              <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700", flex: 1 }}>⚡ ¿Generan luz?</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                <Icono n="luz" color={c.luz} tam={18} />
+                <Text style={{ color: c.texto, fontSize: 18, fontWeight: "700" }}>¿Generan luz?</Text>
+                <Info titulo="Central de Barazar" texto={`El agua de Ullíbarri y Urrunaga (unidos por una tubería) sale hacia Bilbao por el salto de Barazar, la central de Iberdrola: 330 m de caída y 84 MW. Iberdrola no publica su producción en directo: se calcula con lo que pierden los embalses en 24 h (1 m³/s ≈ 2,85 MW). Si las compuertas no pueden soltar agua, lo que pierden sale casi seguro por Barazar.${agua.barazar.estado !== "no" && agua.barazar.potenciaMw > 0 ? ` ${num(agua.barazar.potenciaMw, 0)} MW dan luz a unas ${num(Math.round(agua.barazar.potenciaMw * 1000 / 0.4 / 1000) * 1000, 0)} casas.` : ""}`} />
+              </View>
               <Insignia nivel={agua.barazar.estado === "probable" ? "ok" : agua.barazar.estado === "posible" ? "aviso" : "info"}
                 texto={agua.barazar.estado === "probable" ? "Casi seguro" : agua.barazar.estado === "posible" ? "Posible" : "No se sabe"} />
             </View>
             {agua.barazar.estado !== "no" && <Cifra valor={`≈ ${num(agua.barazar.potenciaMw, 0)}`} unidad="MW" />}
             <Etiqueta>{agua.barazar.texto}</Etiqueta>
-            <Etiqueta>
-              {`El agua de los dos embalses (unidos por una tubería) sale hacia Bilbao por el salto de Barazar: 330 m de caída y 84 MW. Calculado con lo que pierden en 24 h; Iberdrola no publica su producción en directo.${agua.barazar.estado !== "no" && agua.barazar.potenciaMw > 0 ?` ${num(agua.barazar.potenciaMw, 0)} MW dan luz a unas ${num(Math.round(agua.barazar.potenciaMw * 1000 / 0.4 / 1000) * 1000, 0)} casas.` : ""}`}
-            </Etiqueta>
           </Tarjeta>
         )}
         {agua.embalses.map(e => <TarjetaEmbalse key={e.id} e={e} barazar={agua.barazar} />)}
         <Text onPress={() => Linking.openURL("https://www.embalses.net/")} style={{ color: c.acento, fontSize: 14, paddingHorizontal: 4 }}>
-          Datos del SAIH Ebro (cada pocas horas, sin confirmar) y del boletín semanal oficial · embalses.net ↗
+          Fuente: embalses.net ↗
         </Text>
       </Seccion>
 
-      <Seccion titulo="Energía hidráulica">
+      <Seccion titulo="Energía hidráulica" icono="luz" info="Red Eléctrica no publica la producción de cada central: es el total hidráulico del País Vasco, de ayer.">
         <Tarjeta>
           {panel.energia.pv.ultimo ? (
             <>
@@ -216,7 +237,6 @@ export default function Agua() {
                 {panel.energia.pv.media30d != null ? ` · media 30 días ${num(panel.energia.pv.media30d, 0)} MWh` : ""}
               </Etiqueta>
               <GraficaLinea serie={panel.energia.pv.serie} color={c.luz} decimales={0} />
-              <Etiqueta>REE no publica la producción de cada presa: es el total hidráulico de Euskadi.</Etiqueta>
             </>
           ) : <Etiqueta>Sin datos de Red Eléctrica todavía.</Etiqueta>}
         </Tarjeta>

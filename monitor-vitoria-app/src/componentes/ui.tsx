@@ -1,12 +1,13 @@
 /** Piezas de interfaz comunes. Estilo iOS: tarjetas redondeadas, títulos grandes, mucho aire. */
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useDatos } from "../datos";
 import { hace } from "../lib/formato";
 import { alfa, colorNivel, TEXTO_NIVEL, useColores } from "../lib/tema";
+import { Icono, type NombreIcono } from "./icono";
 import type { Nivel } from "../lib/tipos";
 
 export function Pantalla({ titulo, subtitulo, children, derecha }: {
@@ -41,7 +42,8 @@ export function Pantalla({ titulo, subtitulo, children, derecha }: {
 
 export function Tarjeta({ children, estilo, onPress }: { children: ReactNode; estilo?: ViewStyle; onPress?: () => void }) {
   const c = useColores();
-  const base: ViewStyle = { backgroundColor: c.tarjeta, borderRadius: 20, padding: 16, gap: 10, borderCurve: "continuous" };
+  const base: ViewStyle = { backgroundColor: c.tarjeta, borderRadius: 20, padding: 16, gap: 10, borderCurve: "continuous",
+    borderWidth: StyleSheet.hairlineWidth, borderColor: c.linea };
   if (!onPress) return <View style={[base, estilo]}>{children}</View>;
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [base, estilo, { opacity: pressed ? 0.75 : 1 }]}>
@@ -50,12 +52,18 @@ export function Tarjeta({ children, estilo, onPress }: { children: ReactNode; es
   );
 }
 
-export function Seccion({ titulo, children, accion }: { titulo: string; children: ReactNode; accion?: ReactNode }) {
+export function Seccion({ titulo, children, accion, icono, info }: {
+  titulo: string; children: ReactNode; accion?: ReactNode; icono?: NombreIcono; info?: string;
+}) {
   const c = useColores();
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 4, marginTop: 6 }}>
-        <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700" }}>{titulo}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+          {icono && <Icono n={icono} color={c.acento} tam={18} />}
+          <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", letterSpacing: -0.3, flexShrink: 1 }}>{titulo}</Text>
+          {info && <Info titulo={titulo} texto={info} />}
+        </View>
         {accion}
       </View>
       {children}
@@ -105,7 +113,7 @@ export function Fila({ izquierda, derecha, detalle, ultima }: { izquierda: React
 }
 
 export function Segmentos<T extends string>({ opciones, valor, cambiar }: {
-  opciones: { valor: T; texto: string }[]; valor: T; cambiar: (v: T) => void;
+  opciones: { valor: T; texto: string; icono?: NombreIcono }[]; valor: T; cambiar: (v: T) => void;
 }) {
   const c = useColores();
   return (
@@ -117,7 +125,10 @@ export function Segmentos<T extends string>({ opciones, valor, cambiar }: {
             style={{ flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: "center",
               backgroundColor: activo ? c.tarjeta : "transparent",
               shadowColor: "#000", shadowOpacity: activo ? 0.12 : 0, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } }}>
-            <Text style={{ color: activo ? c.texto : c.suave, fontWeight: activo ? "700" : "500", fontSize: 14 }}>{o.texto}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+              {o.icono && <Icono n={o.icono} color={activo ? c.acento : c.suave} tam={14} />}
+              <Text numberOfLines={1} style={{ color: activo ? c.texto : c.suave, fontWeight: activo ? "700" : "500", fontSize: 14 }}>{o.texto}</Text>
+            </View>
           </Pressable>
         );
       })}
@@ -129,9 +140,21 @@ export function Aviso({ texto, nivel = "info" }: { texto: string; nivel?: Nivel 
   const c = useColores();
   const color = colorNivel(c, nivel);
   return (
-    <View style={{ backgroundColor: alfa(color, 0.12), borderRadius: 14, padding: 12 }}>
-      <Text style={{ color: c.texto, fontSize: 14, lineHeight: 20 }}>{texto}</Text>
+    <View style={{ flexDirection: "row", gap: 10, backgroundColor: alfa(color, 0.12), borderRadius: 14, padding: 12, alignItems: "flex-start" }}>
+      <View style={{ paddingTop: 1 }}><Icono n={nivel === "info" || nivel === "ok" ? "info" : "aviso"} color={color} tam={16} /></View>
+      <Text style={{ color: c.texto, fontSize: 14, lineHeight: 20, flex: 1 }}>{texto}</Text>
     </View>
+  );
+}
+
+/** Botón ⓘ: la explicación (de dónde sale el dato, cómo se calcula…) en vez de un párrafo en pantalla. */
+export function Info({ titulo, texto }: { titulo: string; texto: string }) {
+  const c = useColores();
+  return (
+    <Pressable onPress={() => Alert.alert(titulo, texto)} hitSlop={12} accessibilityLabel={`Información: ${titulo}`}
+      style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1 })}>
+      <Icono n="info" color={c.tenue} tam={17} peso="regular" />
+    </Pressable>
   );
 }
 

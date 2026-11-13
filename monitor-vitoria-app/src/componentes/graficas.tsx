@@ -1,7 +1,7 @@
 /** Gráficas dibujadas con SVG (sin librerías pesadas): línea con área y barras del precio de la luz. */
 import { useState } from "react";
 import { Text, View, type LayoutChangeEvent } from "react-native";
-import Svg, { Defs, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from "react-native-svg";
 
 import { hora, num } from "../lib/formato";
 import type { Punto } from "../lib/historial";
@@ -20,6 +20,8 @@ export function GraficaLinea({ serie, color, alto = 120, decimales = 1, marcas =
 }) {
   const c = useColores();
   const [ancho, onLayout] = useAncho();
+  // Punto que se está tocando (deslizando el dedo por la gráfica)
+  const [toque, setToque] = useState<number | null>(null);
   const id = `g${color.replace(/[^a-z0-9]/gi, "")}${alto}`;
   if (serie.length < 2) {
     return (
@@ -43,8 +45,41 @@ export function GraficaLinea({ serie, color, alto = 120, decimales = 1, marcas =
   const d = serie.map(([t, v], i) => `${i ? "L" : "M"}${x(t).toFixed(1)},${y(v).toFixed(1)}`).join("");
   const area = `${d}L${x(t1).toFixed(1)},${margenSup + altoUtil}L${x(t0).toFixed(1)},${margenSup + altoUtil}Z`;
   const ultimo = serie.at(-1)!;
+  // Máximo y mínimo de lo que se ve
+  let iMax = 0, iMin = 0;
+  serie.forEach((p, i) => { if (p[1] > serie[iMax][1]) iMax = i; if (p[1] < serie[iMin][1]) iMin = i; });
+  const mostrarExtremos = !mini && serie[iMax][1] - serie[iMin][1] > 1e-9;
+  const elegido = toque != null ? serie[toque] : null;
+  const tocar = (xToque: number) => {
+    const t = t0 + ((xToque - margenIzq) / Math.max(1, ancho - margenIzq - margenDer)) * (t1 - t0);
+    let mejor = 0;
+    for (let i = 1; i < serie.length; i++) if (Math.abs(serie[i][0] - t) < Math.abs(serie[mejor][0] - t)) mejor = i;
+    setToque(mejor);
+  };
+  const tocable = mini ? {} : {
+    onStartShouldSetResponder: () => true,
+    onResponderTerminationRequest: () => false,
+    onResponderGrant: (e: { nativeEvent: { locationX: number } }) => tocar(e.nativeEvent.locationX),
+    onResponderMove: (e: { nativeEvent: { locationX: number } }) => tocar(e.nativeEvent.locationX),
+    onResponderRelease: () => setToque(null),
+    onResponderTerminate: () => setToque(null),
+  };
+  const etiquetaExtremo = (i: number, arriba: boolean) => {
+    const [t, v] = serie[i];
+    const xx = x(t), yy = y(v);
+    const derecha = xx > ancho * 0.6;
+    return (
+      <G>
+        <Circle cx={xx} cy={yy} r={3} fill={c.tarjeta} stroke={color} strokeWidth={1.5} />
+        <SvgText x={derecha ? xx - 6 : xx + 6} y={arriba ? Math.max(10, yy - 6) : Math.min((mini ? 36 : alto) - margenInf - 2, yy + 13)}
+          fill={c.suave} fontSize={10} fontWeight="600" textAnchor={derecha ? "end" : "start"}>
+          {`${arriba ? "máx" : "mín"} ${num(v, decimales)} · ${etiquetaTiempo(t, t1 - t0)}`}
+        </SvgText>
+      </G>
+    );
+  };
   return (
-    <View onLayout={onLayout} style={{ height: mini ? 36 : alto }}>
+    <View onLayout={onLayout} style={{ height: mini ? 36 : alto }} {...tocable}>
       {ancho > 0 && (
         <Svg width={ancho} height={mini ? 36 : alto}>
           <Defs>
@@ -68,6 +103,22 @@ export function GraficaLinea({ serie, color, alto = 120, decimales = 1, marcas =
           <Path d={area} fill={`url(#${id})`} />
           <Path d={d} stroke={color} strokeWidth={2} fill="none" strokeLinejoin="round" strokeLinecap="round" />
           <Rect x={x(ultimo[0]) - 3.5} y={y(ultimo[1]) - 3.5} width={7} height={7} rx={3.5} fill={color} />
+          {mostrarExtremos && !elegido && iMax !== serie.length - 1 && etiquetaExtremo(iMax, true)}
+          {mostrarExtremos && !elegido && iMin !== serie.length - 1 && iMin !== iMax && etiquetaExtremo(iMin, false)}
+          {elegido && (() => {
+            const xx = x(elegido[0]), yy = y(elegido[1]);
+            const texto = `${num(elegido[1], decimales)} · ${t1 - t0 > 36 * 3600e3 ? `${etiquetaTiempo(elegido[0], t1 - t0)} ` : ""}${hora(elegido[0])}`;
+            const anchoCaja = texto.length * 6.4 + 14;
+            const cx = Math.min(Math.max(xx - anchoCaja / 2, 0), ancho - anchoCaja);
+            return (
+              <G>
+                <Line x1={xx} x2={xx} y1={margenSup} y2={margenSup + altoUtil} stroke={c.texto} strokeWidth={1} opacity={0.5} />
+                <Circle cx={xx} cy={yy} r={5} fill={color} stroke={c.tarjeta} strokeWidth={2} />
+                <Rect x={cx} y={0} width={anchoCaja} height={18} rx={9} fill={c.texto} />
+                <SvgText x={cx + anchoCaja / 2} y={13} fill={c.tarjeta} fontSize={11} fontWeight="700" textAnchor="middle">{texto}</SvgText>
+              </G>
+            );
+          })()}
           {!mini && (
             <>
               <SvgText x={margenIzq} y={alto - 4} fill={c.tenue} fontSize={10}>{etiquetaTiempo(t0, t1 - t0)}</SvgText>

@@ -6,13 +6,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fechaMadrid } from "../lib/formato";
 import { ocurreEl, type Evento } from "../lib/fuentes/agenda";
 import { useColores } from "../lib/tema";
+import { Icono, type NombreIcono } from "./icono";
 import { Etiqueta, Tarjeta } from "./ui";
 
-const ICONO: Record<string, string> = {
-  Concierto: "🎵", Teatro: "🎭", Danza: "💃", Exposición: "🖼️", Cine: "🎬", Festival: "🎪", Conferencia: "🎤",
-  Formación: "📚", Fiestas: "🎉", Infantil: "🧸", Bertsolarismo: "🗣️", Deportes: "⚽",
+const ICONO: Record<string, NombreIcono> = {
+  Concierto: "musica", Teatro: "teatro", Danza: "danza", Exposición: "arte", Cine: "cine", Festival: "fiesta", Conferencia: "micro",
+  Formación: "libro", Fiestas: "fiesta", Infantil: "ninos", Bertsolarismo: "charla", Deportes: "deporte",
 };
-const icono = (tipo: string) => ICONO[tipo] ?? "📅";
+const icono = (tipo: string): NombreIcono => ICONO[tipo] ?? "calendario";
 
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
 function etiquetaDia(d: string, hoy: string, manana: string): string {
@@ -51,14 +52,15 @@ function FilaEvento({ e, dia }: { e: Evento; dia: string }) {
         <Image source={{ uri: e.imagen }} style={{ width: 58, height: 58, borderRadius: 12, backgroundColor: c.tarjetaAlta }} />
       ) : (
         <View style={{ width: 58, height: 58, borderRadius: 12, backgroundColor: c.tarjetaAlta, alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 26 }}>{icono(e.tipo)}</Text>
+          <Icono n={icono(e.tipo)} color={c.acento} tam={26} />
         </View>
       )}
       <View style={{ flex: 1, gap: 2 }}>
         <Text numberOfLines={2} style={{ color: c.texto, fontSize: 15, fontWeight: "700" }}>{e.nombre}</Text>
-        <Text numberOfLines={1} style={{ color: c.suave, fontSize: 13 }}>
-          {icono(e.tipo)} {e.tipo}{e.lugar ? ` · ${e.lugar}` : ""}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+          <Icono n={icono(e.tipo)} color={c.suave} tam={12} />
+          <Text numberOfLines={1} style={{ color: c.suave, fontSize: 13, flex: 1 }}>{e.tipo}{e.lugar ? ` · ${e.lugar}` : ""}</Text>
+        </View>
         <Text numberOfLines={1} style={{ color: c.acento, fontSize: 13, fontWeight: "600" }}>
           {dia}{horario(e)}{e.desde !== e.hasta ? ` · hasta el ${diaCorto(e.hasta)}` : ""}{e.precio ? ` · ${e.precio}` : ""}
         </Text>
@@ -115,7 +117,10 @@ function AgendaCompleta({ eventos, visible, cerrar }: { eventos: Evento[]; visib
           <Pressable onPress={() => setTipo(null)} style={chip(!tipo)}><Text style={textoChip(!tipo)}>Todos</Text></Pressable>
           {tipos.map(t => (
             <Pressable key={t} onPress={() => setTipo(tipo === t ? null : t)} style={chip(tipo === t)}>
-              <Text style={textoChip(tipo === t)}>{icono(t)} {t}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Icono n={icono(t)} color={tipo === t ? c.fondo : c.texto} tam={13} />
+                <Text style={textoChip(tipo === t)}>{t}</Text>
+              </View>
             </Pressable>
           ))}
         </ScrollView>
@@ -139,7 +144,10 @@ export function TarjetaAgenda({ eventos }: { eventos: Evento[] }) {
   return (
     <Tarjeta>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>{deHoy.length ? `Hoy en la agenda · ${deHoy.length}` : "Próximamente"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+          <Icono n="teatro" color={c.acento} tam={17} />
+          <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>{deHoy.length ? `Hoy en la agenda · ${deHoy.length}` : "Próximamente"}</Text>
+        </View>
         <Pressable onPress={() => setAbierta(true)}><Text style={{ color: c.acento, fontSize: 15 }}>Ver todo ({eventos.length})</Text></Pressable>
       </View>
       {proximos.map(e => <FilaEvento key={e.id} e={e} dia={etiquetaDia(e.desde < hoy ? hoy : e.desde, hoy, manana)} />)}

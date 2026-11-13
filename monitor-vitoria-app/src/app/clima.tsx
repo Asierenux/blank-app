@@ -46,7 +46,7 @@ export default function Clima() {
       <TarjetasAvisos avisos={panel.avisos} />
 
       {panel.prevision ? (
-        <Seccion titulo="Previsión">
+        <Seccion titulo="Previsión" icono="calendario" info="Previsión de AEMET para Vitoria-Gasteiz, por horas y por días.">
           <Tarjeta>
             <Etiqueta>Próximas horas</Etiqueta>
             <PrevisionHoras prevision={panel.prevision} horas={36} />
@@ -60,7 +60,7 @@ export default function Clima() {
         <Aviso nivel="aviso" texto={`Previsión: ${historial.ejecuciones.prevision.error}`} />
       ) : null}
 
-      <Seccion titulo="Ahora · Vitoria aeropuerto">
+      <Seccion titulo="Ahora · Vitoria aeropuerto" icono="termometro" info="Observación de AEMET en el aeropuerto de Foronda, cada hora. Desliza el dedo por las gráficas para ver cada valor.">
         <Tarjeta>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
             <View>
@@ -94,7 +94,7 @@ export default function Clima() {
         })}
       </Seccion>
 
-      <Seccion titulo="Kapildui · 1.173 m">
+      <Seccion titulo="Kapildui · 1.173 m" icono="viento" info="Estación de Euskalmet en la cima de Kapildui (montes de Vitoria): viento y temperatura en altura, cada 10 minutos.">
         {historial.ejecuciones.euskalmet?.ok === false && <Aviso nivel="aviso" texto={`Euskalmet: ${historial.ejecuciones.euskalmet.error}`} />}
         <Rejilla>{kapildui.map(fichaK)}</Rejilla>
         <Tarjeta>
@@ -104,7 +104,7 @@ export default function Clima() {
         </Tarjeta>
       </Seccion>
 
-      <Seccion titulo="Calidad del aire">
+      <Seccion titulo="Calidad del aire" icono="aire" info="Estaciones oficiales del Gobierno Vasco en Vitoria y el índice WAQI.">
         <AireOficial panel={panel} />
         {historial.ejecuciones.aireoficial?.ok === false && (
           <Aviso nivel="info" texto={`Estaciones oficiales: ${historial.ejecuciones.aireoficial.error}`} />

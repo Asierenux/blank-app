@@ -12,6 +12,7 @@ import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View, useWindow
 import MapView, { Circle, Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { Icono } from "../componentes/icono";
 import { Aviso, Etiqueta, Fila, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
@@ -233,10 +234,10 @@ export default function Movilidad() {
           </Text>
         </View>
         <Segmentos<Modo> valor={modo} cambiar={setModo} opciones={[
-          { valor: "transporte", texto: "🚌 Bus" },
-          { valor: "trafico", texto: "🚦 Tráfico" },
-          { valor: "camaras", texto: "📷 Cámaras" },
-          { valor: "gasolina", texto: "⛽ Gasol." },
+          { valor: "transporte", texto: "Bus", icono: "bus" },
+          { valor: "trafico", texto: "Tráfico", icono: "trafico" },
+          { valor: "camaras", texto: "Cámaras", icono: "camara" },
+          { valor: "gasolina", texto: "Gasolina", icono: "gasolina" },
         ]} />
         {verTransporte && (
           <Segmentos<Vehiculos> valor={vehiculo} cambiar={setVehiculo} opciones={[
@@ -302,7 +303,7 @@ export default function Movilidad() {
             style={({ pressed }) => ({ position: "absolute", right: 12, bottom: 12, width: 44, height: 44, borderRadius: 22,
               backgroundColor: c.tarjeta, alignItems: "center", justifyContent: "center", opacity: pressed ? 0.7 : 1,
               shadowColor: "#000", shadowOpacity: 0.25, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } })}>
-            <Text style={{ fontSize: 20 }}>📍</Text>
+            <Icono n="ubicacion" color={c.acento} tam={20} />
           </Pressable>
         </View>
       )}
@@ -315,9 +316,13 @@ export default function Movilidad() {
             {siguiendo && (
               <Tarjeta>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                  <Text style={{ color: c.texto, fontSize: 17, fontWeight: "800", flex: 1 }}>
-                    {`🎯 ${vehiculo === "bus" ? "🚌" : "🚋"} ${siguiendo.linea}${siguiendo.destino ? ` → ${siguiendo.destino}` : ""}`}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flex: 1 }}>
+                    <Icono n="diana" color={c.acento} tam={18} />
+                    <Icono n={vehiculo === "bus" ? "bus" : "tranvia"} color={vehiculo === "bus" ? c.bus : c.tranvia} tam={18} />
+                    <Text numberOfLines={1} style={{ color: c.texto, fontSize: 17, fontWeight: "800", flexShrink: 1 }}>
+                      {`${siguiendo.linea}${siguiendo.destino ? ` → ${siguiendo.destino}` : ""}`}
+                    </Text>
+                  </View>
                   <Pressable onPress={() => setSiguiendo(null)} hitSlop={10}><Text style={{ color: c.acento, fontSize: 15 }}>Dejar de seguir</Text></Pressable>
                 </View>
                 {siguiendo.llega > 0 && siguiendo.parada ? (

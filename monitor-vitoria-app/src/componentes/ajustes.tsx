@@ -107,7 +107,7 @@ export function Ajustes({ cerrar }: { cerrar?: () => void }) {
         <Text style={{ color: c.acento, fontSize: 17, fontWeight: "600" }}>Listo</Text>
       </Pressable>
     )}>
-      <Seccion titulo="Claves de acceso">
+      <Seccion titulo="Claves de acceso" icono="ajustes">
         <Tarjeta>
           <Etiqueta>Se guardan cifradas en el llavero del iPhone y solo se envían a su propia web.</Etiqueta>
           <CampoClave titulo="AEMET" campo="aemet" placeholder="eyJhbGciOi…" url="https://opendata.aemet.es/centrodedescargas/altaUsuario"
@@ -124,7 +124,7 @@ export function Ajustes({ cerrar }: { cerrar?: () => void }) {
         <Aviso texto="Sin claves también funcionan: precio de la luz, embalses y ríos, energía, tráfico, autobuses y tranvía." />
       </Seccion>
 
-      <Seccion titulo="Alertas">
+      <Seccion titulo="Alertas" icono="campana">
         <Tarjeta>
           <Fila izquierda="Notificaciones" detalle="Solo mientras la app se usa: iOS no deja a las apps vigilar sin parar."
             derecha={<Switch value={preferencias.alertas} onValueChange={v => ponerPreferencias({ ...preferencias, alertas: v })} />} />

@@ -10,6 +10,7 @@ import { dia, enMinutos, fechaMadrid, hora, num } from "../lib/formato";
 import type { Aviso as AvisoMeteo } from "../lib/fuentes/avisos";
 import type { Gasolinera } from "../lib/fuentes/gasolina";
 import { iconoCielo, type Prevision } from "../lib/fuentes/prevision";
+import { Icono, IconoCielo } from "./icono";
 import type { Llegada, ParadaElegible } from "../lib/fuentes/transporte";
 import type { Panel } from "../lib/panel";
 import { alfa, colorNivel, useColores } from "../lib/tema";
@@ -30,9 +31,10 @@ export function TarjetasAvisos({ avisos }: { avisos: AvisoMeteo[] }) {
       {avisos.map(a => (
         <View key={a.id} style={{ backgroundColor: alfa(color[a.nivel], 0.16), borderRadius: 18, padding: 14, gap: 4,
           borderLeftWidth: 5, borderLeftColor: color[a.nivel] }}>
-          <Text style={{ color: c.texto, fontSize: 16, fontWeight: "800" }}>
-            ⚠️ Aviso {a.nivel} · {a.fenomeno}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Icono n="aviso" color={color[a.nivel]} tam={16} />
+            <Text style={{ color: c.texto, fontSize: 16, fontWeight: "800", flex: 1 }}>Aviso {a.nivel} · {a.fenomeno}</Text>
+          </View>
           <Text style={{ color: c.suave, fontSize: 13, fontWeight: "600" }}>
             {a.zona}{a.inicio ? ` · desde ${dia(a.inicio)} ${hora(a.inicio)}` : ""}{a.fin ? ` hasta ${dia(a.fin)} ${hora(a.fin)}` : ""}
           </Text>
@@ -57,7 +59,7 @@ export function PrevisionHoras({ prevision, horas = 24 }: { prevision: Prevision
         <View key={h.t} style={{ width: 52, alignItems: "center", gap: 4, paddingVertical: 8, borderRadius: 14,
           backgroundColor: i === 0 ? c.tarjetaAlta : "transparent" }}>
           <Text style={{ color: c.suave, fontSize: 12, fontWeight: "600" }}>{i === 0 ? "Ahora" : hora(h.t).split(":")[0] + "h"}</Text>
-          <Text style={{ fontSize: 22 }}>{iconoCielo(h.cielo)}</Text>
+          <IconoCielo emoji={iconoCielo(h.cielo)} tam={26} />
           <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700" }}>{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</Text>
           <Text style={{ color: c.agua, fontSize: 11, fontWeight: "600", minHeight: 14 }}>
             {h.probLluvia != null && h.probLluvia >= 20 ? `${h.probLluvia}%` : ""}
@@ -83,7 +85,7 @@ export function PrevisionDias({ prevision }: { prevision: Prevision }) {
           <View key={d.fecha} style={{ flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8,
             borderBottomWidth: i === dias.length - 1 ? 0 : 0.5, borderBottomColor: c.linea }}>
             <Text style={{ color: c.texto, width: 54, fontSize: 15, fontWeight: "600" }}>{i === 0 ? "Hoy" : dia(t)}</Text>
-            <Text style={{ fontSize: 20, width: 30 }}>{iconoCielo(d.cielo)}</Text>
+            <View style={{ width: 30, alignItems: "center" }}><IconoCielo emoji={iconoCielo(d.cielo)} tam={22} /></View>
             <Text style={{ color: c.agua, width: 38, fontSize: 12, fontWeight: "600" }}>{d.probLluvia ? `${d.probLluvia}%` : ""}</Text>
             <Text style={{ color: c.suave, width: 30, textAlign: "right", fontVariant: ["tabular-nums"] }}>{d.min != null ? `${d.min}°` : ""}</Text>
             <View style={{ flex: 1, height: 6, borderRadius: 3, backgroundColor: c.tarjetaAlta }}>
@@ -111,7 +113,7 @@ export function ResumenHoy({ prevision }: { prevision: Prevision }) {
   return (
     <View style={{ gap: 8 }}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-        <Text style={{ fontSize: 40 }}>{iconoCielo(ahora?.cielo ?? hoy?.cielo ?? "")}</Text>
+        <IconoCielo emoji={iconoCielo(ahora?.cielo ?? hoy?.cielo ?? "")} tam={46} />
         <View style={{ flex: 1 }}>
           <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>{ahora?.desc || hoy?.desc || "Previsión"}</Text>
           <Etiqueta>
@@ -119,7 +121,7 @@ export function ResumenHoy({ prevision }: { prevision: Prevision }) {
           </Etiqueta>
         </View>
       </View>
-      {lluviaPronto && <Aviso nivel="info" texto={`🌧️ Probable lluvia hacia las ${hora(lluviaPronto.t)} (${lluviaPronto.probLluvia}%).`} />}
+      {lluviaPronto && <Aviso nivel="info" texto={`Probable lluvia hacia las ${hora(lluviaPronto.t)} (${lluviaPronto.probLluvia}%).`} />}
       <PrevisionHoras prevision={prevision} horas={12} />
     </View>
   );
@@ -205,7 +207,10 @@ export function MisParadas() {
   return (
     <Tarjeta>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Mis paradas</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Icono n="parada" color={c.acento} tam={18} />
+          <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Mis paradas</Text>
+        </View>
         <Pressable onPress={() => setEligiendo(true)}><Text style={{ color: c.acento, fontSize: 15 }}>＋ Añadir</Text></Pressable>
       </View>
       {!paradas.length && <Etiqueta>Añade tu parada de bus o tranvía y verás aquí cuánto falta para los próximos.</Etiqueta>}
@@ -216,7 +221,10 @@ export function MisParadas() {
         return (
           <View key={`${p.operador}:${p.id}`} style={{ gap: 6, paddingTop: 4 }}>
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ color: c.texto, fontWeight: "600" }}>{p.operador === "tuvisa" ? "🚌" : "🚋"} {p.nombre}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Icono n={p.operador === "tuvisa" ? "bus" : "tranvia"} color={p.operador === "tuvisa" ? c.bus : c.tranvia} tam={15} />
+                <Text style={{ color: c.texto, fontWeight: "700" }}>{p.nombre}</Text>
+              </View>
               <Pressable onPress={() => quitar(p)}><Text style={{ color: c.tenue }}>Quitar</Text></Pressable>
             </View>
             {lista.length ? (

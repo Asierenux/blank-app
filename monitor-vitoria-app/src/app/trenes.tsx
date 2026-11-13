@@ -15,7 +15,8 @@ import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } fro
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Aviso, Etiqueta, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
+import { Icono } from "../componentes/icono";
+import { Aviso, Etiqueta, Info, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
 import { DEMO, useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
 import { itinerariosDemo, rastrosDemo, trenesDemo } from "../lib/demo";
@@ -334,8 +335,8 @@ export default function Trenes() {
           </Text>
         </View>
         <Segmentos<Alcance> valor={alcance} cambiar={cambiarAlcance} opciones={[
-          { valor: "espana", texto: `🇪🇸 Toda España${renfe.length ? ` · ${renfe.length + cercanias.length}` : ""}` },
-          { valor: "vitoria", texto: "📍 Cerca de Vitoria" },
+          { valor: "espana", icono: "tren", texto: `Toda España${renfe.length ? ` · ${renfe.length + cercanias.length}` : ""}` },
+          { valor: "vitoria", texto: "Cerca de Vitoria", icono: "ubicacion" },
         ]} />
       </View>
 
@@ -414,17 +415,24 @@ export default function Trenes() {
                   </View>
                 ))}
               </View>
-              <Etiqueta>
-                {tren.operador === "Ouigo"
-                  ? "Posición SEGÚN HORARIO: Ouigo no publica el GPS ni los retrasos de sus trenes. Si va con retraso o está parado, no se puede saber."
-                  : tren.estimada
-                  ? "Posición estimada: Euskotren no publica el GPS de sus trenes (se calcula con su horario en tiempo real)."
-                  : `Posición GPS ${hace(tren.t)}${enVia_ ? " · sobre la vía" : ""}${animado && vel ? " (entre lecturas avanza con su velocidad)" : ""}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · a ${tren.distanciaKm} km de Vitoria`}
-              </Etiqueta>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Etiqueta>
+                  {tren.operador === "Ouigo" ? "Posición según horario"
+                    : tren.estimada ? "Posición estimada"
+                    : `GPS ${hace(tren.t)}${tren.material ? ` · unidad ${tren.material.slice(0, 3)}-${tren.material.slice(3)}` : ""} · ${tren.distanciaKm} km de Vitoria`}
+                </Etiqueta>
+                <Info titulo="Posición del tren" texto={tren.operador === "Ouigo"
+                  ? "Ouigo no publica el GPS ni los retrasos de sus trenes: sale donde debería estar según su horario, por la vía. Si va con retraso o está parado, no se puede saber."
+                  : tren.estimada ? "Euskotren no publica el GPS de sus trenes: la posición se calcula con su horario en tiempo real."
+                  : "Posición GPS de Renfe (datos abiertos oficiales), renovada cada ~15 s. Se coloca sobre la vía (red ferroviaria de la IDEE) y, entre lecturas, avanza por ella con su velocidad real sin pasarse de la siguiente estación."} />
+              </View>
             </Tarjeta>
 
             {!tren.estimada && <Tarjeta>
-              <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Paradas detectadas</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Paradas detectadas</Text>
+                <Info titulo="Paradas detectadas" texto={`Cuenta como parada estar quieto 2 min o más; si es a menos de 600 m de una estación, se dice cuál (si no, «en plena vía»). Renfe no publica el motivo. El rastro se guarda mientras la app está abierta, durante 5 h${rastro[0] ? `; este empieza a las ${hora(rastro[0][0])}` : ""}.`} />
+              </View>
               {paradas.length === 0 && (
                 <Etiqueta>{rastro.length > 1 ? "No se ha parado más de 2 min desde que lo sigues." : "Se empieza a seguir ahora: su rastro y sus paradas aparecerán aquí."}</Etiqueta>
               )}
@@ -438,11 +446,13 @@ export default function Trenes() {
                   </Text>
                 </View>
               ))}
-              <Etiqueta>{`Rastro desde las ${rastro[0] ? hora(rastro[0][0]) : "—"} (mientras la app está abierta; se guarda 5 h).`}</Etiqueta>
             </Tarjeta>}
 
             <Tarjeta>
-              <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Recorrido</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={{ color: c.texto, fontSize: 17, fontWeight: "700" }}>Recorrido</Text>
+                <Info titulo="Recorrido" texto="Horas previstas del horario oficial de Renfe; en color, la estimación con el retraso actual. Las estaciones ya pasadas salen en azul." />
+              </View>
               {!it && <Etiqueta>{itinerarios ? "Este tren no está en el horario oficial de hoy." : "Cargando el horario oficial de Renfe…"}</Etiqueta>}
               {it?.paradas.map(([s, llega, sale], i) => {
                 const pasada = sig >= 0 && i < sig, siguiente = i === sig;
@@ -469,7 +479,6 @@ export default function Trenes() {
                   </View>
                 );
               })}
-              {it && <Etiqueta>Horas previstas del horario oficial; en color, la estimación con el retraso actual.</Etiqueta>}
             </Tarjeta>
           </>
         ) : (
@@ -536,7 +545,11 @@ export default function Trenes() {
               )}
             </Tarjeta>
 
-            <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700", marginTop: 6 }}>Incidencias en la red · Adif</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
+              <Icono n="aviso" color={c.critico} tam={18} />
+              <Text style={{ color: c.texto, fontSize: 20, fontWeight: "700" }}>Incidencias en la red · Adif</Text>
+              <Info titulo="Incidencias de Adif" texto="Adif gestiona las vías: sus incidencias afectan a todos los operadores (Renfe, Iryo, Ouigo y mercancías) y explican la causa." />
+            </View>
             <Tarjeta>
               {adif.length === 0 && <Etiqueta>{estado ? "Adif no tiene incidencias publicadas ahora mismo." : "Cargando…"}</Etiqueta>}
               {adif.map((a, i) => (
@@ -548,7 +561,6 @@ export default function Trenes() {
                   <Text style={{ color: c.texto, fontSize: 14 }}>{a.texto}</Text>
                 </View>
               ))}
-              <Etiqueta>Adif gestiona las vías: sus incidencias afectan a todos los operadores (Renfe, Iryo, Ouigo, mercancías).</Etiqueta>
             </Tarjeta>
             {otros.length > 0 && (
               <Pressable onPress={() => setVerAvisos(!verAvisos)}>
@@ -562,11 +574,10 @@ export default function Trenes() {
                 {otros.map(a => <Etiqueta key={a.id}>{`· ${a.fuente ?? "Renfe"}: ${a.texto}`}</Etiqueta>)}
               </Tarjeta>
             )}
-            <Etiqueta>
-              Renfe publica en abierto la posición GPS y el retraso de todos sus trenes (alta velocidad, larga y media distancia y
-              Cercanías). Ouigo solo publica su horario: sus trenes salen donde deberían estar (rosa, borde discontinuo). Iryo no
-              publica nada, así que no aparece. "Parado en vía": quieto 2 min o más lejos de una estación, según su rastro.
-            </Etiqueta>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 4 }}>
+              <Etiqueta>Fuentes: Renfe, Ouigo, Euskotren, Adif e IDEE</Etiqueta>
+              <Info titulo="De dónde salen los datos" texto={"Renfe publica en abierto la posición GPS y el retraso de todos sus trenes (alta velocidad, larga y media distancia y Cercanías). Ouigo solo publica su horario: sus trenes salen donde deberían estar (rosa, borde discontinuo). Iryo no publica nada, así que no aparece. Las vías son la red ferroviaria de la IDEE (Adif/IGN)."} />
+            </View>
           </>
         )}
       </ScrollView>

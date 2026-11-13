@@ -3,25 +3,19 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Modal, Pressable, Text, View } from "react-native";
 
-import { Barra, GraficaPvpc } from "../componentes/graficas";
-import { Aviso, Cifra, Etiqueta, Ficha, Insignia, Pantalla, Rejilla, Seccion, Tarjeta } from "../componentes/ui";
+import { GraficaPvpc } from "../componentes/graficas";
+import { Aviso, Cifra, Etiqueta, Insignia, Pantalla, Seccion, Tarjeta } from "../componentes/ui";
 import { MejorGasolina, MisParadas, ResumenHoy, TarjetasAvisos } from "../componentes/novedades";
 import { TarjetaAgenda } from "../componentes/agenda";
+import { Icono } from "../componentes/icono";
+import { Tablero } from "../componentes/tablero";
 import { Ajustes } from "../componentes/ajustes";
 import { useDatos } from "../datos";
 import { fechaMadrid, hora, num } from "../lib/formato";
-import type { Indicador } from "../lib/panel";
 import { alfa, colorNivel, useColores } from "../lib/tema";
 
 const TRAMO = { barato: "Barata", medio: "Media", caro: "Cara" } as const;
 
-function fichaDe(i: Indicador | undefined, etiqueta?: string) {
-  if (!i) return null;
-  return (
-    <Ficha key={i.id} etiqueta={etiqueta ?? i.etiqueta} valor={num(i.valor, i.decimales)} unidad={i.unidad}
-      nivel={i.antiguo ? "sin_datos" : i.nivel} texto={i.antiguo ? "Dato antiguo" : i.texto} detalle={i.secundario} />
-  );
-}
 
 export default function Inicio() {
   const c = useColores();
@@ -40,18 +34,18 @@ export default function Inicio() {
       <Pressable onPress={() => setAjustes(true)} hitSlop={10} accessibilityLabel="Ajustes"
         style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, backgroundColor: c.tarjeta, alignItems: "center",
           justifyContent: "center", marginBottom: 4, opacity: pressed ? 0.6 : 1 })}>
-        <Text style={{ fontSize: 20 }}>⚙️</Text>
+        <Icono n="ajustes" color={c.suave} tam={20} />
       </Pressable>
     }>
       <Modal visible={ajustes} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAjustes(false)}>
         <Ajustes cerrar={() => setAjustes(false)} />
       </Modal>
-      <Tarjeta estilo={{ backgroundColor: alfa(color, 0.14) }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: color }} />
-          <Text style={{ color: c.texto, fontSize: 22, fontWeight: "800", flex: 1 }}>{global.texto}</Text>
+      <Tarjeta estilo={{ backgroundColor: alfa(color, 0.14), borderColor: alfa(color, 0.35), gap: 4, paddingVertical: 14 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color, shadowColor: color, shadowOpacity: 0.8, shadowRadius: 6 }} />
+          <Text style={{ color: c.texto, fontSize: 20, fontWeight: "800", flex: 1, letterSpacing: -0.3 }}>{global.texto}</Text>
         </View>
-        <Text style={{ color: c.suave, fontSize: 14 }}>
+        <Text numberOfLines={2} style={{ color: c.suave, fontSize: 14, paddingLeft: 22 }}>
           {[...panel.avisos.map(a => ({ nivel: "aviso", etiqueta: `Aviso ${a.nivel}`, texto: a.fenomeno.toLowerCase() })),
             ...panel.indicadores, ...agua.embalses.map(e => ({ nivel: e.nivelEstado, etiqueta: e.corto, texto: e.texto })),
             ...agua.rios.map(r => ({ nivel: r.nivelEstado, etiqueta: r.nombre, texto: r.texto }))]
@@ -60,10 +54,12 @@ export default function Inicio() {
         </Text>
       </Tarjeta>
 
+      <Tablero panel={panel} />
+
       <TarjetasAvisos avisos={panel.avisos} />
 
       {panel.prevision && (
-        <Seccion titulo="Hoy en Vitoria">
+        <Seccion titulo="Hoy en Vitoria" icono="calendario">
           <Tarjeta onPress={() => router.navigate("/clima")}>
             <ResumenHoy prevision={panel.prevision} />
           </Tarjeta>
@@ -83,7 +79,8 @@ export default function Inicio() {
         </Tarjeta>
       )}
 
-      <Seccion titulo="Luz ahora">
+      <Seccion titulo="Luz ahora" icono="luz"
+        info="Precio de la luz regulada (PVPC) de Red Eléctrica, con todos los peajes, por cada hora (o cuarto de hora). Barata, media y cara se miden respecto al propio día. «Mejores horas» es la franja seguida más barata.">
         <Tarjeta>
           {pvpc.actual ? (
             <>
@@ -101,61 +98,19 @@ export default function Inicio() {
             </>
           ) : <Etiqueta>Aún no hay precios. Desliza hacia abajo para actualizar.</Etiqueta>}
           {panel.renovable.peninsula && (
-            <Etiqueta>
-              🌱 Renovable ayer: {num(panel.renovable.peninsula[1], 0)} % en la península
-              {panel.renovable.pv ? ` · ${num(panel.renovable.pv[1], 0)} % en Euskadi` : ""}
-            </Etiqueta>
-          )}
-        </Tarjeta>
-      </Seccion>
-
-      <Seccion titulo="Tiempo y aire">
-        <Rejilla>
-          {fichaDe(porId["aemet.temperatura"])}
-          {fichaDe(porId["aemet.racha"], "Viento (racha)")}
-          {fichaDe(porId["aemet.precipitacion"])}
-          {fichaDe(porId["waqi.aqi"])}
-        </Rejilla>
-      </Seccion>
-
-      <Seccion titulo="Embalses">
-        <Tarjeta onPress={() => router.navigate("/agua")}>
-          {agua.embalses.map(e => (
-            <View key={e.id} style={{ gap: 6 }}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ color: c.texto, fontSize: 16, fontWeight: "600" }}>{e.corto}</Text>
-                <Text style={{ color: c.texto, fontSize: 16, fontWeight: "700", fontVariant: ["tabular-nums"] }}>
-                  {e.porcentaje != null ? `${num(e.porcentaje, 1)} %` : e.texto}
-                </Text>
-              </View>
-              <Barra pct={e.porcentaje ?? 0} color={e.porcentaje != null ? colorNivel(c, e.nivelEstado === "ok" ? "info" : e.nivelEstado) : c.linea} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Icono n="hoja" color={c.ok} tam={13} />
+              <Etiqueta>
+                Renovable ayer: {num(panel.renovable.peninsula[1], 0)} % en la península
+                {panel.renovable.pv ? ` · ${num(panel.renovable.pv[1], 0)} % en Euskadi` : ""}
+              </Etiqueta>
             </View>
-          ))}
-          <Etiqueta>Lluvia en Vitoria: {num(agua.lluvia.h24)} mm en 24 h · {num(agua.lluvia.d7)} mm en 7 días</Etiqueta>
-        </Tarjeta>
-      </Seccion>
-
-      <Seccion titulo="Tráfico">
-        <Tarjeta onPress={() => router.navigate("/movilidad")}>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Cifra valor={String(trafico.activas.length)} unidad={trafico.activas.length === 1 ? "incidencia" : "incidencias"} tam={28} />
-            <Insignia nivel={trafico.nivel} texto={trafico.activas.length ? undefined : "Despejado"} />
-          </View>
-          {trafico.puertos.some(p => p.nivelEstado !== "ok") && (
-            <Text style={{ color: c.aviso, fontSize: 14, fontWeight: "600" }}>
-              ⛰️ Puertos: {trafico.puertos.filter(p => p.nivelEstado !== "ok").map(p => `${p.carretera} (${p.nivelEstado === "critico" ? "cerrado" : "precaución"})`).join(", ")}
-            </Text>
           )}
-          {trafico.activas.slice(0, 3).map(i => (
-            <Text key={i.id} numberOfLines={1} style={{ color: c.suave, fontSize: 14 }}>
-              • {i.nombre}{i.carretera ? ` · ${i.carretera}` : ""}{i.municipio ? ` (${i.municipio})` : ""}
-            </Text>
-          ))}
         </Tarjeta>
       </Seccion>
 
       {panel.gasolineras && (
-        <Seccion titulo="Gasolina">
+        <Seccion titulo="Gasolina" icono="gasolina">
           <Tarjeta onPress={() => router.navigate("/movilidad")}>
             <MejorGasolina panel={panel} />
           </Tarjeta>
