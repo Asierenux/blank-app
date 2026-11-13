@@ -12,7 +12,7 @@ import { Tablero } from "../componentes/tablero";
 import { Ajustes } from "../componentes/ajustes";
 import { useDatos } from "../datos";
 import { fechaMadrid, hora, num } from "../lib/formato";
-import { alfa, colorNivel, useColores } from "../lib/tema";
+import { alfa, colorNivel, mezcla, useColores } from "../lib/tema";
 
 const TRAMO = { barato: "Barata", medio: "Media", caro: "Cara" } as const;
 
@@ -40,7 +40,7 @@ export default function Inicio() {
       <Modal visible={ajustes} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAjustes(false)}>
         <Ajustes cerrar={() => setAjustes(false)} />
       </Modal>
-      <Tarjeta estilo={{ backgroundColor: alfa(color, 0.14), borderColor: alfa(color, 0.35), gap: 4, paddingVertical: 14 }}>
+      <Tarjeta estilo={{ backgroundColor: mezcla(color, c.tarjeta, 0.14), borderColor: alfa(color, 0.35), gap: 4, paddingVertical: 14 }}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
           <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color, shadowColor: color, shadowOpacity: 0.8, shadowRadius: 6 }} />
           <Text style={{ color: c.texto, fontSize: 20, fontWeight: "800", flex: 1, letterSpacing: -0.3 }}>{global.texto}</Text>

@@ -3,11 +3,12 @@ import { useColorScheme } from "react-native";
 import type { Nivel } from "./tipos";
 
 const claro = {
-  fondo: "#F2F2F7",
+  fondo: "#EDF1F6",
   tarjeta: "#FFFFFF",
   tarjetaAlta: "#F7F7FA",
   texto: "#0B0D12",
   suave: "#6B7280",
+  oscuroSuave: "#3E4A5C",
   tenue: "#9AA1AD",
   linea: "rgba(60,60,67,0.14)",
   acento: "#2F6BFF",
@@ -28,6 +29,7 @@ const oscuro: typeof claro = {
   tarjetaAlta: "#1E2128",
   texto: "#F4F5F7",
   suave: "#9BA3AF",
+  oscuroSuave: "#C3CAD4",
   tenue: "#6B7280",
   linea: "rgba(255,255,255,0.10)",
   acento: "#5B8CFF",
@@ -59,4 +61,11 @@ export const TEXTO_NIVEL: Record<Nivel, string> = {
 /** Mezcla un color con transparencia: "#RRGGBB" + 0.15 → "#RRGGBB26". */
 export function alfa(color: string, a: number): string {
   return color + Math.round(a * 255).toString(16).padStart(2, "0");
+}
+
+/** Color opaco: «color» mezclado al «a» sobre «base» (para tarjetas tintadas que no transparenten el fondo). */
+export function mezcla(color: string, base: string, a: number): string {
+  const rgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+  const [c1, c2] = [rgb(color), rgb(base)];
+  return "#" + c1.map((v, i) => Math.round(v * a + c2[i] * (1 - a)).toString(16).padStart(2, "0")).join("");
 }

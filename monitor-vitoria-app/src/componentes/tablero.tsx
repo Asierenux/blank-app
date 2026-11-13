@@ -72,7 +72,7 @@ export function Tablero({ panel }: { panel: Panel }) {
     },
     {
       clave: "luz", icono: "luz", etiqueta: "Luz", color: c.luz,
-      valor: pvpc.actual ? num(pvpc.actual.v, 3) : "—", unidad: "€/kWh", estado: pvpc.actual ? TRAMO[pvpc.actual.tramo] : "Sin precios",
+      valor: pvpc.actual ? num(pvpc.actual.v, 3) : "—", unidad: "€", estado: pvpc.actual ? TRAMO[pvpc.actual.tramo] : "Sin precios",
       nivel: pvpc.actual ? pvpc.nivel : "sin_datos",
       serie: pvpc.puntos.filter(p => p.dia === pvpc.actual?.dia).map(p => [p.t, p.v] as Punto),
     },

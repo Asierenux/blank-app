@@ -1,14 +1,62 @@
 /** Piezas de interfaz comunes. Estilo iOS: tarjetas redondeadas, títulos grandes, mucho aire. */
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type ViewStyle } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from "react-native";
+import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useDatos } from "../datos";
 import { hace } from "../lib/formato";
+import { iconoCielo } from "../lib/fuentes/prevision";
 import { alfa, colorNivel, TEXTO_NIVEL, useColores } from "../lib/tema";
 import { Icono, type NombreIcono } from "./icono";
 import type { Nivel } from "../lib/tipos";
+
+/** Colores del cielo de arriba de la pantalla según el tiempo de ahora y si es de día o de noche. */
+const CIELOS: Record<string, { claro: string; oscuro: string }> = {
+  despejado: { claro: "#7DB9F2", oscuro: "#123A6B" },
+  nubes: { claro: "#9CBDE0", oscuro: "#1B3352" },
+  cubierto: { claro: "#AEBCCD", oscuro: "#262F3D" },
+  lluvia: { claro: "#93A8C2", oscuro: "#1C2A3D" },
+  tormenta: { claro: "#8C92AE", oscuro: "#22223A" },
+  noche: { claro: "#5E78B8", oscuro: "#14193A" },
+};
+
+function tipoCielo(emoji: string | undefined): keyof typeof CIELOS {
+  switch (emoji) {
+    case "☀️": return "despejado";
+    case "🌙": return "noche";
+    case "🌤️": case "⛅": return "nubes";
+    case "🌧️": case "🌦️": case "❄️": return "lluvia";
+    case "⛈️": return "tormenta";
+    case "☁️": case "🌫️": return "cubierto";
+    default: return "despejado";
+  }
+}
+
+/** Fondo de las pantallas: un degradado del color del cielo de Vitoria que se funde con el gris de abajo. */
+function FondoCielo() {
+  const c = useColores();
+  const { panel } = useDatos();
+  const { width, height } = useWindowDimensions();
+  const oscuro = c.fondo === "#000000";
+  const ahora = panel?.prevision?.horas[0];
+  const cielo = CIELOS[tipoCielo(ahora ? iconoCielo(ahora.cielo) : undefined)];
+  const arriba = oscuro ? cielo.oscuro : cielo.claro;
+  return (
+    <Svg width={width} height={height} style={{ position: "absolute", top: 0, left: 0 }} pointerEvents="none">
+      <Defs>
+        <LinearGradient id="fondo-cielo" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={arriba} />
+          <Stop offset="0.38" stopColor={arriba} stopOpacity={oscuro ? 0.35 : 0.3} />
+          <Stop offset="0.75" stopColor={c.fondo} />
+        </LinearGradient>
+      </Defs>
+      <Rect x={0} y={0} width={width} height={height} fill={c.fondo} />
+      <Rect x={0} y={0} width={width} height={height} fill="url(#fondo-cielo)" />
+    </Svg>
+  );
+}
 
 export function Pantalla({ titulo, subtitulo, children, derecha }: {
   titulo: string; subtitulo?: string; children: ReactNode; derecha?: ReactNode;
@@ -17,26 +65,29 @@ export function Pantalla({ titulo, subtitulo, children, derecha }: {
   const ins = useSafeAreaInsets();
   const { actualizando, actualizar, panel } = useDatos();
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: c.fondo }}
-      contentContainerStyle={{ paddingTop: ins.top + 12, paddingBottom: 40, paddingHorizontal: 16, gap: 14 }}
-      contentInsetAdjustmentBehavior="automatic"
-      refreshControl={<RefreshControl refreshing={actualizando} onRefresh={() => {
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        void actualizar(true);
-      }} />}
-    >
-      <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 2 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ color: c.suave, fontSize: 13, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 }}>
-            {subtitulo ?? (panel ? `Actualizado ${hace(panel.generado)}` : "Cargando…")}
-          </Text>
-          <Text style={{ color: c.texto, fontSize: 34, fontWeight: "800", letterSpacing: -0.6 }}>{titulo}</Text>
+    <View style={{ flex: 1, backgroundColor: c.fondo }}>
+      <FondoCielo />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: "transparent" }}
+        contentContainerStyle={{ paddingTop: ins.top + 12, paddingBottom: 40, paddingHorizontal: 16, gap: 14 }}
+        contentInsetAdjustmentBehavior="automatic"
+        refreshControl={<RefreshControl refreshing={actualizando} onRefresh={() => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          void actualizar(true);
+        }} />}
+      >
+        <View style={{ flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", marginBottom: 2 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: c.oscuroSuave, fontSize: 13, fontWeight: "600", textTransform: "uppercase", letterSpacing: 0.6 }}>
+              {subtitulo ?? (panel ? `Actualizado ${hace(panel.generado)}` : "Cargando…")}
+            </Text>
+            <Text style={{ color: c.texto, fontSize: 34, fontWeight: "800", letterSpacing: -0.6 }}>{titulo}</Text>
+          </View>
+          {derecha}
         </View>
-        {derecha}
-      </View>
-      {children}
-    </ScrollView>
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 

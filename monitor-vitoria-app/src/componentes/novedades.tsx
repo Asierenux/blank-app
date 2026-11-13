@@ -13,7 +13,7 @@ import { iconoCielo, type Prevision } from "../lib/fuentes/prevision";
 import { Icono, IconoCielo } from "./icono";
 import type { Llegada, ParadaElegible } from "../lib/fuentes/transporte";
 import type { Panel } from "../lib/panel";
-import { alfa, colorNivel, useColores } from "../lib/tema";
+import { alfa, colorNivel, mezcla, useColores } from "../lib/tema";
 import { GraficaLinea } from "./graficas";
 import { Aviso, Cifra, Etiqueta, Fila, Insignia, Tarjeta } from "./ui";
 import { TEXTO_CALIFICACION } from "../lib/fuentes/aireOficial";
@@ -29,7 +29,7 @@ export function TarjetasAvisos({ avisos }: { avisos: AvisoMeteo[] }) {
   return (
     <View style={{ gap: 10 }}>
       {avisos.map(a => (
-        <View key={a.id} style={{ backgroundColor: alfa(color[a.nivel], 0.16), borderRadius: 18, padding: 14, gap: 4,
+        <View key={a.id} style={{ backgroundColor: mezcla(color[a.nivel], c.tarjeta, 0.16), borderRadius: 18, padding: 14, gap: 4,
           borderLeftWidth: 5, borderLeftColor: color[a.nivel] }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Icono n="aviso" color={color[a.nivel]} tam={16} />
