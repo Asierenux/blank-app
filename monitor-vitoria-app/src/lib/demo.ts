@@ -14,6 +14,7 @@ import { VITORIA } from "./config";
 import { SeguimientoTrenes, type PuntoTren } from "./seguimientoTrenes";
 import type { Historial } from "./historial";
 import { inicioDiaMadrid } from "./formato";
+import { planificar, type Lugar, type Plan, type RedDia } from "./planificador";
 import type { Lectura } from "./tipos";
 
 const H = 3600e3;
@@ -387,3 +388,33 @@ export function rastrosDemo(ahora: number): SeguimientoTrenes {
   s.rastros.set("03150", linea([41.62, -0.98], [41.536686, -1.3676776], ahora - 12 * min, 12));
   return s;
 }
+
+/** «Cómo llegar» en modo demostración: una red inventada con el tranvía y los autobuses de arriba, con salidas frecuentes. */
+function redDemo(): RedDia {
+  const paradas: RedDia["paradas"] = [];
+  const viajes: RedDia["viajes"] = [];
+  const linea = (tipo: "bus" | "tranvia", nombre: string, color: string, puntos: [string, number, number][], cadaMin: number, tramoMin: number) => {
+    const base = paradas.length;
+    puntos.forEach(([n, lat, lon], i) => paradas.push({ id: `${nombre}-${i}`, nombre: n, lat, lon }));
+    const idx = puntos.map((_, i) => base + i);
+    for (const [sentido, orden] of [["0", idx], ["1", [...idx].reverse()]] as const) {
+      for (let s = 6 * 3600 + (sentido === "1" ? 240 : 0); s < 23.5 * 3600; s += cadaMin * 60) {
+        viajes.push({
+          id: `${nombre}-${sentido}-${s}`, tipo, linea: nombre, color, destino: puntos[sentido === "0" ? puntos.length - 1 : 0][0],
+          ruta: nombre, dir: sentido, inicio: s, paradas: [...orden], t: orden.map((_, i) => s + i * tramoMin * 60),
+        });
+      }
+    }
+  };
+  linea("tranvia", "TG1", "#5FA830", TRANVIA, 8, 2);
+  for (const b of BUSES) linea("bus", b.linea, b.color, b.ruta.map(([la, lo], i) => [`${b.linea} · parada ${i + 1}`, la, lo]), 12, 3);
+  return { fecha: "demo", paradas, viajes };
+}
+let RED_DEMO: RedDia | null = null;
+export const rutasDemo = {
+  async planificar(origen: Lugar, destino: Lugar, ahora = Date.now()): Promise<Plan> {
+    RED_DEMO ??= redDemo();
+    const base = inicioDiaMadrid(ahora);
+    return { base, ...planificar(RED_DEMO, origen, destino, Math.round((ahora - base) / 1000)), enDirecto: false };
+  },
+};

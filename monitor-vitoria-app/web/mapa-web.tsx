@@ -17,13 +17,21 @@ function proyectar(c: Caja, lat: number, lon: number) {
 }
 
 const MapView = forwardRef(function MapView(
-  { style, initialRegion, children }: { style?: ViewStyle; initialRegion: Region; children?: ReactNode },
+  { style, initialRegion, children }: { style?: ViewStyle; initialRegion: Region; children?: ReactNode; onLongPress?: unknown; showsUserLocation?: boolean; showsMyLocationButton?: boolean; showsPointsOfInterests?: boolean; showsBuildings?: boolean; pitchEnabled?: boolean },
   ref,
 ) {
   const [region, setRegion] = useState(initialRegion);
   const [tam, setTam] = useState({ ancho: 0, alto: 0 });
   const oscuro = useColorScheme() === "dark";
-  useImperativeHandle(ref, () => ({ animateToRegion: (r: Region) => setRegion(r) }));
+  useImperativeHandle(ref, () => ({
+    animateToRegion: (r: Region) => setRegion(r),
+    fitToCoordinates: (ps: { latitude: number; longitude: number }[]) => {
+      if (!ps.length) return;
+      const la = ps.map(p => p.latitude), lo = ps.map(p => p.longitude);
+      setRegion({ latitude: (Math.min(...la) + Math.max(...la)) / 2, longitude: (Math.min(...lo) + Math.max(...lo)) / 2,
+        latitudeDelta: (Math.max(...la) - Math.min(...la)) * 1.4 + 0.004, longitudeDelta: (Math.max(...lo) - Math.min(...lo)) * 1.4 + 0.004 });
+    },
+  }));
   const caja = { region, ...tam };
   const calles = Array.from({ length: 14 }, (_, i) => i);
   return (
@@ -52,7 +60,7 @@ const MapView = forwardRef(function MapView(
 });
 export default MapView;
 
-export function Polyline({ coordinates, strokeColor, strokeWidth }: { coordinates: { latitude: number; longitude: number }[]; strokeColor?: string; strokeWidth?: number }) {
+export function Polyline({ coordinates, strokeColor, strokeWidth }: { coordinates: { latitude: number; longitude: number }[]; strokeColor?: string; strokeWidth?: number; [k: string]: unknown }) {
   const c = useContext(Ctx);
   if (!c || coordinates.length < 2) return null;
   const d = coordinates.map((p, i) => {

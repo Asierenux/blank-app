@@ -13,6 +13,8 @@ import MapView, { Circle, Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icono } from "../componentes/icono";
+import { ComoLlegar, type LugarBuscado } from "../componentes/comoLlegar";
+import type { Plan, Trayecto } from "../lib/planificador";
 import { Aviso, Etiqueta, Fila, Insignia, Segmentos, Tarjeta } from "../componentes/ui";
 import { useDatos } from "../datos";
 import { VITORIA } from "../lib/config";
@@ -25,7 +27,7 @@ import { interpolarEnVia, type EstadoTransporte, type Recorrido, type Vehiculo }
 import { colorNivel, useColores } from "../lib/tema";
 
 type Modo = "transporte" | "trafico" | "camaras" | "gasolina";
-type Vehiculos = "bus" | "tranvia";
+type Vehiculos = "bus" | "tranvia" | "ir";
 type Zona = "ciudad" | "carreteras";
 
 const REGION = { latitude: VITORIA.lat, longitude: VITORIA.lon, latitudeDelta: 0.07, longitudeDelta: 0.07 };
@@ -46,6 +48,38 @@ function Chapa({ v, c, grande = false }: { v: Vehiculo; c: ReturnType<typeof use
       shadowColor: "#000", shadowOpacity: 0.3, shadowRadius: 2, shadowOffset: { width: 0, height: 1 } }}>
       <Text style={{ color: "#fff", fontSize: grande ? 14 : 11, fontWeight: "800" }}>{v.linea.replace(/^TG/, "T")}</Text>
     </View>
+  );
+}
+
+/** El trayecto de «Cómo llegar» en el mapa: a pie con puntos, autobús y tranvía con el color de su línea. */
+function DibujoRuta({ t }: { t: Trayecto }) {
+  const c = useColores();
+  const fin = t.tramos.at(-1)!;
+  return (
+    <>
+      {t.tramos.map((x, i) => x.tipo === "pie" ? (
+        <Polyline key={i} coordinates={[x.desde, x.hasta].map(p => ({ latitude: p.lat, longitude: p.lon }))}
+          strokeColor={c.suave} strokeWidth={3} lineDashPattern={[2, 6]} lineCap="round" />
+      ) : (
+        <Polyline key={i} coordinates={x.paradas.map(p => ({ latitude: p.lat, longitude: p.lon }))}
+          strokeColor={x.color ?? (x.tipo === "bus" ? c.bus : c.tranvia)} strokeWidth={6} lineCap="round" lineJoin="round" />
+      ))}
+      {t.tramos.flatMap((x, i) => x.tipo === "pie" ? [] : [
+        <Marker key={`s${i}`} coordinate={{ latitude: x.desde.lat, longitude: x.desde.lon }} anchor={{ x: 0.5, y: 0.5 }}
+          title={`Coge el ${x.linea}`} description={x.desde.nombre} tracksViewChanges={false}>
+          <View style={{ paddingHorizontal: 6, height: 22, borderRadius: 11, alignItems: "center", justifyContent: "center",
+            backgroundColor: x.color ?? (x.tipo === "bus" ? c.bus : c.tranvia), borderWidth: 2, borderColor: "#fff" }}>
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 11 }}>{x.linea}</Text>
+          </View>
+        </Marker>,
+        <Marker key={`b${i}`} coordinate={{ latitude: x.hasta.lat, longitude: x.hasta.lon }} anchor={{ x: 0.5, y: 0.5 }}
+          title="Bájate aquí" description={x.hasta.nombre} tracksViewChanges={false}>
+          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: "#fff", borderWidth: 3,
+            borderColor: x.color ?? (x.tipo === "bus" ? c.bus : c.tranvia) }} />
+        </Marker>,
+      ])}
+      <Marker coordinate={{ latitude: fin.hasta.lat, longitude: fin.hasta.lon }} title="Destino" description={fin.hasta.nombre} pinColor={c.critico} />
+    </>
   );
 }
 
@@ -99,6 +133,9 @@ export default function Movilidad() {
   const [ahora, setAhora] = useState(Date.now());
   const mapa = useRef<MapView>(null);
   const [verme, setVerme] = useState(false);
+  // Cómo llegar: el trayecto elegido se dibuja en el mapa; el destino también se puede marcar dejando el dedo en el mapa
+  const [ruta, setRuta] = useState<{ plan: Plan; t: Trayecto } | null>(null);
+  const [destinoMapa, setDestinoMapa] = useState<LugarBuscado | null>(null);
 
   // Mi posición: se pide permiso la primera vez que se toca el botón 📍
   useEffect(() => {
@@ -152,6 +189,14 @@ export default function Movilidad() {
 
   const verTransporte = modo === "transporte";
   const verTranvia = verTransporte && vehiculo === "tranvia";
+  const verIr = verTransporte && vehiculo === "ir";
+  // Encuadrar el trayecto elegido
+  useEffect(() => {
+    if (!verIr || !ruta) return;
+    const puntos = ruta.t.tramos.flatMap(x => (x.tipo === "pie" ? [x.desde, x.hasta] : x.paradas))
+      .map(p => ({ latitude: p.lat, longitude: p.lon }));
+    mapa.current?.fitToCoordinates(puntos, { edgePadding: { top: 40, right: 40, bottom: 40, left: 40 }, animated: true });
+  }, [verIr, ruta]);
 
   // El tranvía se mueve segundo a segundo entre paradas
   useEffect(() => {
@@ -222,7 +267,7 @@ export default function Movilidad() {
   const texto = buscar.trim().toLowerCase();
   const camarasVista = texto ? camaras.filter(cam => cam.nombre.toLowerCase().includes(texto)) : camaras;
 
-  const alturaMapa = Math.round(height * (modo === "trafico" ? 0.38 : 0.44));
+  const alturaMapa = Math.round(height * (modo === "trafico" ? 0.38 : modo === "transporte" && vehiculo === "ir" ? 0.3 : 0.44));
 
   return (
     <View style={{ flex: 1, backgroundColor: c.fondo }}>
@@ -243,6 +288,7 @@ export default function Movilidad() {
           <Segmentos<Vehiculos> valor={vehiculo} cambiar={setVehiculo} opciones={[
             { valor: "bus", texto: `Autobuses${estado ? ` · ${estado.buses}` : ""}` },
             { valor: "tranvia", texto: `Tranvía${estado ? ` · ${estado.tranvias}` : ""}` },
+            { valor: "ir", texto: "Cómo llegar", icono: "ruta" },
           ]} />
         )}
         {modo === "trafico" && (
@@ -256,7 +302,12 @@ export default function Movilidad() {
       {modo !== "camaras" && (
         <View style={{ height: alturaMapa }}>
         <MapView ref={mapa} style={{ flex: 1 }} initialRegion={REGION} showsUserLocation={verme} showsMyLocationButton={false}
-          showsPointsOfInterests={false} showsBuildings={false} pitchEnabled={false}>
+          showsPointsOfInterests={false} showsBuildings={false} pitchEnabled={false}
+          onLongPress={verIr ? e => {
+            const { latitude, longitude } = e.nativeEvent.coordinate;
+            setDestinoMapa({ lat: latitude, lon: longitude, nombre: "Punto marcado en el mapa", tipo: "mapa" });
+          } : undefined}>
+          {verIr && ruta && <DibujoRuta t={ruta.t} />}
           {trazos.flatMap(r => r.formas.map((f, i) => (
             <Polyline key={`${r.linea}-${i}`} coordinates={f.map(([latitude, longitude]) => ({ latitude, longitude }))}
               strokeColor={(r.color ?? (vehiculo === "bus" ? c.bus : c.tranvia)) + (linea ? "" : "99")} strokeWidth={linea ? 4 : 2.5} />
@@ -356,7 +407,9 @@ export default function Movilidad() {
                 })}
               </ScrollView>
             )}
-            {vehiculo === "bus" ? (
+            {verIr ? (
+              <ComoLlegar destinoMapa={destinoMapa} elegido={ruta} elegir={setRuta} />
+            ) : vehiculo === "bus" ? (
               <Tarjeta>
                 <Etiqueta>{vehiculos.length} autobuses en servicio{linea ? ` en la línea ${linea}` : ""}</Etiqueta>
                 {vehiculos.slice(0, 40).map((v, i) => (

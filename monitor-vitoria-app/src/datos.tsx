@@ -13,7 +13,8 @@ import { AppState, Platform } from "react-native";
 import { guardarClave, guardarPreferencias, leerClaves, leerPreferencias, type Preferencias } from "./lib/ajustes";
 import { UMBRALES_DEFECTO } from "./lib/config";
 import { Transporte, type CacheHorarios } from "./lib/fuentes/transporte";
-import { rellenarDemo, transporteDemo } from "./lib/demo";
+import { Rutas, type CacheRed } from "./lib/planificador";
+import { rellenarDemo, rutasDemo, transporteDemo } from "./lib/demo";
 import { Historial } from "./lib/historial";
 import { Motor, faltaConfiguracion, type Fuente } from "./lib/motor";
 import { construirPanel, type Panel } from "./lib/panel";
@@ -42,12 +43,26 @@ const cacheHorarios: CacheHorarios = {
   },
 };
 
+/** Horario del día ya procesado para «Cómo llegar» (solo se guarda el de hoy). */
+const cacheRed: CacheRed = {
+  async leer(clave) {
+    const txt = await AsyncStorage.getItem(`mv1:red:${clave}`);
+    return txt ? JSON.parse(txt) : null;
+  },
+  async guardar(clave, red) {
+    const viejas = (await AsyncStorage.getAllKeys()).filter(k => k.startsWith("mv1:red:") && k.split(":").pop()! < clave.split(":").pop()!);
+    if (viejas.length) await AsyncStorage.multiRemove(viejas);
+    await AsyncStorage.setItem(`mv1:red:${clave}`, JSON.stringify(red));
+  },
+};
+
 interface ValorDatos {
   panel: Panel | null;
   listo: boolean;
   actualizando: boolean;
   actualizar: (forzar?: boolean, solo?: Fuente[]) => Promise<void>;
   transporte: Pick<Transporte, "estado" | "recorridos" | "todasLasParadas" | "proximas" | "trenesEuskotren" | "avisosEuskotren">;
+  rutas: Pick<Rutas, "planificar">;
   historial: Historial;
   claves: Claves;
   ponerClave: (campo: keyof Claves, valor: string) => Promise<void>;
@@ -67,6 +82,7 @@ export function useDatos(): ValorDatos {
 export function ProveedorDatos({ children }: { children: ReactNode }) {
   const historial = useMemo(() => new Historial(AsyncStorage), []);
   const transporte = useMemo(() => (DEMO ? transporteDemo : new Transporte(descargar, cacheHorarios)), []);
+  const rutas = useMemo(() => (DEMO ? rutasDemo : new Rutas(descargar, cacheRed)), []);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [listo, setListo] = useState(false);
   const [actualizando, setActualizando] = useState(false);
@@ -174,7 +190,7 @@ export function ProveedorDatos({ children }: { children: ReactNode }) {
   }, [listo, preferencias.alertas]);
 
   const valor: ValorDatos = {
-    panel, listo, actualizando, actualizar, transporte, historial,
+    panel, listo, actualizando, actualizar, transporte, rutas, historial,
     claves, ponerClave, preferencias, ponerPreferencias, vaciar,
   };
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>;
