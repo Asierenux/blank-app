@@ -41,8 +41,15 @@ Cada producto se dibuja en los dos lados (AR a la izquierda, R a la derecha), co
 desde el 0 hasta su trazo. Se marcan también las líneas de *Entre-tringles* y *Hors tout carcasse*.
 
 - **Sección:** Carcasa (GI → FE, hasta «FORME AU DIAMETRE»), Bandaje o Todo.
-- **Vista:** *Posiciones (TRAZO)*, una fila por producto, o *Sección apilada*, los productos
-  apilados por espesor en el orden de colocación.
+- **Vista:**
+  - *Plano (semisección)* (por defecto): como el plano de la máquina. Va a escala real, con el 0 a
+    la derecha y el radio del tambor (TAMBOUR / FORME AU DIAMETRE) en vertical. Los productos se
+    apilan con su espesor en el orden de la consigna, el aro (TT) va en ±ET/2 y, si la consigna
+    dice «RETOURNER PRODUIT NC», la NC (y lo que pasa del aro) se pliega alrededor del aro. Se
+    muestra el retournement estimado junto a la COTE RETOURNEMENT de la consigna. Es un esquema:
+    los productos se dibujan como trapecios con los bordes achaflanados, no con su perfil real.
+  - *Posiciones (TRAZO)*: una fila por producto, con la flecha desde el 0 hasta su trazo.
+  - *Sección apilada*: los productos apilados por espesor (escala exagerada), a ambos lados.
 - La tabla de abajo muestra el borde interior y exterior de cada producto en mm desde el 0.
 
 ## Formato de la consigna (perfil genérico)

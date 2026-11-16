@@ -41,7 +41,7 @@ class App(tk.Tk):
         self.var_puntos = tk.BooleanVar(value=True)
         self.var_cotas = tk.BooleanVar(value=True)
         self.var_seccion = tk.StringVar(value=neumatico.CARCASA)
-        self.var_vista = tk.StringVar(value="Posiciones (TRAZO)")
+        self.var_vista = tk.StringVar(value="Plano (semisección)")
 
         self._construir_ui()
         self.bind("<Control-o>", lambda e: self.abrir())
@@ -71,7 +71,7 @@ class App(tk.Tk):
         cb.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
         ttk.Label(self.barra_neum, text="Vista:").pack(side=tk.LEFT, padx=(8, 2))
         cb2 = ttk.Combobox(self.barra_neum, textvariable=self.var_vista, state="readonly", width=20,
-                           values=("Posiciones (TRAZO)", "Sección apilada"))
+                           values=("Plano (semisección)", "Posiciones (TRAZO)", "Sección apilada"))
         cb2.pack(side=tk.LEFT)
         cb2.bind("<<ComboboxSelected>>", lambda e: self.redibujar())
         ttk.Button(barra, text="Guardar plantilla de ejemplo…",
@@ -208,7 +208,8 @@ class App(tk.Tk):
         if not self.consigna:
             return
         if isinstance(self.consigna, neumatico.ConsignaNeumatico):
-            vista = "seccion" if self.var_vista.get().startswith("Secc") else "posiciones"
+            v = self.var_vista.get()
+            vista = "plano" if v.startswith("Plano") else ("seccion" if v.startswith("Secc") else "posiciones")
             neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get())
             self.canvas.draw()
             return

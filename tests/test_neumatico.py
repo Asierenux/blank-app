@@ -24,9 +24,12 @@ def consigna(tmp_path):
         (None, "TAMBOUR AU DIAMETRE  400    ;"),
         (("GI", "XX 1", 300, 1.0, 0, "C", 0, 1000, 0.5), None),
         (("RFI", "XX 2", 50, 1.0, 0, "IN", 70, 2000, 0.1), None),
+        (("NC", "XX 7", 360, 1.5, 90, "C", 0, 1300, 1.0), None),
         (("BJ", "XX 3", 40, 3.0, 0, "EX", 150, 2000, 0.3), None),
         (None, "ENTRE-TRINGLES  320.5    ;TAMBOUR AU DIAMETRE  430    ;"),
         (("TT", "XX 4", 0, 4.0, 0, "EX", None, "Des.:1300", 0.3), None),
+        (None, "ENTRE-TRINGLES  320.5    ;RETOURNER PRODUIT NC     ;"),
+        (None, "COTE RETOURNEMENT 140 140 C 140 ;"),
         (None, "HORS TOUT CARCASSE:  330    ;"),
         (None, "FORME AU DIAMETRE  600    ;"),
         (("NST1", "XX 5", 160, 1.1, "27 D", "C", 0, 1900, 0.7), None),
@@ -66,7 +69,7 @@ def test_posiciones_trazo_desde_el_centro(consigna):
 def test_dibuja_todas_las_vistas(consigna):
     c = neumatico.cargar(consigna)
     for sec in (neumatico.CARCASA, neumatico.BANDAJE, "Todo"):
-        for vista in ("posiciones", "seccion"):
+        for vista in ("plano", "posiciones", "seccion"):
             neumatico.dibujar(Figure(), c, sec, vista)
 
 
@@ -74,3 +77,23 @@ def test_perfil_generico_no_se_confunde(tmp_path):
     import os
     ej = os.path.join(os.path.dirname(__file__), "..", "ejemplos", "perfil_tubo.xlsx")
     assert not neumatico.es_consigna_neumatico(ej)
+
+
+def test_plano_tambor_y_retournement(consigna):
+    import math
+
+    c = neumatico.cargar(consigna)
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
+    assert info["y0"] == pytest.approx(200)                 # TAMBOUR AU DIAMETRE 400
+    (xb, yc, r), = aros
+    assert xb == pytest.approx(160.25) and r == pytest.approx(2.0)
+    cod, xr = info["retournement"]
+    assert cod == "NC"
+    # NC sobra 180 - 160,25 = 19,75 mm; media vuelta alrededor del aro y el resto vuelve hacia dentro
+    rm = r + 1.5 / 2
+    assert xr == pytest.approx(160.25 - (19.75 - math.pi * rm), abs=0.01)
+    assert neumatico._cota_retournement(c) == 140
+    # nada de la NC queda fuera del aro en plano
+    nc = next(k for k in capas if k["prod"].codigo == "NC" and not k["vuelta"])
+    assert nc["t"][x > xb + 0.1].max() == 0

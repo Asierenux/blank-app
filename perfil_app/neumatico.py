@@ -272,7 +272,7 @@ PALETA = ["#2a6fdb", "#e07a1f", "#2e9e5b", "#c23b5a", "#7a4fc9", "#178f8f", "#b8
           "#d14fa0", "#4f6b8a", "#6b8e23", "#8b4513", "#1e90ff", "#a0522d", "#3cb371"]
 
 
-def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "posiciones",
+def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "plano",
             mostrar_cotas: bool = True):
     fig.clear()
     prods = [p for p in cons.de(seccion) if p.tramos]
@@ -281,7 +281,19 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
         ax.axis("off")
         ax.text(0.5, 0.5, "No hay productos en esta sección", ha="center")
         return ax
-    if vista == "seccion":
+    if vista == "plano":
+        if seccion == "Todo":
+            fig.clear()
+            secs = [sc for sc in (CARCASA, BANDAJE) if any(p.tramos for p in cons.de(sc))]
+            ax = None
+            for k, sc in enumerate(secs):
+                ax = fig.add_subplot(len(secs), 1, k + 1)
+                _dibujar_plano(ax, cons, [p for p in cons.de(sc) if p.tramos], mostrar_cotas)
+                ax.set_title(sc, fontsize=9)
+            fig.tight_layout()
+            return ax
+        _dibujar_plano(ax, cons, prods, mostrar_cotas)
+    elif vista == "seccion":
         _dibujar_apilado(ax, cons, prods, mostrar_cotas)
     else:
         _dibujar_posiciones(ax, cons, prods, mostrar_cotas)
@@ -402,3 +414,250 @@ def _dibujar_apilado(ax, cons, prods, cotas):
 def _rect(x, y, w, h, col):
     from matplotlib.patches import Rectangle
     return Rectangle((x, y), w, h, facecolor=col, edgecolor="#222", lw=0.5, alpha=0.9, zorder=3)
+
+
+# ---------------------------------------------------------------------------
+# Plano: semisección a escala real (como el plano de la máquina)
+# ---------------------------------------------------------------------------
+
+
+def _diametro_base(cons: ConsignaNeumatico, prods: list[Producto]) -> float | None:
+    """Diámetro del tambor/forma sobre el que se coloca el primer producto de la sección."""
+    if not prods:
+        return None
+    todos = cons.productos
+    i0 = todos.index(prods[0])
+    for p in reversed(todos[: i0 + 1]):
+        for nota in reversed(p.notas):
+            m = re.search(r"DIAMETRE\s+([\d.]+)", nota.upper())
+            if m:
+                return float(m.group(1))
+    return None
+
+
+def _cota_retournement(cons: ConsignaNeumatico) -> float | None:
+    for k, v in cons.notas.items():
+        if "RETOURNEMENT" in k.upper() and v:
+            return _num(v.split()[0])
+    return None
+
+
+def _hay_retournement(cons: ConsignaNeumatico) -> bool:
+    return any("RETOURN" in k.upper() for k in cons.notas)
+
+
+def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True):
+    """Espesor del producto en cada x: trapecio con los bordes achaflanados."""
+    import numpy as np
+
+    t = np.zeros_like(x)
+    if esp is None or esp <= 0 or b <= a:
+        return t
+    ancho = b - a
+    bev = min(max(2.5 * esp, 2.0), ancho / 3)
+    sube = (x - a) / bev if chaflan_ini else np.full_like(x, np.inf)
+    baja = (b - x) / bev if chaflan_fin else np.full_like(x, np.inf)
+    t = esp * np.clip(np.minimum(sube, baja), 0, 1)
+    t[(x < a) | (x > b)] = 0
+    return t
+
+
+def _puentear(h, paso=0.1, mm=2.0):
+    """Las gomas no se meten en huecos pequeños: envolvente máxima en ±mm."""
+    import numpy as np
+    from numpy.lib.stride_tricks import sliding_window_view
+
+    k = max(int(mm / paso), 1)
+    hp = np.pad(h, k, mode="edge")
+    return sliding_window_view(hp, 2 * k + 1).max(axis=1)
+
+
+def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
+    """Apila los productos (lado R, desde el 0) y pliega el retournement alrededor del aro."""
+    import numpy as np
+
+    xmax = max(max(abs(a), abs(b)) for p in prods for a, b in p.tramos) + 20
+    x = np.arange(0, xmax, 0.1)
+    d = _diametro_base(cons, prods) or 0.0
+    y0 = d / 2
+    h = np.full_like(x, y0)
+    capas = []   # dict(prod, color, abajo, t)
+    cuñas = []   # (color, xc, yc, rin, rout, ang0, ang1)
+    aros = []    # (xc, yc, r)
+    info = {"y0": y0, "diametro": d, "retournement": None}
+    aro_ext = None
+    colores = {}
+
+    def color(p):
+        if p.codigo not in colores:
+            colores[p.codigo] = PALETA[len(colores) % len(PALETA)]
+        return colores[p.codigo]
+
+    for p in prods:
+        if not p.tramos:
+            continue
+        a, b = p.tramos[-1]
+        if p.es_aro:
+            xb, r = (a + b) / 2, (p.espesor or 4) / 2
+            ib = int(np.searchsorted(x, xb))
+            yc = h[ib] + r
+            aros.append((xb, yc, r))
+            if not _hay_retournement(cons):
+                h = np.maximum(h, np.where(np.abs(x - xb) <= r, yc + np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None)), h))
+                continue
+            plegar = [c for c in capas if c["t"][x > xb + 0.2].max(initial=0) > 0]
+            rin = r
+            vueltas = []
+            for c in reversed(plegar):  # la más cercana al aro primero
+                ti = c["t"][ib] or c["prod"].espesor or 1.0
+                ro = rin + ti
+                largo = c["fin"] - xb
+                rm = (rin + ro) / 2
+                arco = math.pi * rm
+                if largo <= arco:
+                    ang1 = -90 + math.degrees(largo / rm)
+                    resto = 0.0
+                else:
+                    ang1, resto = 90, largo - arco
+                cuñas.append((c["color"], xb, yc, rin, ro, -90, ang1))
+                vueltas.append((c, ti, resto))
+                if c["prod"].codigo.upper() == "NC" or info["retournement"] is None:
+                    info["retournement"] = (c["prod"].codigo, xb - resto)
+                rin = ro
+            for c in plegar:
+                c["t"][x > xb] = 0
+            h = y0 + sum(c["t"] for c in capas)
+            # el aro y una rampa suave por dentro: sobre ellos se apoya la vuelta
+            dentro = (x >= xb - r) & (x <= xb)
+            h = np.where(dentro, np.maximum(h, yc + np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None))), h)
+            rampa = (x >= xb - 4 * r) & (x < xb - r)
+            ib0 = int(np.searchsorted(x, xb - 4 * r))
+            ylin = np.interp(x, [xb - 4 * r, xb - r], [h[ib0], yc])
+            h = np.where(rampa, np.maximum(h, ylin), h)
+            for c, ti, resto in vueltas:
+                if resto <= 0:
+                    continue
+                t = _espesor_x(x, xb - resto, xb, ti, chaflan_fin=False)
+                t[x > xb] = 0
+                capas.append({"prod": c["prod"], "color": c["color"], "abajo": h.copy(), "t": t,
+                              "fin": xb, "vuelta": True})
+                h = h + t
+            # por fuera del aro, la superficie es la última vuelta
+            fuera = (x > xb) & (x <= xb + rin)
+            h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(rin**2 - (x - xb) ** 2, 0, None))), h)
+            aro_ext = {"xb": xb, "yc": yc, "r": rin}
+            continue
+        if aro_ext and b > aro_ext["xb"] + 0.2:
+            # producto que pasa del aro: la parte de fuera se envuelve por el exterior del aro
+            xb, yc, rin = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
+            t = _espesor_x(x, max(a, 0.0), b, p.espesor, a > 0)
+            ib = int(np.searchsorted(x, xb))
+            ti = p.espesor or 1.0
+            t[x > xb] = 0
+            abajo = _puentear(h)
+            capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
+            h = np.where(t > 0, abajo + t, h)
+            ro = rin + ti
+            rm = (rin + ro) / 2
+            largo = b - xb
+            ang = min(math.degrees(largo / rm), 270)
+            cuñas.append((color(p), xb, yc, rin, ro, 90 - ang, 90))
+            aro_ext["r"] = ro
+            fuera = (x > xb) & (x <= xb + ro)
+            h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(ro**2 - (x - xb) ** 2, 0, None))), h)
+            continue
+        chaflan_ini = a > 0
+        t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini)
+        abajo = _puentear(h) if aro_ext else h.copy()
+        capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
+        h = np.where(t > 0, abajo + t, h)
+    for p in prods:
+        if p.es_aro:
+            colores.setdefault(p.codigo, "#f2d600")
+    return x, capas, cuñas, aros, info, colores, h
+
+
+def _dibujar_plano(ax, cons, prods, cotas):
+    import numpy as np
+    from matplotlib.patches import Circle, Patch, Wedge
+
+    x, capas, cuñas, aros, info, colores, h = _calcular_plano(cons, prods)
+    y0 = info["y0"]
+    for c in capas:
+        m = c["t"] > 1e-6
+        if not m.any():
+            continue
+        ax.fill_between(x, c["abajo"], c["abajo"] + c["t"], where=m, facecolor=c["color"],
+                        edgecolor="#1b1b1b", linewidth=0.5, zorder=3)
+    for col, xc, yc, rin, ro, a0, a1 in cuñas:
+        ax.add_patch(Wedge((xc, yc), ro, a0, a1, width=ro - rin, facecolor=col, edgecolor="#1b1b1b",
+                           linewidth=0.5, zorder=3))
+    for xc, yc, r in aros:
+        ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
+
+    ax.set_aspect("equal")
+    alto = max(h.max(), max((yc + r for xc, yc, r in aros), default=y0)) - y0
+    ax.axhline(y0, color="#3a8dde", lw=1.2, zorder=2)  # superficie del tambor
+    ax.text(x[-1], y0 - 0.6, f"Tambor Ø{_f(info['diametro'])}  (R {_f(round(y0, 2))})", fontsize=7,
+            color="#3a8dde", ha="left", va="top")
+    ax.axvline(0, color="#111", lw=1.4, zorder=2)
+    ytxt = y0 + alto + 6
+
+    def vline(xv, txt, col, ls="--", dy=0.0):
+        ax.plot([xv, xv], [y0 - 4, ytxt - 1 + dy], color=col, lw=0.9, ls=ls, zorder=2)
+        ax.text(xv, ytxt + dy, txt, color=col, fontsize=7, ha="center", va="bottom",
+                bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="none", alpha=0.9))
+
+    niveles = iter([0, 4.5, 9, 13.5])
+    if cons.entre_tringles and any(p.es_aro for p in prods):
+        vline(cons.entre_tringles / 2, f"ET/2 = {_f(round(cons.entre_tringles / 2, 2))}", "#8b0000",
+              dy=next(niveles))
+    cr = _cota_retournement(cons)
+    if info["retournement"] and any(p.es_aro for p in prods):
+        cod, xr = info["retournement"]
+        txt = f"Retournement {cod} estimado ≈ {_f(round(xr, 1))}"
+        if cr:
+            txt += f"\n(consigna {_f(cr)}, Δ {_f(round(xr - cr, 1))})"
+        vline(xr, txt, "#2e7d32", ls=":", dy=next(niveles))
+    if cons.hors_tout and any(p.es_aro for p in prods):
+        vline(cons.hors_tout / 2, f"Hors tout/2 = {_f(cons.hors_tout / 2)}", "#555", dy=next(niveles))
+
+    if cotas:
+        # etiqueta de cada producto en su zona más gruesa, repartidas para no pisarse
+        usados = []  # (x, fila)
+        for c in capas:
+            if c.get("vuelta") or not (c["t"] > 0).any():
+                continue
+            zona = np.nonzero(c["t"] >= 0.6 * c["t"].max())[0]
+            elegido = None
+            for frac in (0.5, 0.3, 0.7, 0.15, 0.85, 0.4, 0.6, 0.22, 0.78, 0.05, 0.95):
+                i = int(zona[int(frac * (len(zona) - 1))])
+                if all(abs(x[i] - ux) >= 11 for ux, _ in usados):
+                    elegido = (i, 0)
+                    break
+            if elegido is None:
+                i = int(zona[len(zona) // 2])
+                elegido = (i, 1 + sum(1 for ux, _ in usados if abs(ux - x[i]) < 11))
+            i, fila = elegido
+            usados.append((x[i], fila))
+            xi, yi = x[i], c["abajo"][i] + c["t"][i] / 2
+            yt = y0 - 6 - fila * 3.2
+            ax.annotate(c["prod"].codigo, (xi, yi), xytext=(xi, yt), fontsize=7, ha="center", va="top",
+                        color=c["color"], fontweight="bold",
+                        arrowprops=dict(arrowstyle="-", color=c["color"], lw=0.6), zorder=6)
+        ybajo = y0 - 6 - max((f for _, f in usados), default=0) * 3.2 - 6
+    else:
+        ybajo = y0 - 6
+
+    xfin = x[-1]
+    ax.set_xlim(xfin, -2)  # el 0 (centro) a la derecha, como en el plano
+    ax.set_ylim(ybajo, ytxt + 18)
+    ax.set_xticks(range(0, int(xfin) + 1, 10))
+    ax.tick_params(axis="x", labelsize=7, rotation=90)
+    ax.tick_params(axis="y", labelsize=7)
+    ax.set_xlabel("mm desde el centro (0)")
+    ax.set_ylabel("radio (mm)")
+    ax.grid(True, color="#ececec", lw=0.5)
+    ax.set_axisbelow(True)
+    ax.legend(handles=[Patch(facecolor=col, edgecolor="#1b1b1b", label=cod) for cod, col in colores.items()],
+              fontsize=7, ncol=min(len(colores), 10), loc="upper left", frameon=False)
