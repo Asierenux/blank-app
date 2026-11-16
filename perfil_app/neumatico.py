@@ -28,8 +28,10 @@ class Ajustes:
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
-    vuelta_bt: str = "arriba"     # «arriba»: el BT envuelve el aro desde la HF por encima;
-                                  # «con_nc»: el BT se vuelve junto con la NC (por dentro de ella)
+    vuelta_bt: str = "con_nc"     # «con_nc»: tras la falaise el BT sigue como labio fino bajo el aro y
+                                  # se vuelve junto con la NC (por dentro de ella);
+                                  # «arriba»: el resto del BT envuelve el aro por encima desde la HF
+    labio_bt: float = 0.8         # mm: espesor del BT después de la falaise (labio)
 
 
 @dataclass
@@ -719,7 +721,12 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
                 if pr.hf_efectivo is None:
                     continue
                 hf = pr.hf_efectivo
-                c["t"][x > hf] = 0
+                if aj.vuelta_bt == "con_nc":
+                    # después de la falaise el BT sigue como labio fino hasta el aro
+                    c["t"] = np.where((x > hf) & (x <= xb), np.minimum(c["t"], aj.labio_bt), c["t"])
+                    c["t"][x > xb] = 0
+                else:
+                    c["t"][x > hf] = 0
                 # asiento: el BT no puede ocupar el sitio del aro (la falaise hace de pared)
                 cara = yc - np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None))
                 en_aro = np.abs(x - xb) < r
@@ -727,7 +734,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
                 info["pared"] = (pr.codigo, hf)
                 largo = c["fin"] - hf
                 if aj.vuelta_bt == "con_nc":
-                    bt_con_nc.append((pr, largo))
+                    bt_con_nc.append((pr, c["fin"] - xb))  # el labio que pasa del aro se vuelve con la NC
                     continue
                 i_hf = max(int(np.searchsorted(x, min(hf, xb - r))) - 1, 0)
                 alto_bt = float((c["abajo"] + c["t"])[i_hf])
@@ -757,7 +764,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             vueltas = []
             for pr, largo in bt_con_nc:
                 # el BT va sobre la NC: al volverse queda entre el aro y la NC, adelgazando hasta 0
-                usado, th_fin = envolver_polar(pr, -90, +1, largo, pr.espesor or 1.0, 0.0, 270)
+                usado, th_fin = envolver_polar(pr, -90, +1, largo, aj.labio_bt, aj.labio_bt * 0.3, 270)
                 info["vueltas"].append({"cod": pr.codigo, "ang": th_fin + 90, "resto": 0.0, "falta_media": 0.0,
                                         "solo_angulo": True})
             for c in reversed(plegar):  # la más cercana al aro primero

@@ -184,7 +184,7 @@ def test_bt_con_falaise_hace_de_tope_y_envuelve_el_aro(consigna, tmp_path):
     bt = next(p for p in c.productos if p.codigo == "BT")
     assert bt.hf == 156
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
-    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods, neumatico.Ajustes(vuelta_bt="arriba"))
     xb, yc, r = info["aro"]
     assert xb == pytest.approx(320.5 / 2)          # centro del aro en entre aros / 2
     assert info["pared"] == ("BT", 156)
@@ -212,3 +212,25 @@ def test_bt_vuelto_con_la_nc(consigna, tmp_path):
     # con el BT dentro de la vuelta, la NC envuelve con más radio y vuelve menos hacia el centro
     assert con_nc["retournement"][1] > arriba["retournement"][1]
     assert {b[1] for b in con_nc["bandas"]} >= {"BT", "NC"}
+
+
+def test_labio_del_bt_bajo_el_aro_y_vuelto_con_la_nc(consigna, tmp_path):
+    """Por defecto: tras la falaise el BT sigue como labio fino y se vuelve dentro de la NC."""
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 6
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
+    ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
+    ruta = tmp_path / "bt3.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    aj = neumatico.Ajustes(labio_bt=0.5)
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods, aj)
+    bt = next(k for k in capas if k["prod"].codigo == "BT")
+    entre = (x > 156.5) & (x < 157)          # justo después de la falaise, antes del aro
+    assert bt["t"][entre].max() == pytest.approx(0.5)
+    assert bt["t"][x < 150].max() == pytest.approx(3.0)
+    orden = [b[1] for b in info["bandas"]]
+    assert orden.index("BT") < orden.index("NC")   # el labio va pegado al aro, la NC por fuera
