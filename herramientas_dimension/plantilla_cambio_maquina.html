@@ -1,0 +1,1980 @@
+<meta charset="utf-8"><title>Cambio de Dimensión</title>
+<style>
+
+:root{
+  --bg-0:#050914;
+  --bg-1:#0a1730;
+  --bg-2:#0f2148;
+  --panel:rgba(18,32,58,.72);
+  --panel-solid:#101d38;
+  --panel-border:rgba(122,164,230,.22);
+  --ink:#eef3fc;
+  --ink-muted:#9db3d4;
+  --ink-faint:#6f84a8;
+  --accent:#3d7bdc;
+  --accent-2:#5b93e8;
+  --accent-glow:rgba(61,123,220,.55);
+  --brand-blue:#27509b;
+  --brand-blue-ink:#ffffff;
+  --brand-amber:#fce500;
+  --brand-amber-ink:#241a00;
+  --good:#33d489;
+  --good-glow:rgba(51,212,137,.45);
+  --warn:#ffb545;
+  --bad:#ff6b5e;
+  --bad-glow:rgba(255,107,94,.4);
+  --nodata:#7e90ac;
+  --font-display: 'Arial Narrow', 'Liberation Sans Narrow', 'Segoe UI', Arial, sans-serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  --font-mono:'Consolas','SF Mono','Cascadia Mono','Liberation Mono',monospace;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(1100px 620px at 15% -10%, var(--bg-2), transparent 60%),
+    radial-gradient(900px 560px at 110% 10%, #142a58, transparent 55%),
+    linear-gradient(180deg, var(--bg-0), var(--bg-1) 55%, var(--bg-0));
+  color:var(--ink);
+  font-family:var(--font-body);
+  font-size:15px;
+  line-height:1.45;
+  overflow-x:hidden;
+}
+::selection{ background:var(--accent-glow); }
+::-webkit-scrollbar{ width:10px; height:10px; }
+::-webkit-scrollbar-thumb{ background:#25406e; border-radius:999px; }
+
+/* patrón de neumático de fondo, muy sutil, para dar sensación técnica sin distraer */
+.tread-bg{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background: repeating-linear-gradient(135deg, rgba(122,164,230,.05) 0 18px, transparent 18px 36px);
+  mask-image: radial-gradient(1000px 700px at 50% 0%, #000 0%, transparent 70%);
+}
+.tread-bar{
+  height:4px; width:100%;
+  background: repeating-linear-gradient(135deg, var(--accent) 0 16px, var(--brand-blue) 16px 32px);
+  box-shadow:0 0 18px var(--accent-glow);
+  position:relative; z-index:2;
+}
+
+.wrap{
+  position:relative; z-index:1;
+  max-width:760px;
+  margin:0 auto;
+  padding:22px 20px 70px;
+  display:flex;
+  flex-direction:column;
+  gap:20px;
+  min-height:100vh;
+}
+
+header.top{
+  display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+}
+header.top h1{
+  font-family:var(--font-display); font-weight:800; font-style:italic;
+  font-size:26px; letter-spacing:.01em; text-transform:uppercase;
+  color:var(--ink); margin:0; line-height:1;
+  text-shadow:0 0 24px var(--accent-glow);
+}
+.dataset-stat{
+  font-family:var(--font-mono); font-size:11px; color:var(--accent-2);
+  background:rgba(61,123,220,.12); border:1px solid var(--panel-border);
+  border-radius:999px; padding:5px 11px; white-space:nowrap;
+}
+/* El logo real (trazo negro + azul) se ve poco legible directamente
+   sobre el fondo oscuro de esta herramienta, así que va en una
+   "placa" clara, como en cualquier aplicación de marca sobre fondo
+   oscuro. */
+.brand-logo-plate{ display:inline-flex; align-items:center; justify-content:center; }
+.brand-logo{ height:40px; width:auto; display:block; }
+
+
+.freshness-row{ display:flex; align-items:center; gap:8px; }
+.freshness-badge{
+  font-family:var(--font-mono); font-size:11px; font-weight:700;
+  padding:5px 11px; border-radius:999px; white-space:nowrap; border:1px solid;
+}
+.freshness-badge.fresh{ color:var(--good); background:rgba(51,212,137,.12); border-color:rgba(51,212,137,.4); }
+.freshness-badge.warn{ color:var(--warn); background:rgba(255,181,69,.12); border-color:rgba(255,181,69,.4); }
+.freshness-badge.stale{ color:var(--bad); background:rgba(255,107,94,.12); border-color:rgba(255,107,94,.4); }
+
+.update-btn{
+  font-family:var(--font-body); font-weight:700; font-size:12px;
+  background:rgba(122,164,230,.14); color:var(--ink); border:1px solid var(--panel-border);
+  border-radius:8px; padding:7px 13px; cursor:pointer; white-space:nowrap;
+}
+.update-btn:hover{ background:rgba(122,164,230,.24); border-color:var(--accent-2); }
+
+.update-modal-backdrop{
+  display:none; position:fixed; inset:0; background:rgba(2,6,14,.65);
+  z-index:200; align-items:center; justify-content:center; padding:20px;
+}
+.update-modal-backdrop.open{ display:flex; }
+.update-modal{
+  background:var(--panel-solid); border:1px solid var(--panel-border); border-radius:16px;
+  padding:26px 28px; max-width:440px; box-shadow:0 20px 60px rgba(0,0,0,.5);
+}
+.update-modal h3{ margin:0 0 12px; font-family:var(--font-display); font-style:italic; font-size:21px; color:var(--accent-2); text-transform:uppercase; }
+.update-modal p{ color:var(--ink-muted); font-size:13.5px; line-height:1.6; margin:0 0 12px; }
+.update-modal ol{ margin:0 0 18px; padding-left:20px; color:var(--ink-muted); font-size:13.5px; line-height:1.75; }
+.update-modal ol li strong{ color:var(--ink); }
+.update-modal .close-btn{
+  background:linear-gradient(135deg, var(--accent-2), var(--brand-blue)); color:#fff; border:none; border-radius:8px;
+  padding:9px 16px; font-weight:700; cursor:pointer; font-size:13px;
+}
+
+/* ---- pestañas de modo: cambio individual vs turno completo ---- */
+.mode-tabs{ display:flex; gap:8px; }
+.mode-tab{
+  flex:1; padding:11px 14px; border-radius:12px; border:1.5px solid var(--panel-border);
+  background:rgba(122,164,230,.06); color:var(--ink-muted);
+  font-family:var(--font-display); font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:.03em;
+  cursor:pointer;
+}
+.mode-tab.active{ background:rgba(61,123,220,.18); border-color:var(--accent); color:var(--ink); }
+.mode-tab:not(.active):hover{ border-color:var(--ink-faint); }
+
+/* ---- indicador de pasos ---- */
+.steps{ display:flex; align-items:center; gap:8px; }
+.step-dot{
+  display:flex; align-items:center; gap:8px;
+  font-family:var(--font-display); font-weight:700; font-size:12px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--ink-faint);
+}
+.step-dot .num{
+  width:26px; height:26px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:rgba(122,164,230,.1); border:1.5px solid var(--panel-border); color:var(--ink-faint);
+  font-family:var(--font-mono);
+}
+.step-dot.active{ color:var(--ink); }
+.step-dot.active .num{ background:var(--accent); border-color:var(--accent); color:#fff; box-shadow:0 0 14px var(--accent-glow); }
+.step-dot.done .num{ background:var(--good); border-color:var(--good); color:#04160e; }
+.step-line{ flex:1; height:2px; background:var(--panel-border); }
+
+/* ---- paneles ---- */
+.panel{
+  background:var(--panel);
+  border:1px solid var(--panel-border);
+  border-radius:20px;
+  padding:26px 24px;
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+  display:none;
+  flex-direction:column;
+  gap:18px;
+  animation:panelIn .35s ease;
+}
+.panel.active{ display:flex; }
+@keyframes panelIn{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+.panel h2{
+  font-family:var(--font-display); font-weight:700; font-size:13px; text-transform:uppercase;
+  letter-spacing:.08em; color:var(--ink-muted); margin:0;
+}
+.panel .sub{ color:var(--ink-faint); font-size:13px; margin-top:-10px; }
+
+/* ---- buscador grande ---- */
+.big-search{
+  width:100%; font-family:var(--font-mono); font-size:26px; font-weight:700; letter-spacing:.02em;
+  color:var(--ink); background:rgba(6,12,26,.6); border:1.5px solid var(--panel-border);
+  border-radius:14px; padding:16px 18px; text-align:center;
+}
+.big-search::placeholder{ color:var(--ink-faint); font-size:16px; font-weight:400; letter-spacing:0; }
+.big-search:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-glow); }
+
+.result-grid{ display:flex; flex-direction:column; gap:10px; max-height:360px; overflow-y:auto; padding-right:2px; }
+.result-card{
+  display:flex; flex-direction:column; gap:6px;
+  background:rgba(122,164,230,.06); border:1px solid var(--panel-border);
+  border-radius:14px; padding:14px 16px; cursor:pointer;
+  transition:background .15s, border-color .15s, transform .1s;
+}
+.result-card:hover{ background:rgba(122,164,230,.14); border-color:var(--accent); }
+.result-card:active{ transform:scale(.99); }
+.result-card .rc-label{ font-family:var(--font-display); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent-2); }
+.result-card .rc-dim{ font-family:var(--font-mono); font-weight:800; font-size:22px; color:var(--ink); letter-spacing:.02em; }
+.result-card .rc-sub{ font-family:var(--font-display); font-style:italic; font-size:13px; color:var(--ink-muted); }
+.result-card .rc-tags{ display:flex; flex-wrap:wrap; gap:6px; }
+.tag{
+  font-family:var(--font-mono); font-size:11px; font-weight:600; color:var(--ink-muted);
+  background:rgba(6,12,26,.5); border:1px solid var(--panel-border); border-radius:999px; padding:3px 10px;
+}
+.result-empty{ padding:22px 10px; text-align:center; color:var(--ink-faint); font-size:13.5px; }
+.result-count{ font-size:11.5px; color:var(--ink-faint); font-family:var(--font-mono); }
+
+/* ---- hero de dimensión seleccionada ---- */
+.hero-dim{
+  background:linear-gradient(135deg, rgba(61,123,220,.18), rgba(61,123,220,.02));
+  border:1.5px solid var(--accent); border-radius:16px; padding:20px 22px;
+  display:flex; flex-direction:column; gap:6px;
+  box-shadow:0 0 30px rgba(61,123,220,.15);
+}
+.hero-dim .hd-label{ font-family:var(--font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--accent-2); }
+.hero-dim .hd-title{ font-family:var(--font-mono); font-weight:800; font-size:36px; color:var(--ink); line-height:1.1; letter-spacing:.02em; }
+.hero-dim .hd-sub{ font-family:var(--font-display); font-style:italic; font-size:16px; color:var(--ink-muted); }
+.hero-dim .hd-meta{ font-family:var(--font-mono); font-size:12.5px; color:var(--ink-muted); }
+
+.compare-pair{ display:flex; align-items:stretch; gap:14px; }
+.compare-pair .hero-dim{ flex:1; }
+.compare-vs{
+  flex-shrink:0; align-self:center;
+  width:64px; height:64px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-weight:800; font-size:26px;
+  background:var(--panel-solid); border:2px solid var(--accent-2); color:var(--ink);
+}
+@media (max-width:640px){
+  .compare-pair{ flex-direction:column; }
+}
+
+.fixed-tags{ display:flex; flex-wrap:wrap; gap:10px; }
+.fixed-tag{
+  display:flex; flex-direction:column; align-items:center; gap:2px;
+  background:rgba(6,12,26,.55); border:1px solid var(--panel-border); border-radius:12px;
+  padding:8px 16px; min-width:100px;
+}
+.fixed-tag .ft-label{ font-family:var(--font-display); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); }
+.fixed-tag .ft-value{ font-family:var(--font-mono); font-weight:700; font-size:18px; color:var(--ink); }
+.fixed-tag .ft-pill{ font-size:9px; text-transform:uppercase; letter-spacing:.04em; font-weight:700; background:var(--brand-amber); color:var(--brand-amber-ink); border-radius:999px; padding:1px 7px; margin-top:2px; }
+.fixed-tag .ft-pill-edit{ background:transparent; border:1px solid var(--accent-2); color:var(--accent-2); }
+
+/* ---- desplegable de máquina (a medida, no <select> nativo, para que
+   la lista abierta también respete el tema oscuro) ---- */
+.search-mac-row{ margin-bottom:2px; }
+/* Botón grande y llamativo para que el operario elija su máquina como
+   primer paso, antes de teclear el código -- mismo peso visual que el
+   buscador, en ámbar para invitar a tocarlo primero. Selector
+   compuesto .ft-dropdown-btn.search-mac-btn para ganar siempre a las
+   reglas base de .ft-dropdown-btn sin depender del orden en la hoja
+   de estilos. */
+.ft-dropdown-btn.search-mac-btn{
+  width:100%; justify-content:space-between;
+  background:rgba(252,229,0,.08); border:1.5px solid var(--brand-amber);
+  color:var(--ink); font-size:16px; font-weight:700; padding:14px 18px; border-radius:14px;
+}
+.ft-dropdown-btn.search-mac-btn:hover, .ft-dropdown-btn.search-mac-btn.open{ background:rgba(252,229,0,.16); border-color:var(--brand-amber); }
+.search-mac-btn .chev{ color:var(--brand-amber); font-size:14px; }
+.ft-dropdown{ position:relative; }
+.ft-dropdown-btn{
+  display:flex; align-items:center; gap:6px; justify-content:center;
+  font-family:var(--font-mono); font-weight:700; font-size:16px; color:var(--ink);
+  background:rgba(122,164,230,.12); border:1px solid var(--panel-border); border-radius:8px;
+  padding:4px 10px; cursor:pointer; min-width:56px;
+}
+.ft-dropdown-btn .chev{ font-size:11px; color:var(--ink-faint); }
+.ft-dropdown-btn:hover, .ft-dropdown-btn.open{ border-color:var(--accent-2); }
+.ft-dropdown-menu{
+  display:none; position:absolute; z-index:40; top:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:#0c1730; border:1px solid var(--panel-border); border-radius:10px;
+  box-shadow:0 14px 34px rgba(0,0,0,.55); padding:4px; min-width:120px; max-height:220px; overflow-y:auto;
+}
+.ft-dropdown-menu.open{ display:block; }
+.ft-dropdown-item{
+  padding:7px 14px; border-radius:6px; font-family:var(--font-mono); font-size:14px; color:var(--ink-muted);
+  cursor:pointer; text-align:center; white-space:nowrap;
+}
+.ft-dropdown-item:hover{ background:rgba(122,164,230,.16); color:var(--ink); }
+.ft-dropdown-item.selected{ background:rgba(61,123,220,.28); color:var(--ink); font-weight:700; }
+
+/* ---- stepper de meses ---- */
+.months-row{ display:flex; align-items:center; justify-content:center; gap:18px; }
+.months-row .ml-label{ font-family:var(--font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-faint); text-align:center; }
+.stepper{ display:flex; align-items:center; gap:14px; }
+.stepper button{
+  width:46px; height:46px; border-radius:50%; border:1.5px solid var(--panel-border);
+  background:rgba(122,164,230,.1); color:var(--ink); font-size:22px; font-weight:700; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.stepper button:hover{ background:rgba(122,164,230,.22); border-color:var(--accent); }
+.stepper button:active{ transform:scale(.94); }
+.stepper .months-value{
+  font-family:var(--font-mono); font-size:34px; font-weight:800; color:var(--ink); min-width:56px; text-align:center;
+}
+
+/* ---- botones grandes ---- */
+.btn-cta{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  width:100%; padding:20px; border:none; border-radius:16px; cursor:pointer;
+  font-family:var(--font-display); font-weight:800; font-size:18px; text-transform:uppercase; letter-spacing:.04em;
+  background:linear-gradient(135deg, var(--accent-2), var(--brand-blue));
+  color:#fff; box-shadow:0 10px 30px rgba(61,123,220,.4);
+  animation:ctaPulse 2.4s ease-in-out infinite;
+}
+.btn-cta:disabled{ opacity:.4; cursor:not-allowed; animation:none; box-shadow:none; }
+.btn-cta:not(:disabled):hover{ filter:brightness(1.08); }
+@keyframes ctaPulse{ 0%,100%{ box-shadow:0 10px 30px rgba(61,123,220,.4); } 50%{ box-shadow:0 10px 44px rgba(61,123,220,.7); } }
+.btn-link{
+  background:none; border:none; color:var(--accent-2); font-size:13.5px; font-weight:600; cursor:pointer;
+  text-align:center; padding:6px;
+}
+.btn-ghost-lg{
+  width:100%; padding:16px; border-radius:14px; border:1.5px solid var(--panel-border); background:rgba(122,164,230,.06);
+  color:var(--ink); font-family:var(--font-display); font-weight:700; font-size:14px; text-transform:uppercase; letter-spacing:.04em;
+  cursor:pointer;
+}
+.btn-ghost-lg:hover{ border-color:var(--accent); }
+.hint-line{ font-size:12.5px; color:var(--ink-faint); text-align:center; }
+
+/* ---- resultado: aguja circular ---- */
+.gauge-wrap{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+.gauge{ position:relative; width:196px; height:196px; }
+.gauge svg{ width:100%; height:100%; transform:rotate(-90deg); }
+.gauge circle{ fill:none; stroke-width:14; }
+.gauge .g-track{ stroke:rgba(122,164,230,.14); }
+.gauge .g-value{ stroke-linecap:round; transition:stroke-dashoffset .6s ease, stroke .3s; }
+.gauge-center{
+  position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.gauge-center .g-num{ font-family:var(--font-mono); font-weight:800; font-size:52px; line-height:1; }
+.gauge-center .g-num.g-num-word{
+  font-size:26px; line-height:1.2; max-width:136px; white-space:normal; text-align:center;
+}
+.gauge-center .g-tool-line{
+  font-family:var(--font-mono); font-weight:700; font-size:15px; color:var(--accent-2); margin-top:3px; letter-spacing:.02em;
+}
+.gauge-center .g-label{ font-family:var(--font-display); font-weight:700; font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-faint); margin-top:4px; }
+.gauge.g-good .g-value{ stroke:var(--good); filter:drop-shadow(0 0 10px var(--good-glow)); }
+.gauge.g-good .g-num{ color:var(--good); }
+.gauge.g-warn .g-value{ stroke:var(--warn); filter:drop-shadow(0 0 10px rgba(255,181,69,.4)); }
+.gauge.g-warn .g-num{ color:var(--warn); }
+.gauge.g-bad .g-value{ stroke:var(--bad); filter:drop-shadow(0 0 10px var(--bad-glow)); }
+.gauge.g-bad .g-num{ color:var(--bad); }
+
+/* ---- cabecera "sale X -> entra Y" del paso 3 ---- */
+.compare-header{
+  display:flex; align-items:center; justify-content:center; gap:16px;
+  background:rgba(6,12,26,.5); border:1px solid var(--panel-border); border-radius:14px;
+  padding:16px 12px;
+}
+.compare-side{ flex:1; min-width:0; text-align:center; }
+.compare-label{ font-family:var(--font-display); font-weight:700; font-size:10px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-faint); }
+.compare-cod{ font-family:var(--font-mono); font-weight:800; font-size:28px; color:var(--ink); line-height:1.15; }
+.compare-sub{
+  font-family:var(--font-display); font-style:italic; font-size:13px; color:var(--ink-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.compare-mac{ font-family:var(--font-mono); font-size:10px; color:var(--ink-faint); margin-top:3px; }
+.compare-arrow{ font-size:26px; color:var(--accent-2); flex-shrink:0; }
+
+.best-eyebrow{
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  font-family:var(--font-display); font-weight:700; font-size:12px; text-transform:uppercase; letter-spacing:.1em; color:var(--brand-amber);
+}
+.best-dim{
+  font-family:var(--font-mono); font-weight:800; font-size:34px; color:var(--ink);
+  text-align:center; line-height:1.1; letter-spacing:.02em;
+}
+.best-sub{ text-align:center; font-family:var(--font-display); font-style:italic; font-size:16px; color:var(--ink-muted); }
+.best-meta{ text-align:center; font-family:var(--font-mono); font-size:11.5px; color:var(--ink-faint); }
+.best-reason{ text-align:center; color:var(--ink-muted); font-size:13.5px; max-width:520px; margin:0 auto; }
+.best-chips{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.chip{
+  font-family:var(--font-mono); font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px;
+  border:1px solid var(--bad); color:var(--bad); background:rgba(255,107,94,.1);
+}
+.chip.chip-tool{ border-color:var(--accent-2); color:var(--accent-2); background:rgba(91,147,232,.12); }
+.chip.chip-quick{ border-color:var(--warn); color:var(--warn); background:rgba(255,181,69,.12); }
+
+
+/* ---- lista de alternativas (colapsable) ---- */
+details.alt-list{ border-top:1px solid var(--panel-border); padding-top:14px; }
+details.alt-list summary{
+  cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:center; gap:8px;
+  font-family:var(--font-display); font-weight:700; font-size:12.5px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--accent-2); padding:6px;
+}
+details.alt-list summary::-webkit-details-marker{ display:none; }
+details.alt-list summary .chev{ transition:transform .2s; }
+details.alt-list[open] summary .chev{ transform:rotate(180deg); }
+.alt-row{
+  display:flex; flex-direction:column; gap:8px;
+  background:rgba(122,164,230,.05); border:1px solid var(--panel-border); border-radius:12px; padding:12px 14px; margin-top:10px;
+}
+.alt-row.is-best{ border-color:var(--good); background:rgba(51,212,137,.06); }
+.alt-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.alt-dim{ font-family:var(--font-mono); font-weight:800; font-size:18px; color:var(--ink); letter-spacing:.02em; }
+.alt-sub{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); }
+.alt-total{ font-family:var(--font-mono); font-weight:800; font-size:15px; white-space:nowrap; text-align:right; }
+.alt-chips{ display:flex; flex-wrap:wrap; gap:5px; }
+
+/* ---- modo "optimizar turno" ---- */
+.turno-textarea{
+  width:100%; min-height:140px; font-family:var(--font-mono); font-size:15px; line-height:1.5;
+  color:var(--ink); background:rgba(6,12,26,.6); border:1.5px solid var(--panel-border);
+  border-radius:14px; padding:14px 16px; resize:vertical;
+}
+.turno-textarea::placeholder{ color:var(--ink-faint); font-size:13px; }
+.turno-textarea:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 4px var(--accent-glow); }
+.turno-input-wrap{ position:relative; }
+.turno-suggest{
+  display:none; position:absolute; z-index:30; top:calc(100% + 6px); left:0; right:0;
+  background:#0c1730; border:1px solid var(--panel-border); border-radius:12px;
+  box-shadow:0 14px 34px rgba(0,0,0,.55); padding:5px; max-height:260px; overflow-y:auto;
+}
+.turno-suggest.open{ display:block; }
+.turno-suggest-item{
+  display:flex; align-items:baseline; gap:12px; padding:8px 12px; border-radius:8px; cursor:pointer;
+}
+.turno-suggest-item:hover, .turno-suggest-item.active{ background:rgba(122,164,230,.16); }
+.turno-suggest-item .ts-cod{ font-family:var(--font-mono); font-weight:800; font-size:15px; color:var(--ink); white-space:nowrap; }
+.turno-suggest-item .ts-dim{ flex:1; font-family:var(--font-display); font-style:italic; font-size:12px; color:var(--ink-muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.turno-suggest-item .ts-date{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); white-space:nowrap; }
+.turno-unresolved{
+  background:rgba(255,107,94,.08); border:1px solid var(--bad); border-radius:12px; padding:10px 14px;
+  font-size:12.5px; color:var(--bad);
+}
+.turno-summary{ display:flex; justify-content:center; gap:28px; }
+.turno-order-row{
+  display:flex; align-items:center; gap:14px;
+  background:rgba(122,164,230,.05); border:1px solid var(--panel-border); border-radius:12px; padding:12px 14px;
+  cursor:pointer;
+}
+.turno-order-row.is-first{ border-color:var(--good); background:rgba(51,212,137,.06); }
+.turno-badge{
+  flex-shrink:0; width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-mono); font-weight:800; font-size:14px; background:rgba(122,164,230,.12); color:var(--ink);
+  border:1.5px solid var(--panel-border);
+}
+.turno-order-row.is-first .turno-badge{ background:var(--good); border-color:var(--good); color:#04160e; }
+.turno-order-main{ flex:1; min-width:0; }
+.turno-order-dim{ font-family:var(--font-mono); font-weight:800; font-size:16px; color:var(--ink); }
+.turno-order-sub{ font-family:var(--font-mono); font-size:11px; color:var(--ink-faint); }
+.turno-order-chips{ display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; }
+.turno-order-cost{
+  flex-shrink:0; font-family:var(--font-mono); font-weight:800; font-size:18px; text-align:right; min-width:44px;
+}
+.turno-arrow{ text-align:center; color:var(--ink-faint); font-size:13px; margin:-4px 0; }
+
+/* ---- tabla de detalle ---- */
+.detail-panel{ margin-top:8px; border-top:1px dashed var(--panel-border); padding-top:10px; }
+#bestDetailPanel:not(:empty){ margin-top:-6px; border-top:1px dashed var(--panel-border); padding-top:10px; }
+.detail-table-wrap{ overflow-x:auto; }
+table.detail-table{ border-collapse:collapse; width:100%; min-width:420px; }
+table.detail-table th{
+  text-align:left; font-family:var(--font-display); font-size:10px; text-transform:uppercase;
+  letter-spacing:.04em; color:var(--ink-faint); padding:5px 8px; border-bottom:1px solid var(--panel-border);
+}
+table.detail-table td{ padding:5px 8px; font-size:12px; border-bottom:1px solid rgba(122,164,230,.08); vertical-align:middle; }
+table.detail-table tr.tr-warn td{ background:rgba(255,107,94,.08); }
+table.detail-table tr.tr-warn td.dv{ color:var(--bad); font-weight:700; }
+table.detail-table tr.tr-nocomp td{ background:rgba(255,181,69,.08); }
+table.detail-table tr.tr-nocomp td.dv{ color:var(--warn); font-weight:700; }
+table.detail-table td.elem{ font-family:var(--font-mono); font-weight:700; color:var(--ink-muted); }
+table.detail-table .na{ color:var(--ink-faint); font-style:italic; font-size:11px; }
+.pill{
+  display:inline-flex; align-items:center; gap:4px; font-size:10.5px; font-weight:700;
+  padding:2px 8px; border-radius:999px; border:1px solid transparent; white-space:nowrap;
+}
+.pill.match{ background:rgba(51,212,137,.12); color:var(--good); border-color:rgba(51,212,137,.4); }
+.pill.differ{ background:rgba(255,107,94,.12); color:var(--bad); border-color:rgba(255,107,94,.4); }
+.pill.nodata{ background:rgba(126,144,172,.14); color:var(--nodata); border-color:rgba(126,144,172,.4); }
+.pill.nocomp{ background:rgba(255,181,69,.14); color:var(--warn); border-color:rgba(255,181,69,.4); }
+
+#loadingMsg{ padding:60px 20px; text-align:center; color:var(--ink-muted); font-family:var(--font-mono); font-size:13px; position:relative; z-index:1; }
+</style>
+
+<div class="tread-bg"></div>
+<div class="tread-bar"></div>
+<div class="wrap">
+  <header class="top">
+    <h1>Cambio de Dimensión</h1>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="freshness-row">
+        <span class="freshness-badge" id="freshnessBadge" style="display:none;"></span>
+        <button class="update-btn" id="updateBtn" type="button">🔄 Actualizar Base CBL</button>
+      </div>
+      
+    </div>
+  </header>
+
+  <div class="update-modal-backdrop" id="updateModalBackdrop">
+    <div class="update-modal">
+      <h3>No se ha podido actualizar sola</h3>
+      <p>Este PC no tiene instalado el acceso automático (o algo ha ido mal). Para traer los datos más recientes a mano:</p>
+      <ol>
+        <li>Ve a la carpeta donde está esta herramienta.</li>
+        <li>Haz doble clic en <strong>Actualizar_Base_CBL.bat</strong>.</li>
+        <li>Espera a que la ventana diga <strong>"Listo"</strong> (unos segundos).</li>
+        <li>Vuelve a esta pestaña y recarga la página (F5) para ver los datos actualizados — no se abre ninguna ventana nueva.</li>
+      </ol>
+      <p>¿Quieres que el botón funcione solo la próxima vez? Pide a soporte que ejecute una vez <strong>Instalar_Acceso_Automatico.bat</strong> en este PC (no hace falta ser administrador).</p>
+      <button class="close-btn" id="updateModalClose" type="button">Entendido</button>
+    </div>
+  </div>
+
+  <div id="loadingMsg">Descomprimiendo BASE_CBLS&hellip;</div>
+
+  <div id="app" style="display:none; flex-direction:column; gap:20px;">
+
+    <div class="mode-tabs">
+      <button type="button" class="mode-tab active" id="modeIndividualBtn">Cambio individual</button>
+      <button type="button" class="mode-tab" id="modeTurnoBtn">Optimizar turno</button>
+      <button type="button" class="mode-tab" id="modeCompareBtn">Comparar dos dimensiones</button>
+    </div>
+
+    <div id="individualMode">
+
+    <div class="steps">
+      <div class="step-dot" data-step-dot="1"><span class="num">1</span> Buscar</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-step-dot="2"><span class="num">2</span> Confirmar</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-step-dot="3"><span class="num">3</span> Resultado</div>
+      <div style="margin-left:auto;" class="dataset-stat" id="datasetStat">&hellip;</div>
+    </div>
+
+    <!-- PASO 1: BUSCAR -->
+    <section class="panel active" id="panel-1">
+      <h2>¿Qué código sale de la máquina?</h2>
+      <div class="search-mac-row">
+        <div class="ft-dropdown">
+          <button type="button" class="ft-dropdown-btn search-mac-btn" id="searchMacBtn">
+            <span id="searchMacLabel">Selecciona tu máquina</span>
+            <span class="chev">&#9662;</span>
+          </button>
+          <div class="ft-dropdown-menu" id="searchMacMenu"></div>
+        </div>
+      </div>
+      <input type="text" id="baseSearch" class="big-search" placeholder="Escribe el código&hellip;" autocomplete="off">
+      <div class="result-count" id="baseCount"></div>
+      <div class="result-grid" id="baseResults"></div>
+    </section>
+
+    <!-- PASO 2: CONFIRMAR -->
+    <section class="panel" id="panel-2">
+      <div class="hero-dim" id="heroDim"></div>
+      <button class="btn-link" id="backToSearch">&larr; Cambiar dimensión</button>
+
+      <div class="fixed-tags">
+        <div class="fixed-tag">
+          <span class="ft-label">Máquina</span>
+          <div class="ft-dropdown">
+            <button type="button" class="ft-dropdown-btn" id="macDropdownBtn">
+              <span id="macDropdownLabel">—</span><span class="chev">&#9662;</span>
+            </button>
+            <div class="ft-dropdown-menu" id="macDropdownMenu"></div>
+          </div>
+          <span class="ft-pill ft-pill-edit">editable</span>
+        </div>
+        <div class="fixed-tag">
+          <span class="ft-label">Año</span>
+          <span class="ft-value" id="yearValue">—</span>
+          <span class="ft-pill">fijo</span>
+        </div>
+      </div>
+      <div class="hint-line">Por defecto, la máquina de la dimensión que sale &mdash; cámbiala para comparar contra otra máquina</div>
+
+      <div class="months-row">
+        <div class="ml-label">En marcha<br>últimos&hellip;meses</div>
+        <div class="stepper">
+          <button type="button" id="monthsMinus" aria-label="Menos meses">&minus;</button>
+          <span class="months-value" id="monthsValue">2</span>
+          <button type="button" id="monthsPlus" aria-label="Más meses">&plus;</button>
+        </div>
+      </div>
+      <div class="hint-line">Define qué dimensiones cuentan como "en marcha" (por fecha de cocción)</div>
+
+      <button class="btn-cta" id="calcBtn">⚡ Calcular mejor cambio</button>
+    </section>
+
+    <!-- PASO 3: RESULTADO -->
+    <section class="panel" id="panel-3">
+      <button class="btn-ghost-lg" id="newSearchBtn">🔄 Nueva búsqueda</button>
+      <div id="resultContent"></div>
+    </section>
+
+    </div>
+
+    <div id="turnoMode" style="display:none;">
+
+    <div class="steps">
+      <div class="step-dot" data-tstep-dot="1"><span class="num">1</span> Actual</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-tstep-dot="2"><span class="num">2</span> Pedido</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-tstep-dot="3"><span class="num">3</span> Orden óptimo</div>
+      <div style="margin-left:auto;" class="dataset-stat" id="datasetStatT">&hellip;</div>
+    </div>
+
+    <!-- PASO 1: DIMENSIÓN ACTUAL -->
+    <section class="panel active" id="tpanel-1">
+      <h2>¿Qué código está puesto ahora en la máquina?</h2>
+      <div class="search-mac-row">
+        <div class="ft-dropdown">
+          <button type="button" class="ft-dropdown-btn search-mac-btn" id="tSearchMacBtn">
+            <span id="tSearchMacLabel">Selecciona tu máquina</span>
+            <span class="chev">&#9662;</span>
+          </button>
+          <div class="ft-dropdown-menu" id="tSearchMacMenu"></div>
+        </div>
+      </div>
+      <input type="text" id="tBaseSearch" class="big-search" placeholder="Escribe el código&hellip;" autocomplete="off">
+      <div class="result-count" id="tBaseCount"></div>
+      <div class="result-grid" id="tBaseResults"></div>
+    </section>
+
+    <!-- PASO 2: PEDIDO DEL TURNO -->
+    <section class="panel" id="tpanel-2">
+      <div class="hero-dim" id="tHeroDim"></div>
+      <button class="btn-link" id="tBackToSearch">&larr; Cambiar dimensión actual</button>
+
+      <h2>Códigos del pedido de este turno</h2>
+      <div class="hint-line">Pega o escribe los códigos de dimensión del pedido (uno por línea, o separados por comas) — no hace falta incluir el que está puesto ahora</div>
+      <div class="turno-input-wrap">
+        <textarea id="turnoQueueInput" class="turno-textarea" placeholder="Ej:&#10;9255&#10;4204&#10;8058&#10;7458" autocomplete="off"></textarea>
+        <div id="turnoSuggest" class="turno-suggest"></div>
+      </div>
+      <div id="turnoUnresolved"></div>
+
+      <button class="btn-cta" id="turnoCalcBtn">⚡ Calcular orden óptimo</button>
+    </section>
+
+    <!-- PASO 3: ORDEN ÓPTIMO -->
+    <section class="panel" id="tpanel-3">
+      <button class="btn-ghost-lg" id="turnoNewBtn">🔄 Nuevo turno</button>
+      <div id="turnoResultContent"></div>
+    </section>
+
+    </div>
+
+    <div id="compareMode" style="display:none;">
+
+    <div class="steps">
+      <div class="step-dot" data-cstep-dot="1"><span class="num">1</span> Dimensión A</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-cstep-dot="2"><span class="num">2</span> Dimensión B</div>
+      <div class="step-line"></div>
+      <div class="step-dot" data-cstep-dot="3"><span class="num">3</span> Resultado</div>
+      <div style="margin-left:auto;" class="dataset-stat" id="datasetStatC">&hellip;</div>
+    </div>
+
+    <!-- PASO 1: DIMENSIÓN A -->
+    <section class="panel active" id="cpanel-1">
+      <h2>Elige la primera dimensión a comparar</h2>
+      <div class="search-mac-row">
+        <div class="ft-dropdown">
+          <button type="button" class="ft-dropdown-btn search-mac-btn" id="cASearchMacBtn">
+            <span id="cASearchMacLabel">Selecciona tu máquina</span>
+            <span class="chev">&#9662;</span>
+          </button>
+          <div class="ft-dropdown-menu" id="cASearchMacMenu"></div>
+        </div>
+      </div>
+      <input type="text" id="cABaseSearch" class="big-search" placeholder="Escribe el código&hellip;" autocomplete="off">
+      <div class="result-count" id="cABaseCount"></div>
+      <div class="result-grid" id="cABaseResults"></div>
+    </section>
+
+    <!-- PASO 2: DIMENSIÓN B -->
+    <section class="panel" id="cpanel-2">
+      <div class="hero-dim" id="cAHeroDim"></div>
+      <button class="btn-link" id="cBackToA">&larr; Cambiar dimensión A</button>
+
+      <h2>Elige la segunda dimensión a comparar</h2>
+      <div class="search-mac-row">
+        <div class="ft-dropdown">
+          <button type="button" class="ft-dropdown-btn search-mac-btn" id="cBSearchMacBtn">
+            <span id="cBSearchMacLabel">Selecciona tu máquina</span>
+            <span class="chev">&#9662;</span>
+          </button>
+          <div class="ft-dropdown-menu" id="cBSearchMacMenu"></div>
+        </div>
+      </div>
+      <input type="text" id="cBBaseSearch" class="big-search" placeholder="Escribe el código&hellip;" autocomplete="off">
+      <div class="result-count" id="cBBaseCount"></div>
+      <div class="result-grid" id="cBBaseResults"></div>
+    </section>
+
+    <!-- PASO 3: RESULTADO -->
+    <section class="panel" id="cpanel-3">
+      <button class="btn-ghost-lg" id="compareNewBtn">🔄 Nueva comparación</button>
+      <div id="compareResultContent"></div>
+    </section>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+/*! pako 2.1.0 https://github.com/nodeca/pako @license (MIT AND Zlib) */
+!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?t(exports):"function"==typeof define&&define.amd?define(["exports"],t):t((e="undefined"!=typeof globalThis?globalThis:e||self).pako={})}(this,(function(e){"use strict";var t=function(e,t,i,n){for(var a=65535&e|0,r=e>>>16&65535|0,o=0;0!==i;){i-=o=i>2e3?2e3:i;do{r=r+(a=a+t[n++]|0)|0}while(--o);a%=65521,r%=65521}return a|r<<16|0},i=new Uint32Array(function(){for(var e,t=[],i=0;i<256;i++){e=i;for(var n=0;n<8;n++)e=1&e?3988292384^e>>>1:e>>>1;t[i]=e}return t}()),n=function(e,t,n,a){var r=i,o=a+n;e^=-1;for(var s=a;s<o;s++)e=e>>>8^r[255&(e^t[s])];return-1^e},a=16209,r=function(e,t){var i,n,r,o,s,l,f,d,h,c,u,w,b,m,k,_,v,g,p,y,x,E,R,A,Z=e.state;i=e.next_in,R=e.input,n=i+(e.avail_in-5),r=e.next_out,A=e.output,o=r-(t-e.avail_out),s=r+(e.avail_out-257),l=Z.dmax,f=Z.wsize,d=Z.whave,h=Z.wnext,c=Z.window,u=Z.hold,w=Z.bits,b=Z.lencode,m=Z.distcode,k=(1<<Z.lenbits)-1,_=(1<<Z.distbits)-1;e:do{w<15&&(u+=R[i++]<<w,w+=8,u+=R[i++]<<w,w+=8),v=b[u&k];t:for(;;){if(u>>>=g=v>>>24,w-=g,0===(g=v>>>16&255))A[r++]=65535&v;else{if(!(16&g)){if(0==(64&g)){v=b[(65535&v)+(u&(1<<g)-1)];continue t}if(32&g){Z.mode=16191;break e}e.msg="invalid literal/length code",Z.mode=a;break e}p=65535&v,(g&=15)&&(w<g&&(u+=R[i++]<<w,w+=8),p+=u&(1<<g)-1,u>>>=g,w-=g),w<15&&(u+=R[i++]<<w,w+=8,u+=R[i++]<<w,w+=8),v=m[u&_];i:for(;;){if(u>>>=g=v>>>24,w-=g,!(16&(g=v>>>16&255))){if(0==(64&g)){v=m[(65535&v)+(u&(1<<g)-1)];continue i}e.msg="invalid distance code",Z.mode=a;break e}if(y=65535&v,w<(g&=15)&&(u+=R[i++]<<w,(w+=8)<g&&(u+=R[i++]<<w,w+=8)),(y+=u&(1<<g)-1)>l){e.msg="invalid distance too far back",Z.mode=a;break e}if(u>>>=g,w-=g,y>(g=r-o)){if((g=y-g)>d&&Z.sane){e.msg="invalid distance too far back",Z.mode=a;break e}if(x=0,E=c,0===h){if(x+=f-g,g<p){p-=g;do{A[r++]=c[x++]}while(--g);x=r-y,E=A}}else if(h<g){if(x+=f+h-g,(g-=h)<p){p-=g;do{A[r++]=c[x++]}while(--g);if(x=0,h<p){p-=g=h;do{A[r++]=c[x++]}while(--g);x=r-y,E=A}}}else if(x+=h-g,g<p){p-=g;do{A[r++]=c[x++]}while(--g);x=r-y,E=A}for(;p>2;)A[r++]=E[x++],A[r++]=E[x++],A[r++]=E[x++],p-=3;p&&(A[r++]=E[x++],p>1&&(A[r++]=E[x++]))}else{x=r-y;do{A[r++]=A[x++],A[r++]=A[x++],A[r++]=A[x++],p-=3}while(p>2);p&&(A[r++]=A[x++],p>1&&(A[r++]=A[x++]))}break}}break}}while(i<n&&r<s);i-=p=w>>3,u&=(1<<(w-=p<<3))-1,e.next_in=i,e.next_out=r,e.avail_in=i<n?n-i+5:5-(i-n),e.avail_out=r<s?s-r+257:257-(r-s),Z.hold=u,Z.bits=w},o=15,s=new Uint16Array([3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258,0,0]),l=new Uint8Array([16,16,16,16,16,16,16,16,17,17,17,17,18,18,18,18,19,19,19,19,20,20,20,20,21,21,21,21,16,72,78]),f=new Uint16Array([1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577,0,0]),d=new Uint8Array([16,16,16,16,17,17,18,18,19,19,20,20,21,21,22,22,23,23,24,24,25,25,26,26,27,27,28,28,29,29,64,64]),h=function(e,t,i,n,a,r,h,c){var u,w,b,m,k,_,v,g,p,y=c.bits,x=0,E=0,R=0,A=0,Z=0,S=0,T=0,O=0,U=0,D=0,I=null,B=new Uint16Array(16),N=new Uint16Array(16),C=null;for(x=0;x<=o;x++)B[x]=0;for(E=0;E<n;E++)B[t[i+E]]++;for(Z=y,A=o;A>=1&&0===B[A];A--);if(Z>A&&(Z=A),0===A)return a[r++]=20971520,a[r++]=20971520,c.bits=1,0;for(R=1;R<A&&0===B[R];R++);for(Z<R&&(Z=R),O=1,x=1;x<=o;x++)if(O<<=1,(O-=B[x])<0)return-1;if(O>0&&(0===e||1!==A))return-1;for(N[1]=0,x=1;x<o;x++)N[x+1]=N[x]+B[x];for(E=0;E<n;E++)0!==t[i+E]&&(h[N[t[i+E]]++]=E);if(0===e?(I=C=h,_=20):1===e?(I=s,C=l,_=257):(I=f,C=d,_=0),D=0,E=0,x=R,k=r,S=Z,T=0,b=-1,m=(U=1<<Z)-1,1===e&&U>852||2===e&&U>592)return 1;for(;;){v=x-T,h[E]+1<_?(g=0,p=h[E]):h[E]>=_?(g=C[h[E]-_],p=I[h[E]-_]):(g=96,p=0),u=1<<x-T,R=w=1<<S;do{a[k+(D>>T)+(w-=u)]=v<<24|g<<16|p|0}while(0!==w);for(u=1<<x-1;D&u;)u>>=1;if(0!==u?(D&=u-1,D+=u):D=0,E++,0==--B[x]){if(x===A)break;x=t[i+h[E]]}if(x>Z&&(D&m)!==b){for(0===T&&(T=Z),k+=R,O=1<<(S=x-T);S+T<A&&!((O-=B[S+T])<=0);)S++,O<<=1;if(U+=1<<S,1===e&&U>852||2===e&&U>592)return 1;a[b=D&m]=Z<<24|S<<16|k-r|0}}return 0!==D&&(a[k+D]=x-T<<24|64<<16|0),c.bits=Z,0},c={Z_NO_FLUSH:0,Z_PARTIAL_FLUSH:1,Z_SYNC_FLUSH:2,Z_FULL_FLUSH:3,Z_FINISH:4,Z_BLOCK:5,Z_TREES:6,Z_OK:0,Z_STREAM_END:1,Z_NEED_DICT:2,Z_ERRNO:-1,Z_STREAM_ERROR:-2,Z_DATA_ERROR:-3,Z_MEM_ERROR:-4,Z_BUF_ERROR:-5,Z_NO_COMPRESSION:0,Z_BEST_SPEED:1,Z_BEST_COMPRESSION:9,Z_DEFAULT_COMPRESSION:-1,Z_FILTERED:1,Z_HUFFMAN_ONLY:2,Z_RLE:3,Z_FIXED:4,Z_DEFAULT_STRATEGY:0,Z_BINARY:0,Z_TEXT:1,Z_UNKNOWN:2,Z_DEFLATED:8},u=c.Z_FINISH,w=c.Z_BLOCK,b=c.Z_TREES,m=c.Z_OK,k=c.Z_STREAM_END,_=c.Z_NEED_DICT,v=c.Z_STREAM_ERROR,g=c.Z_DATA_ERROR,p=c.Z_MEM_ERROR,y=c.Z_BUF_ERROR,x=c.Z_DEFLATED,E=16180,R=16190,A=16191,Z=16192,S=16194,T=16199,O=16200,U=16206,D=16209,I=function(e){return(e>>>24&255)+(e>>>8&65280)+((65280&e)<<8)+((255&e)<<24)};function B(){this.strm=null,this.mode=0,this.last=!1,this.wrap=0,this.havedict=!1,this.flags=0,this.dmax=0,this.check=0,this.total=0,this.head=null,this.wbits=0,this.wsize=0,this.whave=0,this.wnext=0,this.window=null,this.hold=0,this.bits=0,this.length=0,this.offset=0,this.extra=0,this.lencode=null,this.distcode=null,this.lenbits=0,this.distbits=0,this.ncode=0,this.nlen=0,this.ndist=0,this.have=0,this.next=null,this.lens=new Uint16Array(320),this.work=new Uint16Array(288),this.lendyn=null,this.distdyn=null,this.sane=0,this.back=0,this.was=0}var N,C,z=function(e){if(!e)return 1;var t=e.state;return!t||t.strm!==e||t.mode<E||t.mode>16211?1:0},F=function(e){if(z(e))return v;var t=e.state;return e.total_in=e.total_out=t.total=0,e.msg="",t.wrap&&(e.adler=1&t.wrap),t.mode=E,t.last=0,t.havedict=0,t.flags=-1,t.dmax=32768,t.head=null,t.hold=0,t.bits=0,t.lencode=t.lendyn=new Int32Array(852),t.distcode=t.distdyn=new Int32Array(592),t.sane=1,t.back=-1,m},L=function(e){if(z(e))return v;var t=e.state;return t.wsize=0,t.whave=0,t.wnext=0,F(e)},M=function(e,t){var i;if(z(e))return v;var n=e.state;return t<0?(i=0,t=-t):(i=5+(t>>4),t<48&&(t&=15)),t&&(t<8||t>15)?v:(null!==n.window&&n.wbits!==t&&(n.window=null),n.wrap=i,n.wbits=t,L(e))},H=function(e,t){if(!e)return v;var i=new B;e.state=i,i.strm=e,i.window=null,i.mode=E;var n=M(e,t);return n!==m&&(e.state=null),n},j=!0,K=function(e){if(j){N=new Int32Array(512),C=new Int32Array(32);for(var t=0;t<144;)e.lens[t++]=8;for(;t<256;)e.lens[t++]=9;for(;t<280;)e.lens[t++]=7;for(;t<288;)e.lens[t++]=8;for(h(1,e.lens,0,288,N,0,e.work,{bits:9}),t=0;t<32;)e.lens[t++]=5;h(2,e.lens,0,32,C,0,e.work,{bits:5}),j=!1}e.lencode=N,e.lenbits=9,e.distcode=C,e.distbits=5},P=function(e,t,i,n){var a,r=e.state;return null===r.window&&(r.wsize=1<<r.wbits,r.wnext=0,r.whave=0,r.window=new Uint8Array(r.wsize)),n>=r.wsize?(r.window.set(t.subarray(i-r.wsize,i),0),r.wnext=0,r.whave=r.wsize):((a=r.wsize-r.wnext)>n&&(a=n),r.window.set(t.subarray(i-n,i-n+a),r.wnext),(n-=a)?(r.window.set(t.subarray(i-n,i),0),r.wnext=n,r.whave=r.wsize):(r.wnext+=a,r.wnext===r.wsize&&(r.wnext=0),r.whave<r.wsize&&(r.whave+=a))),0},Y={inflateReset:L,inflateReset2:M,inflateResetKeep:F,inflateInit:function(e){return H(e,15)},inflateInit2:H,inflate:function(e,i){var a,o,s,l,f,d,c,B,N,C,F,L,M,H,j,Y,G,X,W,q,J,Q,V,$,ee=0,te=new Uint8Array(4),ie=new Uint8Array([16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]);if(z(e)||!e.output||!e.input&&0!==e.avail_in)return v;(a=e.state).mode===A&&(a.mode=Z),f=e.next_out,s=e.output,c=e.avail_out,l=e.next_in,o=e.input,d=e.avail_in,B=a.hold,N=a.bits,C=d,F=c,Q=m;e:for(;;)switch(a.mode){case E:if(0===a.wrap){a.mode=Z;break}for(;N<16;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(2&a.wrap&&35615===B){0===a.wbits&&(a.wbits=15),a.check=0,te[0]=255&B,te[1]=B>>>8&255,a.check=n(a.check,te,2,0),B=0,N=0,a.mode=16181;break}if(a.head&&(a.head.done=!1),!(1&a.wrap)||(((255&B)<<8)+(B>>8))%31){e.msg="incorrect header check",a.mode=D;break}if((15&B)!==x){e.msg="unknown compression method",a.mode=D;break}if(N-=4,J=8+(15&(B>>>=4)),0===a.wbits&&(a.wbits=J),J>15||J>a.wbits){e.msg="invalid window size",a.mode=D;break}a.dmax=1<<a.wbits,a.flags=0,e.adler=a.check=1,a.mode=512&B?16189:A,B=0,N=0;break;case 16181:for(;N<16;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(a.flags=B,(255&a.flags)!==x){e.msg="unknown compression method",a.mode=D;break}if(57344&a.flags){e.msg="unknown header flags set",a.mode=D;break}a.head&&(a.head.text=B>>8&1),512&a.flags&&4&a.wrap&&(te[0]=255&B,te[1]=B>>>8&255,a.check=n(a.check,te,2,0)),B=0,N=0,a.mode=16182;case 16182:for(;N<32;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.head&&(a.head.time=B),512&a.flags&&4&a.wrap&&(te[0]=255&B,te[1]=B>>>8&255,te[2]=B>>>16&255,te[3]=B>>>24&255,a.check=n(a.check,te,4,0)),B=0,N=0,a.mode=16183;case 16183:for(;N<16;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.head&&(a.head.xflags=255&B,a.head.os=B>>8),512&a.flags&&4&a.wrap&&(te[0]=255&B,te[1]=B>>>8&255,a.check=n(a.check,te,2,0)),B=0,N=0,a.mode=16184;case 16184:if(1024&a.flags){for(;N<16;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.length=B,a.head&&(a.head.extra_len=B),512&a.flags&&4&a.wrap&&(te[0]=255&B,te[1]=B>>>8&255,a.check=n(a.check,te,2,0)),B=0,N=0}else a.head&&(a.head.extra=null);a.mode=16185;case 16185:if(1024&a.flags&&((L=a.length)>d&&(L=d),L&&(a.head&&(J=a.head.extra_len-a.length,a.head.extra||(a.head.extra=new Uint8Array(a.head.extra_len)),a.head.extra.set(o.subarray(l,l+L),J)),512&a.flags&&4&a.wrap&&(a.check=n(a.check,o,L,l)),d-=L,l+=L,a.length-=L),a.length))break e;a.length=0,a.mode=16186;case 16186:if(2048&a.flags){if(0===d)break e;L=0;do{J=o[l+L++],a.head&&J&&a.length<65536&&(a.head.name+=String.fromCharCode(J))}while(J&&L<d);if(512&a.flags&&4&a.wrap&&(a.check=n(a.check,o,L,l)),d-=L,l+=L,J)break e}else a.head&&(a.head.name=null);a.length=0,a.mode=16187;case 16187:if(4096&a.flags){if(0===d)break e;L=0;do{J=o[l+L++],a.head&&J&&a.length<65536&&(a.head.comment+=String.fromCharCode(J))}while(J&&L<d);if(512&a.flags&&4&a.wrap&&(a.check=n(a.check,o,L,l)),d-=L,l+=L,J)break e}else a.head&&(a.head.comment=null);a.mode=16188;case 16188:if(512&a.flags){for(;N<16;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(4&a.wrap&&B!==(65535&a.check)){e.msg="header crc mismatch",a.mode=D;break}B=0,N=0}a.head&&(a.head.hcrc=a.flags>>9&1,a.head.done=!0),e.adler=a.check=0,a.mode=A;break;case 16189:for(;N<32;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}e.adler=a.check=I(B),B=0,N=0,a.mode=R;case R:if(0===a.havedict)return e.next_out=f,e.avail_out=c,e.next_in=l,e.avail_in=d,a.hold=B,a.bits=N,_;e.adler=a.check=1,a.mode=A;case A:if(i===w||i===b)break e;case Z:if(a.last){B>>>=7&N,N-=7&N,a.mode=U;break}for(;N<3;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}switch(a.last=1&B,N-=1,3&(B>>>=1)){case 0:a.mode=16193;break;case 1:if(K(a),a.mode=T,i===b){B>>>=2,N-=2;break e}break;case 2:a.mode=16196;break;case 3:e.msg="invalid block type",a.mode=D}B>>>=2,N-=2;break;case 16193:for(B>>>=7&N,N-=7&N;N<32;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if((65535&B)!=(B>>>16^65535)){e.msg="invalid stored block lengths",a.mode=D;break}if(a.length=65535&B,B=0,N=0,a.mode=S,i===b)break e;case S:a.mode=16195;case 16195:if(L=a.length){if(L>d&&(L=d),L>c&&(L=c),0===L)break e;s.set(o.subarray(l,l+L),f),d-=L,l+=L,c-=L,f+=L,a.length-=L;break}a.mode=A;break;case 16196:for(;N<14;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(a.nlen=257+(31&B),B>>>=5,N-=5,a.ndist=1+(31&B),B>>>=5,N-=5,a.ncode=4+(15&B),B>>>=4,N-=4,a.nlen>286||a.ndist>30){e.msg="too many length or distance symbols",a.mode=D;break}a.have=0,a.mode=16197;case 16197:for(;a.have<a.ncode;){for(;N<3;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.lens[ie[a.have++]]=7&B,B>>>=3,N-=3}for(;a.have<19;)a.lens[ie[a.have++]]=0;if(a.lencode=a.lendyn,a.lenbits=7,V={bits:a.lenbits},Q=h(0,a.lens,0,19,a.lencode,0,a.work,V),a.lenbits=V.bits,Q){e.msg="invalid code lengths set",a.mode=D;break}a.have=0,a.mode=16198;case 16198:for(;a.have<a.nlen+a.ndist;){for(;Y=(ee=a.lencode[B&(1<<a.lenbits)-1])>>>16&255,G=65535&ee,!((j=ee>>>24)<=N);){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(G<16)B>>>=j,N-=j,a.lens[a.have++]=G;else{if(16===G){for($=j+2;N<$;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(B>>>=j,N-=j,0===a.have){e.msg="invalid bit length repeat",a.mode=D;break}J=a.lens[a.have-1],L=3+(3&B),B>>>=2,N-=2}else if(17===G){for($=j+3;N<$;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}N-=j,J=0,L=3+(7&(B>>>=j)),B>>>=3,N-=3}else{for($=j+7;N<$;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}N-=j,J=0,L=11+(127&(B>>>=j)),B>>>=7,N-=7}if(a.have+L>a.nlen+a.ndist){e.msg="invalid bit length repeat",a.mode=D;break}for(;L--;)a.lens[a.have++]=J}}if(a.mode===D)break;if(0===a.lens[256]){e.msg="invalid code -- missing end-of-block",a.mode=D;break}if(a.lenbits=9,V={bits:a.lenbits},Q=h(1,a.lens,0,a.nlen,a.lencode,0,a.work,V),a.lenbits=V.bits,Q){e.msg="invalid literal/lengths set",a.mode=D;break}if(a.distbits=6,a.distcode=a.distdyn,V={bits:a.distbits},Q=h(2,a.lens,a.nlen,a.ndist,a.distcode,0,a.work,V),a.distbits=V.bits,Q){e.msg="invalid distances set",a.mode=D;break}if(a.mode=T,i===b)break e;case T:a.mode=O;case O:if(d>=6&&c>=258){e.next_out=f,e.avail_out=c,e.next_in=l,e.avail_in=d,a.hold=B,a.bits=N,r(e,F),f=e.next_out,s=e.output,c=e.avail_out,l=e.next_in,o=e.input,d=e.avail_in,B=a.hold,N=a.bits,a.mode===A&&(a.back=-1);break}for(a.back=0;Y=(ee=a.lencode[B&(1<<a.lenbits)-1])>>>16&255,G=65535&ee,!((j=ee>>>24)<=N);){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(Y&&0==(240&Y)){for(X=j,W=Y,q=G;Y=(ee=a.lencode[q+((B&(1<<X+W)-1)>>X)])>>>16&255,G=65535&ee,!(X+(j=ee>>>24)<=N);){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}B>>>=X,N-=X,a.back+=X}if(B>>>=j,N-=j,a.back+=j,a.length=G,0===Y){a.mode=16205;break}if(32&Y){a.back=-1,a.mode=A;break}if(64&Y){e.msg="invalid literal/length code",a.mode=D;break}a.extra=15&Y,a.mode=16201;case 16201:if(a.extra){for($=a.extra;N<$;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.length+=B&(1<<a.extra)-1,B>>>=a.extra,N-=a.extra,a.back+=a.extra}a.was=a.length,a.mode=16202;case 16202:for(;Y=(ee=a.distcode[B&(1<<a.distbits)-1])>>>16&255,G=65535&ee,!((j=ee>>>24)<=N);){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(0==(240&Y)){for(X=j,W=Y,q=G;Y=(ee=a.distcode[q+((B&(1<<X+W)-1)>>X)])>>>16&255,G=65535&ee,!(X+(j=ee>>>24)<=N);){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}B>>>=X,N-=X,a.back+=X}if(B>>>=j,N-=j,a.back+=j,64&Y){e.msg="invalid distance code",a.mode=D;break}a.offset=G,a.extra=15&Y,a.mode=16203;case 16203:if(a.extra){for($=a.extra;N<$;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}a.offset+=B&(1<<a.extra)-1,B>>>=a.extra,N-=a.extra,a.back+=a.extra}if(a.offset>a.dmax){e.msg="invalid distance too far back",a.mode=D;break}a.mode=16204;case 16204:if(0===c)break e;if(L=F-c,a.offset>L){if((L=a.offset-L)>a.whave&&a.sane){e.msg="invalid distance too far back",a.mode=D;break}L>a.wnext?(L-=a.wnext,M=a.wsize-L):M=a.wnext-L,L>a.length&&(L=a.length),H=a.window}else H=s,M=f-a.offset,L=a.length;L>c&&(L=c),c-=L,a.length-=L;do{s[f++]=H[M++]}while(--L);0===a.length&&(a.mode=O);break;case 16205:if(0===c)break e;s[f++]=a.length,c--,a.mode=O;break;case U:if(a.wrap){for(;N<32;){if(0===d)break e;d--,B|=o[l++]<<N,N+=8}if(F-=c,e.total_out+=F,a.total+=F,4&a.wrap&&F&&(e.adler=a.check=a.flags?n(a.check,s,F,f-F):t(a.check,s,F,f-F)),F=c,4&a.wrap&&(a.flags?B:I(B))!==a.check){e.msg="incorrect data check",a.mode=D;break}B=0,N=0}a.mode=16207;case 16207:if(a.wrap&&a.flags){for(;N<32;){if(0===d)break e;d--,B+=o[l++]<<N,N+=8}if(4&a.wrap&&B!==(4294967295&a.total)){e.msg="incorrect length check",a.mode=D;break}B=0,N=0}a.mode=16208;case 16208:Q=k;break e;case D:Q=g;break e;case 16210:return p;default:return v}return e.next_out=f,e.avail_out=c,e.next_in=l,e.avail_in=d,a.hold=B,a.bits=N,(a.wsize||F!==e.avail_out&&a.mode<D&&(a.mode<U||i!==u))&&P(e,e.output,e.next_out,F-e.avail_out),C-=e.avail_in,F-=e.avail_out,e.total_in+=C,e.total_out+=F,a.total+=F,4&a.wrap&&F&&(e.adler=a.check=a.flags?n(a.check,s,F,e.next_out-F):t(a.check,s,F,e.next_out-F)),e.data_type=a.bits+(a.last?64:0)+(a.mode===A?128:0)+(a.mode===T||a.mode===S?256:0),(0===C&&0===F||i===u)&&Q===m&&(Q=y),Q},inflateEnd:function(e){if(z(e))return v;var t=e.state;return t.window&&(t.window=null),e.state=null,m},inflateGetHeader:function(e,t){if(z(e))return v;var i=e.state;return 0==(2&i.wrap)?v:(i.head=t,t.done=!1,m)},inflateSetDictionary:function(e,i){var n,a=i.length;return z(e)||0!==(n=e.state).wrap&&n.mode!==R?v:n.mode===R&&t(1,i,a,0)!==n.check?g:P(e,i,a,a)?(n.mode=16210,p):(n.havedict=1,m)},inflateInfo:"pako inflate (from Nodeca project)"};function G(e){return G="function"==typeof Symbol&&"symbol"==typeof Symbol.iterator?function(e){return typeof e}:function(e){return e&&"function"==typeof Symbol&&e.constructor===Symbol&&e!==Symbol.prototype?"symbol":typeof e},G(e)}var X=function(e,t){return Object.prototype.hasOwnProperty.call(e,t)},W=function(e){for(var t=Array.prototype.slice.call(arguments,1);t.length;){var i=t.shift();if(i){if("object"!==G(i))throw new TypeError(i+"must be non-object");for(var n in i)X(i,n)&&(e[n]=i[n])}}return e},q=function(e){for(var t=0,i=0,n=e.length;i<n;i++)t+=e[i].length;for(var a=new Uint8Array(t),r=0,o=0,s=e.length;r<s;r++){var l=e[r];a.set(l,o),o+=l.length}return a},J=!0;try{String.fromCharCode.apply(null,new Uint8Array(1))}catch(e){J=!1}for(var Q=new Uint8Array(256),V=0;V<256;V++)Q[V]=V>=252?6:V>=248?5:V>=240?4:V>=224?3:V>=192?2:1;Q[254]=Q[254]=1;var $=function(e){if("function"==typeof TextEncoder&&TextEncoder.prototype.encode)return(new TextEncoder).encode(e);var t,i,n,a,r,o=e.length,s=0;for(a=0;a<o;a++)55296==(64512&(i=e.charCodeAt(a)))&&a+1<o&&56320==(64512&(n=e.charCodeAt(a+1)))&&(i=65536+(i-55296<<10)+(n-56320),a++),s+=i<128?1:i<2048?2:i<65536?3:4;for(t=new Uint8Array(s),r=0,a=0;r<s;a++)55296==(64512&(i=e.charCodeAt(a)))&&a+1<o&&56320==(64512&(n=e.charCodeAt(a+1)))&&(i=65536+(i-55296<<10)+(n-56320),a++),i<128?t[r++]=i:i<2048?(t[r++]=192|i>>>6,t[r++]=128|63&i):i<65536?(t[r++]=224|i>>>12,t[r++]=128|i>>>6&63,t[r++]=128|63&i):(t[r++]=240|i>>>18,t[r++]=128|i>>>12&63,t[r++]=128|i>>>6&63,t[r++]=128|63&i);return t},ee=function(e,t){var i,n,a=t||e.length;if("function"==typeof TextDecoder&&TextDecoder.prototype.decode)return(new TextDecoder).decode(e.subarray(0,t));var r=new Array(2*a);for(n=0,i=0;i<a;){var o=e[i++];if(o<128)r[n++]=o;else{var s=Q[o];if(s>4)r[n++]=65533,i+=s-1;else{for(o&=2===s?31:3===s?15:7;s>1&&i<a;)o=o<<6|63&e[i++],s--;s>1?r[n++]=65533:o<65536?r[n++]=o:(o-=65536,r[n++]=55296|o>>10&1023,r[n++]=56320|1023&o)}}}return function(e,t){if(t<65534&&e.subarray&&J)return String.fromCharCode.apply(null,e.length===t?e:e.subarray(0,t));for(var i="",n=0;n<t;n++)i+=String.fromCharCode(e[n]);return i}(r,n)},te=function(e,t){(t=t||e.length)>e.length&&(t=e.length);for(var i=t-1;i>=0&&128==(192&e[i]);)i--;return i<0||0===i?t:i+Q[e[i]]>t?i:t},ie={2:"need dictionary",1:"stream end",0:"","-1":"file error","-2":"stream error","-3":"data error","-4":"insufficient memory","-5":"buffer error","-6":"incompatible version"};var ne=function(){this.input=null,this.next_in=0,this.avail_in=0,this.total_in=0,this.output=null,this.next_out=0,this.avail_out=0,this.total_out=0,this.msg="",this.state=null,this.data_type=2,this.adler=0};var ae=function(){this.text=0,this.time=0,this.xflags=0,this.os=0,this.extra=null,this.extra_len=0,this.name="",this.comment="",this.hcrc=0,this.done=!1},re=Object.prototype.toString,oe=c.Z_NO_FLUSH,se=c.Z_FINISH,le=c.Z_OK,fe=c.Z_STREAM_END,de=c.Z_NEED_DICT,he=c.Z_STREAM_ERROR,ce=c.Z_DATA_ERROR,ue=c.Z_MEM_ERROR;function we(e){this.options=W({chunkSize:65536,windowBits:15,to:""},e||{});var t=this.options;t.raw&&t.windowBits>=0&&t.windowBits<16&&(t.windowBits=-t.windowBits,0===t.windowBits&&(t.windowBits=-15)),!(t.windowBits>=0&&t.windowBits<16)||e&&e.windowBits||(t.windowBits+=32),t.windowBits>15&&t.windowBits<48&&0==(15&t.windowBits)&&(t.windowBits|=15),this.err=0,this.msg="",this.ended=!1,this.chunks=[],this.strm=new ne,this.strm.avail_out=0;var i=Y.inflateInit2(this.strm,t.windowBits);if(i!==le)throw new Error(ie[i]);if(this.header=new ae,Y.inflateGetHeader(this.strm,this.header),t.dictionary&&("string"==typeof t.dictionary?t.dictionary=$(t.dictionary):"[object ArrayBuffer]"===re.call(t.dictionary)&&(t.dictionary=new Uint8Array(t.dictionary)),t.raw&&(i=Y.inflateSetDictionary(this.strm,t.dictionary))!==le))throw new Error(ie[i])}function be(e,t){var i=new we(t);if(i.push(e),i.err)throw i.msg||ie[i.err];return i.result}we.prototype.push=function(e,t){var i,n,a,r=this.strm,o=this.options.chunkSize,s=this.options.dictionary;if(this.ended)return!1;for(n=t===~~t?t:!0===t?se:oe,"[object ArrayBuffer]"===re.call(e)?r.input=new Uint8Array(e):r.input=e,r.next_in=0,r.avail_in=r.input.length;;){for(0===r.avail_out&&(r.output=new Uint8Array(o),r.next_out=0,r.avail_out=o),(i=Y.inflate(r,n))===de&&s&&((i=Y.inflateSetDictionary(r,s))===le?i=Y.inflate(r,n):i===ce&&(i=de));r.avail_in>0&&i===fe&&r.state.wrap>0&&0!==e[r.next_in];)Y.inflateReset(r),i=Y.inflate(r,n);switch(i){case he:case ce:case de:case ue:return this.onEnd(i),this.ended=!0,!1}if(a=r.avail_out,r.next_out&&(0===r.avail_out||i===fe))if("string"===this.options.to){var l=te(r.output,r.next_out),f=r.next_out-l,d=ee(r.output,l);r.next_out=f,r.avail_out=o-f,f&&r.output.set(r.output.subarray(l,l+f),0),this.onData(d)}else this.onData(r.output.length===r.next_out?r.output:r.output.subarray(0,r.next_out));if(i!==le||0!==a){if(i===fe)return i=Y.inflateEnd(this.strm),this.onEnd(i),this.ended=!0,!0;if(0===r.avail_in)break}}return!0},we.prototype.onData=function(e){this.chunks.push(e)},we.prototype.onEnd=function(e){e===le&&("string"===this.options.to?this.result=this.chunks.join(""):this.result=q(this.chunks)),this.chunks=[],this.err=e,this.msg=this.strm.msg};var me=we,ke=be,_e=function(e,t){return(t=t||{}).raw=!0,be(e,t)},ve=be,ge=c,pe={Inflate:me,inflate:ke,inflateRaw:_e,ungzip:ve,constants:ge};e.Inflate=me,e.constants=ge,e.default=pe,e.inflate=ke,e.inflateRaw=_e,e.ungzip=ve,Object.defineProperty(e,"__esModule",{value:!0})}));
+
+</script>
+<script>
+const DATA_B64 = "__DATA_B64__";
+
+let SCHEMA, ROWS, DIMS, FIELD_IDX, INFO_IDX;
+let state = { base: null, results: [], months: 2, mac: null };
+let MACHINES = [];
+let macDropdown;
+let baseSearchPicker, turnoSearchPicker;
+let turnoState = { current: null, queue: [] };
+
+/* Si la última cocción real de una dimensión es muy antigua, no tiene
+   sentido que salga en la búsqueda como si fuera a retirarse de una
+   máquina ahora mismo -- puede que su ficha se haya tocado este año
+   por otro motivo (p.ej. una corrección) sin que se haya vuelto a
+   cocer. Se oculta de la búsqueda, aunque coincida el código. */
+const DIMENSION_INACTIVA_MESES = 12;
+
+/* Qué código está "vigente" en producción no lo dice la fecha de la
+   ficha (FECHA_CBL) -- dos códigos pueden ir alternándose (p.ej. 25 y
+   74) y el que tenga el papeleo revisado más reciente no es
+   necesariamente el que está físicamente en máquina hoy. Lo que manda
+   es la fecha de cocción real (FECHA_COCCION); si una ficha no la
+   tiene (nunca se llegó a cocer), se usa FECHA_CBL como respaldo. */
+function prodDate(row){
+  return rowVal(row,'FECHA_COCCION') || rowVal(row,'FECHA_CBL');
+}
+
+/* El COD_DIM es lo que prevalece: dos fichas con COD_DIM distinto son
+   dos dimensiones distintas, aunque compartan la misma descripción
+   (DIMENSION) -- nunca se fusionan por texto parecido. Se agrupa
+   estrictamente por COD_DIM y, si ese código tiene varias fichas (CBL)
+   a lo largo del tiempo, nos quedamos con la más reciente por cocción. */
+function buildLatestPerDimension(rows){
+  const best = new Map();
+  for(const r of rows){
+    const cod = norm(rowVal(r, 'COD_DIM'));
+    if(!cod) continue;
+    const prev = best.get(cod);
+    if(!prev || String(prodDate(r)||'') >= String(prodDate(prev)||'')){
+      best.set(cod, r);
+    }
+  }
+  const out = Array.from(best.values());
+  out.sort((a,b)=> String(prodDate(b)||'').localeCompare(String(prodDate(a)||'')));
+  return out;
+}
+
+function norm(s){
+  if(s===null||s===undefined) return '';
+  return String(s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').trim();
+}
+function esc(s){
+  if(s===null||s===undefined) return '';
+  return String(s).replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function gunzipBase64ToString(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
+  return pako.ungzip(bytes, {to:'string'});
+}
+
+async function init(){
+  if(DATA_B64.length < 1000){
+    document.getElementById('loadingMsg').textContent =
+      'Este es el archivo PLANTILLA (sin datos todavía). Hay que generar la página final ejecutando generar_comparador.py — no abrir plantilla_cambio_maquina.html directamente.';
+    return;
+  }
+  let jsonStr;
+  try{
+    jsonStr = gunzipBase64ToString(DATA_B64);
+  } catch(e){
+    document.getElementById('loadingMsg').textContent =
+      'No se han podido cargar los datos (' + (e && e.message ? e.message : 'error desconocido') + '). Prueba a recargar la página; si persiste, avisa a soporte.';
+    return;
+  }
+  const data = JSON.parse(jsonStr);
+  SCHEMA = data.schema;
+  ROWS = data.rows;
+
+  INFO_IDX = {};
+  SCHEMA.infoFields.forEach((f,i)=>INFO_IDX[f]=i);
+
+  FIELD_IDX = {};
+  let ci = SCHEMA.infoFields.length;
+  for(const comp of SCHEMA.components){
+    FIELD_IDX[comp] = {};
+    for(const f of SCHEMA.componentFields[comp]){
+      FIELD_IDX[comp][f] = ci++;
+    }
+  }
+
+  DIMS = buildLatestPerDimension(ROWS);
+
+  MACHINES = Array.from(new Set(DIMS.map(rowMac).filter(m => m !== '')))
+    .sort((a,b) => a.localeCompare(b, 'es', {numeric:true}));
+  macDropdown = createMacDropdown('macDropdownBtn', 'macDropdownMenu', 'macDropdownLabel', (v)=>{
+    state.mac = v;
+  });
+  macDropdown.render();
+
+  document.getElementById('datasetStat').textContent =
+    `${DIMS.length.toLocaleString('es-ES')} dimensiones`;
+  document.getElementById('datasetStatT').textContent =
+    `${DIMS.length.toLocaleString('es-ES')} dimensiones`;
+  document.getElementById('datasetStatC').textContent =
+    `${DIMS.length.toLocaleString('es-ES')} dimensiones`;
+  renderFreshness(data.generadoEn);
+  document.getElementById('loadingMsg').style.display='none';
+  document.getElementById('app').style.display='flex';
+
+  wireSearch();
+  wireConfirmStep();
+  wireResultStep();
+  wireModeTabs();
+  wireTurno();
+  wireCompareMode();
+  wireUpdateModal();
+  goToStep(1);
+}
+
+/* Le dice al operario, de un vistazo, si merece la pena relanzar
+   Actualizar_Base_CBL.bat -- la página no puede comprobar por sí sola
+   si el Excel maestro ha cambiado, así que esto es la mejor señal
+   honesta que puede dar: cuánto hace que se generó esta copia. */
+const FRESCURA_AVISO_HORAS = 24;
+const FRESCURA_ALERTA_HORAS = 72;
+
+function renderFreshness(generadoEn){
+  const badge = document.getElementById('freshnessBadge');
+  if(!generadoEn){ badge.style.display='none'; return; }
+  const fecha = new Date(generadoEn);
+  if(isNaN(fecha.getTime())){ badge.style.display='none'; return; }
+  const horas = (Date.now() - fecha.getTime()) / 3600000;
+  let cls, texto;
+  if(horas < FRESCURA_AVISO_HORAS){
+    cls = 'fresh';
+    texto = horas < 1 ? 'Actualizado hace unos minutos' : `Actualizado hace ${Math.round(horas)} h`;
+  } else if(horas < FRESCURA_ALERTA_HORAS){
+    cls = 'warn';
+    texto = `Actualizado hace ${Math.round(horas/24)} día(s)`;
+  } else {
+    cls = 'stale';
+    texto = `Sin actualizar hace ${Math.round(horas/24)} días`;
+  }
+  badge.className = 'freshness-badge ' + cls;
+  badge.textContent = texto;
+  badge.title = 'Generado el ' + fecha.toLocaleString('es-ES');
+  badge.style.display = '';
+}
+
+/* El botón intenta lanzar el protocolo "actualizarcbl://" -- si el PC
+   tiene instalado Instalar_Acceso_Automatico.bat, esto abre
+   Actualizar_Base_CBL.bat sin más pasos. Un navegador no avisa si un
+   protocolo no está registrado, así que la única señal fiable es si
+   la pestaña sigue aquí pasado un instante: si es así, mostramos las
+   instrucciones manuales como respaldo. */
+const UPDATE_PROTOCOL = 'actualizarcbl://run';
+const UPDATE_FALLBACK_MS = 1200;
+
+function wireUpdateModal(){
+  const backdrop = document.getElementById('updateModalBackdrop');
+  let fallbackTimer = null;
+
+  function cancelFallback(){
+    if(fallbackTimer){ clearTimeout(fallbackTimer); fallbackTimer = null; }
+  }
+
+  document.getElementById('updateBtn').addEventListener('click', ()=>{
+    cancelFallback();
+    window.location.href = UPDATE_PROTOCOL;
+    fallbackTimer = setTimeout(()=>{ backdrop.classList.add('open'); }, UPDATE_FALLBACK_MS);
+  });
+  document.addEventListener('visibilitychange', ()=>{ if(document.hidden) cancelFallback(); });
+  window.addEventListener('blur', cancelFallback);
+
+  document.getElementById('updateModalClose').addEventListener('click', ()=>{
+    backdrop.classList.remove('open');
+  });
+  backdrop.addEventListener('click', (ev)=>{
+    if(ev.target === backdrop) backdrop.classList.remove('open');
+  });
+}
+
+function rowVal(row, field){ return row[INFO_IDX[field]]; }
+function compVal(row, comp, field){
+  const idx = FIELD_IDX[comp][field];
+  return idx===undefined ? null : row[idx];
+}
+
+/* Se busca SOLO por el código de dimensión (COD_DIM) -- no por CBL, no
+   por el texto de la dimensión. Cada COD_DIM es su propia entidad, así
+   que no se busca por códigos "antiguos" de una supuesta misma
+   dimensión: si el código no es exactamente el que aparece hoy con
+   ese prefijo, no debe salir. La coincidencia es por "empieza por", no
+   por "contiene": con códigos numéricos cortos, "contiene" generaba
+   falsos positivos (p.ej. "255" encontrando "9255"). */
+function isDimActive(row){
+  return isRecentEnough(prodDate(row), DIMENSION_INACTIVA_MESES);
+}
+
+function queryMatchInfo(row, q){
+  if(!q) return {matches:true};
+  const nq = norm(q);
+  return {matches: norm(rowVal(row,'COD_DIM')).startsWith(nq)};
+}
+function rowYear(row){
+  const fecha = rowVal(row,'FECHA_CBL');
+  if(!fecha) return null;
+  const y = parseInt(String(fecha).slice(0,4), 10);
+  return isNaN(y) ? null : y;
+}
+function fmtDate(iso){
+  if(!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
+}
+function rowSummaryHTML(row){
+  const cbl = esc(rowVal(row,'CBL'));
+  const dim = esc(rowVal(row,'DIMENSION')||'');
+  const seat = esc(rowVal(row,'SEAT')??'');
+  const eg = esc(rowVal(row,'EG')??'');
+  const mac = esc(rowMac(row));
+  const cod = esc(rowVal(row,'COD_DIM')??'');
+  const fecha = fmtDate(prodDate(row));
+  return {cbl,dim,seat,eg,mac,cod,fecha};
+}
+
+/* ---------- navegación entre pasos ---------- */
+function goToStep(n){
+  for(let i=1;i<=3;i++){
+    document.getElementById('panel-'+i).classList.toggle('active', i===n);
+  }
+  document.querySelectorAll('[data-step-dot]').forEach(el=>{
+    const step = Number(el.dataset.stepDot);
+    el.classList.toggle('active', step===n);
+    el.classList.toggle('done', step<n);
+  });
+  if(n===1){
+    const search = document.getElementById('baseSearch');
+    search.value = '';
+    document.getElementById('baseResults').innerHTML = '';
+    document.getElementById('baseCount').textContent = '';
+    setTimeout(()=>search.focus(), 50);
+  }
+}
+
+/* ---------- paso 1: buscar (reutilizable: cambio individual y turno) ---------- */
+/* ids: {search, results, count, macBtn, macMenu, macLabel}. onPick(row) se
+   llama al tocar una tarjeta de resultado. */
+function createDimSearch(ids, onPick){
+  const search = document.getElementById(ids.search);
+  const results = document.getElementById(ids.results);
+  const count = document.getElementById(ids.count);
+  let macFilter = null;
+
+  function refresh(){
+    const q = search.value.trim();
+    if(!q){ results.innerHTML=''; count.textContent=''; return; }
+    const pool = macFilter===null ? DIMS : DIMS.filter(r => rowMac(r)===macFilter);
+    const matched = pool.filter(isDimActive).map(r=>({row:r, info:queryMatchInfo(r,q)})).filter(x=>x.info.matches);
+    count.textContent = matched.length ? `${Math.min(matched.length,40)} de ${matched.length.toLocaleString('es-ES')} resultados` : '';
+    if(matched.length===0){
+      results.innerHTML = '<div class="result-empty">Sin resultados. Prueba otro código.</div>';
+      return;
+    }
+    results.innerHTML='';
+    for(const {row:r} of matched.slice(0,40)){
+      const s = rowSummaryHTML(r);
+      const div = document.createElement('div');
+      div.className = 'result-card';
+      div.innerHTML = `
+        <div class="rc-label">Cod dimensión</div>
+        <div class="rc-dim">${s.cod||'—'}</div>
+        <div class="rc-sub">${s.dim}</div>
+        <div class="rc-tags">
+          <span class="tag">CBL ${s.cbl||'—'}</span>
+          <span class="tag">Cocción ${s.fecha||'—'}</span>
+          <span class="tag">SEAT ${s.seat||'—'}</span>
+          <span class="tag">EG ${s.eg||'—'}</span>
+          <span class="tag">MAC ${s.mac||'—'}</span>
+        </div>`;
+      div.addEventListener('click', ()=>onPick(r));
+      results.appendChild(div);
+    }
+  }
+  search.addEventListener('input', refresh);
+
+  const macDd = createMacDropdown(ids.macBtn, ids.macMenu, ids.macLabel, (v)=>{
+    macFilter = v;
+    refresh();
+  }, 'Selecciona tu máquina');
+  macDd.render();
+
+  return {
+    reset(){ search.value=''; results.innerHTML=''; count.textContent=''; },
+    focus(){ setTimeout(()=>search.focus(), 50); },
+  };
+}
+
+function wireSearch(){
+  baseSearchPicker = createDimSearch({
+    search:'baseSearch', results:'baseResults', count:'baseCount',
+    macBtn:'searchMacBtn', macMenu:'searchMacMenu', macLabel:'searchMacLabel',
+  }, selectDimension);
+}
+
+function selectDimension(row){
+  state.base = row;
+  const s = rowSummaryHTML(row);
+  document.getElementById('heroDim').innerHTML = `
+    <span class="hd-label">Sale de la máquina · Cod dimensión</span>
+    <span class="hd-title">${s.cod||'—'}</span>
+    <span class="hd-sub">${s.dim}</span>
+    <span class="hd-meta">CBL ${s.cbl||'—'} · Cocción ${s.fecha||'—'} · SEAT ${s.seat||'—'} · EG ${s.eg||'—'}</span>
+  `;
+  /* Si la dimensión no tiene una máquina real (rowMac vacío, p.ej.
+     por venir de la "1" inválida), no hay nada que preseleccionar:
+     se deja en "Todas" en vez de un filtro vacío que no encontraría
+     ninguna candidata. */
+  state.mac = rowMac(row) || null;
+  macDropdown.setSelected(state.mac);
+  document.getElementById('yearValue').textContent = String(new Date().getFullYear());
+  goToStep(2);
+}
+
+/* ================= MODO "OPTIMIZAR TURNO" =================
+   Los operarios apuntan en un Excel aparte el orden de fabricación del
+   turno (según stock, prioridad de cliente, etc.). Aquí no se decide
+   QUÉ fabricar -- eso ya lo decidieron ellos -- solo EN QUÉ ORDEN,
+   para que la máquina cambie de producto el menor número de veces
+   posible a lo largo del turno. Reutiliza el mismo motor de
+   comparación (compareForChangeover) que el modo individual, pero en
+   vez de comparar un solo par, busca la secuencia completa (empezando
+   siempre por la dimensión que está puesta ahora) que minimiza la
+   suma de cambios de todo el turno. */
+
+function wireModeTabs(){
+  const indBtn = document.getElementById('modeIndividualBtn');
+  const turBtn = document.getElementById('modeTurnoBtn');
+  const cmpBtn = document.getElementById('modeCompareBtn');
+  const indPanel = document.getElementById('individualMode');
+  const turPanel = document.getElementById('turnoMode');
+  const cmpPanel = document.getElementById('compareMode');
+  const btns = [indBtn, turBtn, cmpBtn];
+  const panels = [indPanel, turPanel, cmpPanel];
+  function activate(activeBtn, activePanel){
+    btns.forEach(b => b.classList.toggle('active', b===activeBtn));
+    panels.forEach(p => p.style.display = (p===activePanel ? '' : 'none'));
+  }
+  indBtn.addEventListener('click', ()=> activate(indBtn, indPanel));
+  turBtn.addEventListener('click', ()=>{ activate(turBtn, turPanel); goToTStep(1); });
+  cmpBtn.addEventListener('click', ()=>{ activate(cmpBtn, cmpPanel); goToCStep(1); });
+}
+
+function goToTStep(n){
+  for(let i=1;i<=3;i++){
+    document.getElementById('tpanel-'+i).classList.toggle('active', i===n);
+  }
+  document.querySelectorAll('[data-tstep-dot]').forEach(el=>{
+    const step = Number(el.dataset.tstepDot);
+    el.classList.toggle('active', step===n);
+    el.classList.toggle('done', step<n);
+  });
+  if(n===1){
+    turnoSearchPicker.reset();
+    turnoSearchPicker.focus();
+  }
+}
+
+function wireTurno(){
+  turnoSearchPicker = createDimSearch({
+    search:'tBaseSearch', results:'tBaseResults', count:'tBaseCount',
+    macBtn:'tSearchMacBtn', macMenu:'tSearchMacMenu', macLabel:'tSearchMacLabel',
+  }, selectTurnoCurrent);
+
+  document.getElementById('tBackToSearch').addEventListener('click', ()=>goToTStep(1));
+
+  document.getElementById('turnoCalcBtn').addEventListener('click', ()=>{
+    if(!turnoState.current) return;
+    const raw = document.getElementById('turnoQueueInput').value;
+    const { resolved, notFound } = resolveTurnoCodes(raw, turnoState.current);
+    const unresolvedEl = document.getElementById('turnoUnresolved');
+    if(notFound.length){
+      unresolvedEl.innerHTML = `<div class="turno-unresolved">No se ${notFound.length===1?'ha encontrado':'han encontrado'} ${notFound.length===1?'este código':'estos códigos'}: ${notFound.map(esc).join(', ')}</div>`;
+    } else {
+      unresolvedEl.innerHTML = '';
+    }
+    if(resolved.length===0) return;
+    turnoState.queue = resolved;
+    const steps = computeOptimalOrder(turnoState.current, resolved);
+    renderTurnoResult(turnoState.current, steps);
+    goToTStep(3);
+  });
+
+  document.getElementById('turnoNewBtn').addEventListener('click', ()=>{
+    turnoState = { current: null, queue: [] };
+    document.getElementById('turnoQueueInput').value = '';
+    document.getElementById('turnoUnresolved').innerHTML = '';
+    document.getElementById('turnoSuggest').classList.remove('open');
+    goToTStep(1);
+  });
+
+  wireTurnoQueueSuggest();
+}
+
+/* Autocompletado del código que se está escribiendo en el textarea del
+   pedido de turno: el operario puede saber solo los primeros dígitos
+   (p.ej. "80") y necesita ver qué códigos existen antes de terminar de
+   escribirlo, igual que en el buscador de los pasos 1. */
+function currentTurnoToken(textarea){
+  const val = textarea.value;
+  const pos = textarea.selectionStart;
+  const before = val.slice(0, pos);
+  const m = before.match(/[^\n,;]*$/);
+  const token = m ? m[0] : '';
+  return { token: token.trim(), start: pos - token.length, end: pos };
+}
+
+function wireTurnoQueueSuggest(){
+  const textarea = document.getElementById('turnoQueueInput');
+  const box = document.getElementById('turnoSuggest');
+  let matches = [];
+  let activeIdx = -1;
+
+  function hide(){ box.classList.remove('open'); box.innerHTML = ''; matches = []; activeIdx = -1; }
+
+  function updateActive(){
+    box.querySelectorAll('.turno-suggest-item').forEach((el,i)=>{ el.classList.toggle('active', i===activeIdx); });
+  }
+
+  function pick(idx){
+    const row = matches[idx];
+    if(!row) return;
+    const { start, end } = currentTurnoToken(textarea);
+    const cod = String(rowVal(row,'COD_DIM')||'');
+    const val = textarea.value;
+    textarea.value = val.slice(0, start) + cod + '\n' + val.slice(end);
+    const newPos = start + cod.length + 1;
+    textarea.setSelectionRange(newPos, newPos);
+    hide();
+    textarea.focus();
+  }
+
+  function refresh(){
+    const { token } = currentTurnoToken(textarea);
+    if(!token){ hide(); return; }
+    const nq = norm(token);
+    const currentCod = turnoState.current ? norm(rowVal(turnoState.current,'COD_DIM')) : '';
+    matches = DIMS.filter(isDimActive)
+      .filter(r => norm(rowVal(r,'COD_DIM')).startsWith(nq) && norm(rowVal(r,'COD_DIM'))!==currentCod)
+      .slice(0, 8);
+    if(matches.length===0){ hide(); return; }
+    box.innerHTML = matches.map((r,i)=>{
+      const s = rowSummaryHTML(r);
+      return `<div class="turno-suggest-item${i===0?' active':''}" data-idx="${i}"><span class="ts-cod">${s.cod||'—'}</span><span class="ts-dim">${s.dim}</span><span class="ts-date">${s.fecha||'—'}</span></div>`;
+    }).join('');
+    activeIdx = 0;
+    box.classList.add('open');
+    box.querySelectorAll('.turno-suggest-item').forEach(el=>{
+      el.addEventListener('pointerdown', (ev)=>{ ev.preventDefault(); pick(Number(el.dataset.idx)); });
+    });
+  }
+
+  textarea.addEventListener('input', refresh);
+  textarea.addEventListener('click', refresh);
+  textarea.addEventListener('keydown', (ev)=>{
+    if(!box.classList.contains('open')) return;
+    if(ev.key==='ArrowDown'){ ev.preventDefault(); activeIdx = Math.min(activeIdx+1, matches.length-1); updateActive(); }
+    else if(ev.key==='ArrowUp'){ ev.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); updateActive(); }
+    else if(ev.key==='Enter' || ev.key==='Tab'){ if(activeIdx>=0){ ev.preventDefault(); pick(activeIdx); } }
+    else if(ev.key==='Escape'){ hide(); }
+  });
+  textarea.addEventListener('blur', ()=>{ setTimeout(hide, 150); });
+}
+
+function selectTurnoCurrent(row){
+  turnoState.current = row;
+  const s = rowSummaryHTML(row);
+  document.getElementById('tHeroDim').innerHTML = `
+    <span class="hd-label">Puesta ahora en la máquina · Cod dimensión</span>
+    <span class="hd-title">${s.cod||'—'}</span>
+    <span class="hd-sub">${s.dim}</span>
+    <span class="hd-meta">CBL ${s.cbl||'—'} · Cocción ${s.fecha||'—'} · SEAT ${s.seat||'—'} · EG ${s.eg||'—'}</span>
+  `;
+  goToTStep(2);
+}
+
+/* Divide el texto pegado en códigos (una línea, coma o punto y coma
+   por código), quita duplicados y el que ya está puesto en la
+   máquina, y busca cada uno por COD_DIM EXACTO (no por prefijo: al
+   pegar una lista concreta de códigos no queremos ambigüedad). */
+function resolveTurnoCodes(text, currentRow){
+  const currentCod = norm(rowVal(currentRow,'COD_DIM'));
+  const tokens = text.split(/[\n,;]+/).map(t=>t.trim()).filter(Boolean);
+  const seen = new Set([currentCod]);
+  const resolved = [];
+  const notFound = [];
+  const MAX_ITEMS = 40;
+  for(const tok of tokens){
+    const ncod = norm(tok);
+    if(!ncod || seen.has(ncod)) continue;
+    seen.add(ncod);
+    const row = DIMS.find(r => norm(rowVal(r,'COD_DIM')) === ncod);
+    if(row) resolved.push(row);
+    else notFound.push(tok);
+    if(resolved.length >= MAX_ITEMS) break;
+  }
+  return { resolved, notFound };
+}
+
+/* Genera todas las permutaciones de un array in-place (algoritmo de
+   Heap), llamando a cb con cada una. */
+function permuteHeap(arr, cb){
+  const n = arr.length;
+  const c = new Array(n).fill(0);
+  cb(arr.slice());
+  let i = 0;
+  while(i < n){
+    if(c[i] < i){
+      const swapWith = (i % 2 === 0) ? 0 : c[i];
+      [arr[swapWith], arr[i]] = [arr[i], arr[swapWith]];
+      cb(arr.slice());
+      c[i]++;
+      i = 0;
+    } else {
+      c[i] = 0;
+      i++;
+    }
+  }
+}
+
+/* Busca el orden de "queue" (partiendo siempre de startRow) que
+   minimiza la suma de cambios de todo el turno. El coste entre dos
+   dimensiones no es simétrico (empezar a llevar un componente cuenta,
+   dejar de llevarlo no), así que es una ruta dirigida, no un
+   problema simétrico. Hasta 8 dimensiones se prueban TODAS las
+   combinaciones (exacto); a partir de ahí, para no bloquear el
+   navegador, se usa un método aproximado (el más cercano primero, con
+   una mejora posterior probando intercambios de pareja). */
+function computeOptimalOrder(startRow, queue){
+  const nodes = [startRow, ...queue];
+  const n = queue.length;
+  const cost = [];
+  for(let i=0;i<nodes.length;i++){
+    cost[i] = [];
+    for(let j=0;j<nodes.length;j++){
+      cost[i][j] = (i===j) ? 0 : compareForChangeover(nodes[i], nodes[j]).total;
+    }
+  }
+  const targets = queue.map((_,i)=>i+1);
+
+  function pathTotal(order){
+    let total=0, prev=0;
+    for(const idx of order){ total += cost[prev][idx]; prev = idx; }
+    return total;
+  }
+
+  let bestOrder;
+  if(n <= 8){
+    let best = null, bestTotal = Infinity;
+    permuteHeap(targets, (perm)=>{
+      const total = pathTotal(perm);
+      if(total < bestTotal){ bestTotal = total; best = perm; }
+    });
+    bestOrder = best;
+  } else {
+    // Vecino más cercano
+    const used = new Set();
+    let order = [];
+    let prev = 0;
+    for(let step=0; step<n; step++){
+      let bestIdx=-1, bestCost=Infinity;
+      for(const idx of targets){
+        if(used.has(idx)) continue;
+        if(cost[prev][idx] < bestCost){ bestCost = cost[prev][idx]; bestIdx = idx; }
+      }
+      order.push(bestIdx); used.add(bestIdx); prev = bestIdx;
+    }
+    // Mejora local: probar intercambiar cada pareja de posiciones y
+    // quedarse con el cambio si reduce el total, hasta que no mejore más.
+    let improved = true, pass = 0;
+    while(improved && pass < 50){
+      improved = false; pass++;
+      for(let i=0;i<order.length;i++){
+        for(let j=i+1;j<order.length;j++){
+          const candidate = order.slice();
+          [candidate[i], candidate[j]] = [candidate[j], candidate[i]];
+          if(pathTotal(candidate) < pathTotal(order)){
+            order = candidate;
+            improved = true;
+          }
+        }
+      }
+    }
+    bestOrder = order;
+  }
+
+  const steps = [];
+  let prev = startRow;
+  for(const idx of bestOrder){
+    const row = nodes[idx];
+    steps.push({ row, result: compareForChangeover(prev, row) });
+    prev = row;
+  }
+  return steps;
+}
+
+function renderTurnoResult(startRow, steps){
+  const content = document.getElementById('turnoResultContent');
+  const total = steps.reduce((sum, s) => sum + s.result.total, 0);
+  const startS = rowSummaryHTML(startRow);
+
+  let html = `
+    <div class="turno-summary">
+      <div class="mini-stat"><div class="ms-value">${steps.length + 1}</div><div class="ms-label">dimensiones</div></div>
+      <div class="mini-stat"><div class="ms-value">${total}</div><div class="ms-label">cambios totales</div></div>
+    </div>
+    <div class="turno-order-row is-first">
+      <div class="turno-badge">1</div>
+      <div class="turno-order-main">
+        <div class="turno-order-dim">${startS.cod||'—'} <span style="font-weight:400; color:var(--ink-faint); font-size:12px;">(en marcha ahora)</span></div>
+        <div class="turno-order-sub">${startS.dim}</div>
+      </div>
+    </div>
+  `;
+
+  content.innerHTML = html;
+
+  steps.forEach((step, i)=>{
+    const s = rowSummaryHTML(step.row);
+    const r = step.result;
+    const chips = chipsForResult(r);
+    const arrow = document.createElement('div');
+    arrow.className = 'turno-arrow';
+    arrow.textContent = '↓';
+    content.appendChild(arrow);
+
+    const row = document.createElement('div');
+    row.className = 'turno-order-row';
+    row.innerHTML = `
+      <div class="turno-badge">${i+2}</div>
+      <div class="turno-order-main">
+        <div class="turno-order-dim">${s.cod||'—'}</div>
+        <div class="turno-order-sub">${s.dim}</div>
+        ${chips ? `<div class="turno-order-chips">${chips}</div>` : ''}
+      </div>
+      <div class="turno-order-cost" style="color:${r.total===0?'var(--good)':(r.total<=2?'var(--warn)':'var(--bad)')}">${r.total}</div>
+    `;
+    row.addEventListener('click', (ev)=>{
+      if(ev.target.closest('.detail-panel')) return;
+      toggleAltDetail(row, step);
+    });
+    content.appendChild(row);
+  });
+}
+
+/* ================= MODO "COMPARAR DOS DIMENSIONES" =================
+   A diferencia de "Cambio individual" (que busca la MEJOR candidata
+   automáticamente), aquí el operario elige las dos dimensiones a mano
+   -- para consultar, sin más, qué cambia entre dos productos
+   concretos. Reutiliza el mismo motor (compareForChangeover) y el
+   mismo desglose que ya se usa en el resultado del modo individual. */
+
+let compareSearchA, compareSearchB;
+let compareState = { a: null, b: null };
+
+function wireCompareMode(){
+  compareSearchA = createDimSearch({
+    search:'cABaseSearch', results:'cABaseResults', count:'cABaseCount',
+    macBtn:'cASearchMacBtn', macMenu:'cASearchMacMenu', macLabel:'cASearchMacLabel',
+  }, selectCompareA);
+
+  compareSearchB = createDimSearch({
+    search:'cBBaseSearch', results:'cBBaseResults', count:'cBBaseCount',
+    macBtn:'cBSearchMacBtn', macMenu:'cBSearchMacMenu', macLabel:'cBSearchMacLabel',
+  }, selectCompareB);
+
+  document.getElementById('cBackToA').addEventListener('click', ()=>goToCStep(1));
+
+  document.getElementById('compareNewBtn').addEventListener('click', ()=>{
+    compareState = { a: null, b: null };
+    goToCStep(1);
+  });
+}
+
+function goToCStep(n){
+  for(let i=1;i<=3;i++){
+    document.getElementById('cpanel-'+i).classList.toggle('active', i===n);
+  }
+  document.querySelectorAll('[data-cstep-dot]').forEach(el=>{
+    const step = Number(el.dataset.cstepDot);
+    el.classList.toggle('active', step===n);
+    el.classList.toggle('done', step<n);
+  });
+  if(n===1){ compareSearchA.reset(); compareSearchA.focus(); }
+  if(n===2){ compareSearchB.reset(); compareSearchB.focus(); }
+}
+
+function selectCompareA(row){
+  compareState.a = row;
+  const s = rowSummaryHTML(row);
+  document.getElementById('cAHeroDim').innerHTML = `
+    <span class="hd-label">Dimensión A · Cod dimensión</span>
+    <span class="hd-title">${s.cod||'—'}</span>
+    <span class="hd-sub">${s.dim}</span>
+    <span class="hd-meta">CBL ${s.cbl||'—'} · Cocción ${s.fecha||'—'} · SEAT ${s.seat||'—'} · EG ${s.eg||'—'}</span>
+  `;
+  goToCStep(2);
+}
+
+function selectCompareB(row){
+  compareState.b = row;
+  const result = compareForChangeover(compareState.a, row);
+  renderCompareResult(compareState.a, row, result);
+  goToCStep(3);
+}
+
+function renderCompareResult(rowA, rowB, r){
+  const content = document.getElementById('compareResultContent');
+  const sA = rowSummaryHTML(rowA);
+  const sB = rowSummaryHTML(rowB);
+  const chips = chipsForResult(r);
+  const summaryText = changeSummaryText(r);
+  content.innerHTML = `
+    <div class="compare-pair">
+      <div class="hero-dim">
+        <span class="hd-label">Dimensión A · Cod dimensión</span>
+        <span class="hd-title">${sA.cod||'—'}</span>
+        <span class="hd-sub">${sA.dim}</span>
+        <span class="hd-meta">CBL ${sA.cbl||'—'} · Cocción ${sA.fecha||'—'} · SEAT ${sA.seat||'—'} · EG ${sA.eg||'—'}</span>
+      </div>
+      <div class="compare-vs">${r.total}</div>
+      <div class="hero-dim">
+        <span class="hd-label">Dimensión B · Cod dimensión</span>
+        <span class="hd-title">${sB.cod||'—'}</span>
+        <span class="hd-sub">${sB.dim}</span>
+        <span class="hd-meta">CBL ${sB.cbl||'—'} · Cocción ${sB.fecha||'—'} · SEAT ${sB.seat||'—'} · EG ${sB.eg||'—'}</span>
+      </div>
+    </div>
+    <div class="alt-chips" style="justify-content:center; margin-top:14px;">${chips || '<span class="hint">Sin diferencias</span>'}</div>
+    <p class="hint-line">${r.total} cambio${r.total===1?'':'s'}${summaryText ? ' (' + summaryText + ')' : ''}</p>
+    ${detailTableHTML(r)}
+  `;
+}
+
+/* ---------- desplegable de máquina (reutilizable: paso 1 y paso 2) ---------- */
+/* mac === null significa "Todas" (sin filtro de máquina). */
+const MAC_ALL = '__TODAS__';
+
+/* Crea un desplegable de máquina propio (no un <select> nativo, para
+   que la lista abierta también respete el tema oscuro). onSelect se
+   llama con el valor elegido (null = "Todas") cada vez que cambia.
+   nullLabel es el texto del botón cuando no hay máquina elegida --
+   "Todas" en el paso 2, pero en el paso 1 conviene una invitación
+   más clara a elegir ("Selecciona tu máquina"), ya que ahí es la
+   primera acción del operario. */
+function createMacDropdown(btnId, menuId, labelId, onSelect, nullLabel){
+  nullLabel = nullLabel || 'Todas';
+  const btn = document.getElementById(btnId);
+  const menu = document.getElementById(menuId);
+  const label = document.getElementById(labelId);
+
+  function setSelected(mac){
+    label.textContent = mac===null ? nullLabel : mac;
+    menu.querySelectorAll('.ft-dropdown-item').forEach(el=>{
+      const v = el.dataset.value === MAC_ALL ? null : el.dataset.value;
+      el.classList.toggle('selected', v === mac);
+    });
+  }
+
+  function render(){
+    const items = [{value: MAC_ALL, label: 'Todas'}].concat(MACHINES.map(m => ({value:m, label:m})));
+    menu.innerHTML = items.map(it =>
+      `<div class="ft-dropdown-item" data-value="${esc(it.value)}">${esc(it.label)}</div>`
+    ).join('');
+    menu.querySelectorAll('.ft-dropdown-item').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        const v = el.dataset.value === MAC_ALL ? null : el.dataset.value;
+        setSelected(v);
+        closeAllMacDropdowns();
+        onSelect(v);
+      });
+    });
+  }
+
+  btn.addEventListener('click', (ev)=>{
+    ev.stopPropagation();
+    const willOpen = !menu.classList.contains('open');
+    closeAllMacDropdowns();
+    if(willOpen){ menu.classList.add('open'); btn.classList.add('open'); }
+  });
+
+  return { render, setSelected };
+}
+
+function closeAllMacDropdowns(){
+  document.querySelectorAll('.ft-dropdown-menu.open').forEach(m=>m.classList.remove('open'));
+  document.querySelectorAll('.ft-dropdown-btn.open').forEach(b=>b.classList.remove('open'));
+}
+
+document.addEventListener('click', (ev)=>{
+  if(!ev.target.closest('.ft-dropdown')) closeAllMacDropdowns();
+});
+
+/* ---------- paso 2: confirmar + meses ---------- */
+function wireConfirmStep(){
+  document.getElementById('backToSearch').addEventListener('click', ()=>goToStep(1));
+
+  const monthsValue = document.getElementById('monthsValue');
+  document.getElementById('monthsMinus').addEventListener('click', ()=>{
+    state.months = Math.max(1, state.months-1);
+    monthsValue.textContent = state.months;
+  });
+  document.getElementById('monthsPlus').addEventListener('click', ()=>{
+    state.months = Math.min(24, state.months+1);
+    monthsValue.textContent = state.months;
+  });
+
+  document.getElementById('calcBtn').addEventListener('click', ()=>{
+    if(!state.base) return;
+    const outCod = norm(rowVal(state.base,'COD_DIM'));
+    const candidates = DIMS.filter(r => norm(rowVal(r,'COD_DIM'))!==outCod && matchesSwapFilters(r, state.mac, state.months));
+    const scored = candidates.map(r => ({row:r, result: compareForChangeover(state.base, r)}));
+    scored.sort((a,b) => a.result.total - b.result.total);
+    state.results = scored;
+    renderResultStep(scored, state.months, state.mac);
+    goToStep(3);
+  });
+}
+
+/* ---------- motor de comparación para cambio de máquina ---------- */
+/* Aquí no hay componentes "bloqueantes": al cambiar de dimensión en la
+   máquina hay que ajustar cualquier diferencia (material, anchura,
+   SEAT o EG), así que se cuentan todas y se ordena por el total más bajo:
+   menos cambios = cambio más rápido y rentable. */
+function pairStatus(va, vb){
+  const aEmpty = va===null||va===undefined||va==='';
+  const bEmpty = vb===null||vb===undefined||vb==='';
+  if(aEmpty && bEmpty) return 'nodata';
+  if(aEmpty || bEmpty) return 'differ';
+  return norm(va)===norm(vb) ? 'match' : 'differ';
+}
+
+/* La máquina "1" no existe de verdad en planta (dato erróneo en el
+   Excel maestro) -- se trata igual que si no hubiera máquina, para
+   que no aparezca como opción ni como filtro en ningún sitio. */
+function rowMac(row){
+  const v = rowVal(row,'MAC');
+  if(v===null || v===undefined) return '';
+  const s = String(v).trim();
+  return s==='1' ? '' : s;
+}
+
+function parseDateFlexible(s){
+  if(!s) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(s));
+  if(!m) return null;
+  return new Date(Number(m[1]), Number(m[2])-1, Number(m[3]));
+}
+
+function monthsAgo(date, months){
+  return new Date(date.getFullYear(), date.getMonth()-months, date.getDate());
+}
+
+/* FECHA_COCCION no es siempre una fecha pasada: puede ser una cocción
+   ya planificada para dentro de unos días. Exigir "d <= hoy" excluía
+   por error justo las fichas más al día (las que tienen la próxima
+   cocción ya programada), tratándolas como si llevaran meses paradas.
+   Por eso solo se exige un límite inferior (no hace demasiado tiempo);
+   no hay límite superior. */
+function isRunning(row, monthsWindow){
+  const d = parseDateFlexible(rowVal(row,'FECHA_COCCION'));
+  if(!d) return false;
+  const now = new Date();
+  return d >= monthsAgo(now, monthsWindow);
+}
+
+function isRecentEnough(fecha, monthsWindow){
+  const d = parseDateFlexible(fecha);
+  if(!d) return false;
+  const now = new Date();
+  return d >= monthsAgo(now, monthsWindow);
+}
+
+function matchesSwapFilters(row, mac, monthsWindow){
+  if(mac !== null && rowMac(row) !== mac) return false;
+  const y = rowYear(row);
+  if(y === null || y !== new Date().getFullYear()) return false;
+  if(!isRunning(row, monthsWindow)) return false;
+  return true;
+}
+
+/* Si NINGÚN campo del componente tiene dato en una ficha, no es que
+   falten datos: esa dimensión simplemente no lleva ese componente
+   (p.ej. muchas dimensiones no llevan RFI). Se comprueba sobre TODOS
+   los campos del componente (incluidos PKX/NPD aunque no cuenten para
+   el cambio), porque lo que importa aquí es si el componente existe
+   en la ficha, no si el campo concreto que comparamos está relleno. */
+function componentAbsent(row, comp){
+  return SCHEMA.componentFields[comp].every(f => {
+    const v = compVal(row, comp, f);
+    return v===null || v===undefined || v==='';
+  });
+}
+
+function compareForChangeover(rowA, rowB){
+  const breakdown = [];
+  for(const comp of SCHEMA.components){
+    const fields = SCHEMA.componentFields[comp];
+    /* Aquí solo importa el material (APELACION) y la anchura -- PKX y
+       NPD son códigos técnicos internos que no se tienen en cuenta
+       para decidir si un componente cambia en un cambio de máquina.
+       RFID no tiene APELACION/ANCHURA (es un SI/NO suelto): se compara
+       su propio campo "RFID" igual que APELACION en los demás. */
+    const nonWidthFields = fields.filter(f => f === 'APELACION' || f === 'RFID');
+    const hasWidth = fields.includes('ANCHURA');
+
+    /* Un componente presente en una ficha y ausente del todo en la
+       otra no es un dato que falte: es que esa dimensión no lleva el
+       componente. La dirección importa:
+       - DEJAR de llevarlo (la que sale lo tiene, la nueva no) es un
+         cambio rápido -- solo hay que retirarlo, no montar nada.
+       - EMPEZAR a llevarlo (la que sale no lo tiene, la nueva sí) es
+         un cambio real -- hay que montar un componente que antes no
+         existía, así que cuenta y se trata como cualquier otro
+         cambio de material. */
+    const absentA = componentAbsent(rowA, comp);
+    const absentB = componentAbsent(rowB, comp);
+    const isRemoval = absentB && !absentA;
+    const isAddition = absentA && !absentB;
+    const bothAbsent = absentA && absentB;
+
+    const fieldDetails = [];
+    let anyDataA=false, anyDataB=false, allEqual=true, anyBothPresent=false;
+    for(const f of nonWidthFields){
+      const va = compVal(rowA, comp, f);
+      const vb = compVal(rowB, comp, f);
+      if(va!==null && va!==undefined && va!=='') anyDataA=true;
+      if(vb!==null && vb!==undefined && vb!=='') anyDataB=true;
+      const st = isRemoval ? 'nocomp' : (isAddition ? 'differ' : pairStatus(va, vb));
+      if(st==='differ') allEqual=false;
+      if(st==='match') anyBothPresent=true;
+      fieldDetails.push({field:f, valueA:va, valueB:vb, status:st, absentA, absentB});
+    }
+    let materialStatus;
+    if(isRemoval) materialStatus='nocomp';
+    else if(isAddition) materialStatus='differ';
+    else if(!anyDataA && !anyDataB) materialStatus='nodata';
+    else if(allEqual && anyBothPresent) materialStatus='match';
+    else materialStatus='differ';
+
+    let widthStatus = 'nodata';
+    if(hasWidth){
+      widthStatus = isRemoval ? 'nocomp' : (isAddition ? 'differ' : pairStatus(compVal(rowA, comp, 'ANCHURA'), compVal(rowB, comp, 'ANCHURA')));
+    }
+
+    breakdown.push({
+      comp, materialStatus, widthStatus, hasWidth, fieldDetails, absentA, absentB, bothAbsent,
+      widthA: hasWidth ? compVal(rowA, comp, 'ANCHURA') : null,
+      widthB: hasWidth ? compVal(rowB, comp, 'ANCHURA') : null,
+    });
+  }
+
+  const seatStatus = pairStatus(rowVal(rowA,'SEAT'), rowVal(rowB,'SEAT'));
+  const egStatus = pairStatus(rowVal(rowA,'EG'), rowVal(rowB,'EG'));
+  const seatDiffers = seatStatus==='differ';
+  const egDiffers = egStatus==='differ';
+  /* Un componente cuenta como UN cambio si difiere el material, el
+     ancho, o ambos -- da igual cuántos campos concretos cambien
+     dentro de ese componente, en la máquina se toca una sola vez. El
+     detalle sigue mostrando material y ancho por separado, con los
+     valores reales, para quien necesite verlo.
+     DEJAR de llevar un componente (nocomp) NO suma al total: es un
+     cambio rápido (solo retirarlo, no hay material ni ajuste que
+     montar) -- aunque sigue apareciendo como chip "sin X" para que se
+     sepa. EMPEZAR a llevar uno que antes no existía sí es un cambio
+     real (queda como 'differ', igual que un cambio de material) y
+     por tanto sí suma. */
+  const componentsChanged = breakdown.filter(b => b.materialStatus==='differ' || b.widthStatus==='differ').length;
+  const total = componentsChanged + (seatDiffers?1:0) + (egDiffers?1:0);
+
+  return {
+    breakdown, componentsChanged, seatStatus, egStatus, seatDiffers, egDiffers, total,
+    seatA: rowVal(rowA,'SEAT'), seatB: rowVal(rowB,'SEAT'),
+    egA: rowVal(rowA,'EG'), egB: rowVal(rowB,'EG'),
+  };
+}
+
+/* Desglose en texto del total ("3 productos + SEAT + EG"): separa
+   los productos/componentes (calidad o anchura) de los ajustes de
+   máquina (SEAT, EG), que son de naturaleza distinta. */
+function changeSummaryText(r){
+  const parts = [];
+  if(r.componentsChanged > 0) parts.push(`${r.componentsChanged} producto${r.componentsChanged===1?'':'s'}`);
+  if(r.seatDiffers) parts.push('SEAT');
+  if(r.egDiffers) parts.push('EG');
+  return parts.join(' + ');
+}
+
+/* Qué mostrar dentro del aro: el número de productos bien grande (lo
+   que más cuesta cambiar) y, debajo, en más pequeño, SEAT/EG si
+   también cambian -- en vez de una sola línea "3 + SEAT + EG" a un
+   tamaño uniforme. Si no cambia ningún producto, SEAT/EG pasan a ser
+   el texto grande (no hay número que mostrar). */
+function gaugeParts(r){
+  const toolParts = [];
+  if(r.seatDiffers) toolParts.push('SEAT');
+  if(r.egDiffers) toolParts.push('EG');
+  const toolText = toolParts.join(' + ');
+  if(r.componentsChanged > 0) return { big: String(r.componentsChanged), small: toolText, bigIsWord: false };
+  return { big: toolText, small: '', bigIsWord: true };
+}
+
+/* Misma idea que gaugeParts pero en una sola línea de texto ("3 +
+   SEAT + EG"), para sitios compactos como la lista de alternativas
+   donde no cabe (ni hace falta) el número grande + línea pequeña. */
+function compactChangeText(r){
+  const parts = [];
+  if(r.componentsChanged > 0) parts.push(String(r.componentsChanged));
+  if(r.seatDiffers) parts.push('SEAT');
+  if(r.egDiffers) parts.push('EG');
+  return parts.join(' + ') || '0';
+}
+
+function chipsForResult(r){
+  const toolChips = (r.seatDiffers? '<span class="chip chip-tool">SEAT</span>':'') +
+                     (r.egDiffers? '<span class="chip chip-tool">EG</span>':'');
+  const changed = s => s==='differ' || s==='nocomp';
+  /* Un componente que se deja de llevar es un cambio rápido (no hay
+     que montar nada nuevo, solo retirarlo) -- se marca "sin X" en
+     ámbar y no cuenta en el total. Uno que se EMPIEZA a llevar es un
+     cambio real (queda como 'differ', no 'nocomp'), así que aquí sale
+     como chip normal, igual que cualquier otro cambio de componente. */
+  const compChips = r.breakdown
+    .filter(b => changed(b.materialStatus) || changed(b.widthStatus))
+    .map(b => (b.materialStatus==='nocomp' || b.widthStatus==='nocomp')
+      ? `<span class="chip chip-quick">sin ${b.comp}</span>`
+      : `<span class="chip">${b.comp}</span>`)
+    .join('');
+  return toolChips + compChips;
+}
+
+/* ---------- paso 3: resultado ---------- */
+function wireResultStep(){
+  document.getElementById('newSearchBtn').addEventListener('click', ()=>{
+    state.base = null;
+    goToStep(1);
+  });
+}
+
+function gaugeClass(total){
+  if(total===0) return 'g-good';
+  if(total<=2) return 'g-warn';
+  return 'g-bad';
+}
+
+/* Cabecera "sale X → entra Y": para que se sepa siempre, sin tener
+   que volver al paso 2, qué dimensión se está comparando. */
+function compareHeaderHTML(outS, newS){
+  const newSide = newS
+    ? `<div class="compare-cod">${newS.cod||'—'}</div><div class="compare-sub">${newS.dim}</div><div class="compare-mac">MAC ${newS.mac||'—'}</div>`
+    : `<div class="compare-cod" style="color:var(--ink-faint);">—</div>`;
+  return `
+    <div class="compare-header">
+      <div class="compare-side">
+        <div class="compare-label">Sale</div>
+        <div class="compare-cod">${outS.cod||'—'}</div>
+        <div class="compare-sub">${outS.dim}</div>
+        <div class="compare-mac">MAC ${outS.mac||'—'}</div>
+      </div>
+      <div class="compare-arrow">&rarr;</div>
+      <div class="compare-side">
+        <div class="compare-label">Entra</div>
+        ${newSide}
+      </div>
+    </div>
+  `;
+}
+
+function renderResultStep(scored, months, mac){
+  const content = document.getElementById('resultContent');
+  const outS = rowSummaryHTML(state.base);
+
+  if(scored.length===0){
+    content.innerHTML = `
+      ${compareHeaderHTML(outS, null)}
+      <div style="text-align:center; padding:20px 10px; display:flex; flex-direction:column; gap:14px;">
+        <div style="font-size:44px;">🔍</div>
+        <div class="best-dim" style="font-size:22px;">Sin candidatas en marcha</div>
+        <div class="best-reason">No hay dimensiones de ${mac===null?'ninguna máquina':'la máquina '+esc(mac)} y año en curso dentro de los últimos ${months} meses. Prueba a ampliar la ventana de meses o elegir otra máquina en el paso anterior.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const best = scored[0];
+  const bestS = rowSummaryHTML(best.row);
+  const bestChips = chipsForResult(best.result);
+  const total = best.result.total;
+  const RADIUS = 84, CIRC = 2*Math.PI*RADIUS;
+  const maxScale = 8;
+  /* El aro representa "lo bueno" del cambio, no "cuántos cambios":
+     0 cambios = aro completo (el mejor caso posible); a más cambios,
+     menos aro relleno. */
+  const frac = 1 - (Math.min(total, maxScale) / maxScale);
+  const offset = CIRC * (1-frac);
+  const gClass = gaugeClass(total);
+
+  const reasonTxt = total===0
+    ? 'Coincide en todo: calidad, anchura, SEAT y EG. Cambio inmediato, sin ajustes.'
+    : `Cambian ${changeSummaryText(best.result)} — es la que menos cambios exige de entre ${scored.length} candidata${scored.length===1?'':'s'} en marcha.`;
+
+  let html = `
+    ${compareHeaderHTML(outS, bestS)}
+    <div class="gauge-wrap">
+      <div class="gauge ${gClass}">
+        <svg viewBox="0 0 200 200">
+          <circle class="g-track" cx="100" cy="100" r="${RADIUS}"></circle>
+          <circle class="g-value" cx="100" cy="100" r="${RADIUS}" stroke-dasharray="${CIRC}" stroke-dashoffset="${offset}"></circle>
+        </svg>
+        <div class="gauge-center">
+          ${(() => {
+            if(total===0) return '<span class="g-num">0</span>';
+            const gp = gaugeParts(best.result);
+            return `<span class="g-num${gp.bigIsWord?' g-num-word':''}">${gp.big}</span>`
+              + (gp.small ? `<span class="g-tool-line">+ ${gp.small}</span>` : '');
+          })()}
+          <span class="g-label">Cambios</span>
+        </div>
+      </div>
+    </div>
+    <div class="best-eyebrow">🏆 Mejor opción · Cod dimensión</div>
+    <div class="best-dim">${bestS.cod||'—'}</div>
+    <div class="best-sub">${bestS.dim}</div>
+    <div class="best-meta">CBL ${bestS.cbl||'—'} · Cocción ${bestS.fecha||'—'}${mac===null?' · MAC '+(bestS.mac||'—'):''}</div>
+    <div class="best-reason">${reasonTxt}</div>
+    ${bestChips ? `<div class="best-chips">${bestChips}</div>` : ''}
+    ${total>0 ? `<button type="button" class="btn-link" id="bestDetailBtn">Ver detalle &#9662;</button><div id="bestDetailPanel"></div>` : ''}
+  `;
+
+  if(scored.length>1){
+    html += `
+      <details class="alt-list">
+        <summary>Ver otras ${scored.length-1} opciones <span class="chev">▾</span></summary>
+        <div id="altRows"></div>
+      </details>
+    `;
+  }
+
+  content.innerHTML = html;
+
+  const bestDetailBtn = document.getElementById('bestDetailBtn');
+  if(bestDetailBtn){
+    bestDetailBtn.addEventListener('click', ()=>{
+      const panel = document.getElementById('bestDetailPanel');
+      if(panel.innerHTML){
+        panel.innerHTML = '';
+        bestDetailBtn.innerHTML = 'Ver detalle &#9662;';
+      } else {
+        panel.innerHTML = detailTableHTML(best.result);
+        bestDetailBtn.innerHTML = 'Ocultar detalle &#9652;';
+      }
+    });
+  }
+
+  if(scored.length>1){
+    const altRows = document.getElementById('altRows');
+    scored.forEach((item, i)=>{
+      const s = rowSummaryHTML(item.row);
+      const r = item.result;
+      const anyChips = chipsForResult(r);
+      const row = document.createElement('div');
+      row.className = 'alt-row' + (i===0 ? ' is-best' : '');
+      row.innerHTML = `
+        <div class="alt-top">
+          <div>
+            <div class="alt-dim">${i+1}. Cod ${s.cod||'—'}</div>
+            <div class="alt-sub">${s.dim} · CBL ${s.cbl} · SEAT ${s.seat||'—'} · EG ${s.eg||'—'} · Cocción ${fmtDate(rowVal(item.row,'FECHA_COCCION'))||'—'}${mac===null?' · MAC '+(s.mac||'—'):''}</div>
+          </div>
+          <div class="alt-total" style="color:${r.total===0?'var(--good)':(r.total<=2?'var(--warn)':'var(--bad)')}">${compactChangeText(r)}</div>
+        </div>
+        <div class="alt-chips">${anyChips || '<span class="tag">sin cambios</span>'}</div>
+      `;
+      row.addEventListener('click', (ev)=>{
+        if(ev.target.closest('.detail-panel')) return;
+        toggleAltDetail(row, item);
+      });
+      altRows.appendChild(row);
+    });
+  }
+}
+
+function detailPillHTML(status){
+  const map = {match:['match','✓'], differ:['differ','✗'], nodata:['nodata','—'], nocomp:['nocomp','∅']};
+  const [cls,label] = map[status];
+  return `<span class="pill ${cls}">${label}</span>`;
+}
+
+/* Un valor vacío no siempre es "sin dato" (un hueco en la ficha):
+   - isAbsentSide: ESTE lado no lleva el componente (el otro sí) --
+     puede ser un cambio rápido (dejar de llevarlo, status 'nocomp')
+     o uno real (empezar a llevarlo, status 'differ'); en ambos casos
+     se explica el motivo en vez de dejarlo en blanco.
+   - bothAbsent: NINGÚN lado lleva el componente -- no es que falte
+     el dato, es que esa dimensión no usa ese componente. */
+function detailValueHTML(v, isAbsentSide, bothAbsent){
+  const empty = v===null||v===undefined||v==='';
+  if(bothAbsent) return '<span class="na nocomp-note">no usa este componente</span>';
+  if(isAbsentSide) return '<span class="na nocomp-note">no lleva este componente</span>';
+  return empty ? '<span class="na">sin dato</span>' : esc(v);
+}
+
+/* Fila del detalle con los valores reales (actual y nueva), no solo
+   un ✓/✗: el operario necesita ver qué tiene y a qué cambiaría.
+   absentA/absentB (opcionales): qué lado no lleva el componente,
+   independientemente de si eso cuenta como cambio rápido o real. */
+function detailRowHTML(label, valueA, valueB, status, absentA, absentB){
+  const rowClass = status==='differ' ? 'tr-warn' : (status==='nocomp' ? 'tr-nocomp' : '');
+  const bothAbsent = !!(absentA && absentB);
+  return `<tr class="${rowClass}">
+    <td class="elem">${label}</td>
+    <td class="dv">${detailValueHTML(valueA, !!absentA, bothAbsent)}</td>
+    <td class="dv">${detailValueHTML(valueB, !!absentB, bothAbsent)}</td>
+    <td>${detailPillHTML(status)}</td>
+  </tr>`;
+}
+
+/* Filas de detalle (SEAT, EG y cada componente) para un resultado de
+   comparación -- se usa tanto para la mejor opción como para cada
+   alternativa de la lista, así el detalle es idéntico en ambos sitios. */
+function buildDetailRowsHTML(r){
+  let rowsHtml = '';
+  rowsHtml += detailRowHTML('SEAT', r.seatA, r.seatB, r.seatStatus);
+  rowsHtml += detailRowHTML('EG', r.egA, r.egB, r.egStatus);
+  for(const b of r.breakdown){
+    for(const fd of b.fieldDetails){
+      const label = fd.field==='APELACION' ? (b.comp+' · calidad')
+        : fd.field===b.comp ? b.comp
+        : (b.comp+' · '+fd.field);
+      rowsHtml += detailRowHTML(label, fd.valueA, fd.valueB, fd.status, fd.absentA, fd.absentB);
+    }
+    if(b.hasWidth){
+      rowsHtml += detailRowHTML(b.comp + ' · ancho', b.widthA, b.widthB, b.widthStatus, b.absentA, b.absentB);
+    }
+  }
+  return rowsHtml;
+}
+
+function detailTableHTML(r){
+  return `
+    <div class="detail-table-wrap">
+      <table class="detail-table">
+        <thead><tr><th>Elemento</th><th>Actual</th><th>Nueva</th><th>Estado</th></tr></thead>
+        <tbody>${buildDetailRowsHTML(r)}</tbody>
+      </table>
+    </div>
+  `;
+}
+
+function toggleAltDetail(row, item){
+  const existing = row.querySelector('.detail-panel');
+  if(existing){ existing.remove(); return; }
+  document.querySelectorAll('.detail-panel').forEach(el=>el.remove());
+  const panel = document.createElement('div');
+  panel.className = 'detail-panel';
+  panel.innerHTML = detailTableHTML(item.result);
+  row.appendChild(panel);
+}
+
+init();
+</script>
