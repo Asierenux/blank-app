@@ -141,10 +141,10 @@ def test_aro_exacto_y_vuelta_hasta_la_gi(consigna, tmp_path):
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
     xb, yc, r = info["aro"]
-    assert xb == pytest.approx(160.25) and r == pytest.approx(3) and yc == pytest.approx(205.5)
-    # el PTR envuelve por fuera de la NC vuelta: radio interior 3 + 1,5
+    assert xb == pytest.approx(160.25) and r == pytest.approx(2) and yc == pytest.approx(205.5)
+    # el PTR envuelve por fuera de la NC vuelta: radio interior 2 (aro = ESP del TT) + 1,5
     v = {v["cod"]: v for v in info["vueltas"]}["PTR"]
-    rm = 3 + 1.5 + 1.0
+    rm = 2 + 1.5 + 1.0
     resto = (200 - 160.25) - math.pi * rm
     assert v["ang"] == pytest.approx(180, abs=0.5) and v["resto"] == pytest.approx(resto, abs=0.05)
     assert v["solape_gi"] == pytest.approx(150 - (160.25 - resto), abs=0.05)  # la GI acaba en 150
@@ -189,8 +189,8 @@ def test_bt_con_falaise_hace_de_tope_y_envuelve_el_aro(consigna, tmp_path):
     assert xb == pytest.approx(320.5 / 2)          # centro del aro en entre aros / 2
     assert info["pared"] == ("BT", 156)
     v = {v["cod"]: v for v in info["vueltas"]}["BT"]
-    # 10 mm de BT, de 3 a 0 mm de espesor, sobre un aro de r = 3 → radio medio ≈ 3,75
-    assert v["ang"] == pytest.approx(math.degrees(10 / 3.75), rel=0.08)
+    # 10 mm de BT, de 3 a 0 mm de espesor, sobre un aro de r = 2 (ESP del TT) → radio medio ≈ 2,75
+    assert v["ang"] == pytest.approx(math.degrees(10 / 2.75), rel=0.08)
     capa_bt = next(k for k in capas if k["prod"].codigo == "BT")
     assert capa_bt["t"][x > 156.05].max() == 0      # la parte plana termina en la pared
 
@@ -214,44 +214,25 @@ def test_bt_vuelto_con_la_nc(consigna, tmp_path):
     assert {b[1] for b in con_nc["bandas"]} >= {"BT", "NC"}
 
 
-def test_labio_del_bt_bajo_el_aro_y_vuelto_con_la_nc(consigna, tmp_path):
-    """Por defecto: tras la falaise el BT sigue como labio fino y se vuelve dentro de la NC."""
+def test_aro_es_el_alambre_y_el_bt_bajo_el_aro_se_vuelve_con_la_nc(consigna, tmp_path):
+    """El aro se dibuja con el ESP del TT (centro = centro del burlete); el aro se apoya en la falaise
+    del BT y lo que pasa del aro se vuelve con la NC, pegado al aro."""
     wb = openpyxl.load_workbook(consigna)
     ws = wb.active
-    ws["R60"], ws["V60"] = "Ø Burlete :", 6
+    ws["R60"], ws["V60"] = "Ø Burlete :", 10
     ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
     ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
     ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
-    ruta = tmp_path / "bt3.xlsx"
-    wb.save(ruta)
-    c = neumatico.cargar(str(ruta))
-    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
-    aj = neumatico.Ajustes(labio_bt=0.5, vuelta_bt="con_nc")
-    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods, aj)
-    bt = next(k for k in capas if k["prod"].codigo == "BT")
-    entre = (x > 156.5) & (x < 157)          # justo después de la falaise, antes del aro
-    assert bt["t"][entre].max() == pytest.approx(0.5)
-    assert bt["t"][x < 150].max() == pytest.approx(3.0)
-    orden = [b[1] for b in info["bandas"]]
-    assert orden.index("BT") < orden.index("NC")   # el labio va pegado al aro, la NC por fuera
-
-
-def test_burlete_bt_envuelve_todo_el_aro(consigna, tmp_path):
-    """Ø Burlete = aro (ESP del TT) + 2 × BT: el aro se dibuja con su ESP y el BT lo cubre entero."""
-    wb = openpyxl.load_workbook(consigna)
-    ws = wb.active
-    ws["R60"], ws["V60"] = "Ø Burlete :", 10            # aro 4 + 2 × 3
-    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
-    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
-    ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
-    ruta = tmp_path / "bur.xlsx"
+    ruta = tmp_path / "alambre.xlsx"
     wb.save(ruta)
     c = neumatico.cargar(str(ruta))
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)   # por defecto
-    (xa, ya, r_aro), = aros
-    assert r_aro == pytest.approx(2.0)                  # ESP del TT = 4
-    xb, yc, r = info["burlete"]
-    assert r == pytest.approx(5.0) and yc == pytest.approx(208.0)
-    assert {v["cod"]: v for v in info["vueltas"]}["BT"]["ang"] == 360
-    assert "BT" in [b[1] for b in info["bandas"]]
+    (xa, ya, r), = aros
+    assert r == pytest.approx(2.0)                      # ESP del TT = 4
+    assert ya == pytest.approx(203.0 + 5.0)             # centro del burlete
+    assert xa == pytest.approx(320.5 / 2)
+    bt = next(k for k in capas if k["prod"].codigo == "BT")
+    assert bt["t"][x > xa + 0.05].max() == 0            # lo que pasa del aro ya no está plano
+    orden = [b[1] for b in info["bandas"]]
+    assert orden.index("BT") < orden.index("NC")       # BT pegado al aro, la NC por fuera
