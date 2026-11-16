@@ -1,0 +1,7 @@
+Nombre;Tipo;Desde;Hasta;Nominal;Tol+;Tol-;Medido;Offset
+Ancho total;H;E1;E2;40;0,2;0,2;40,12;-6
+Alto total;V;E2;E3;30;0,2;0,2;30,25;5
+Pared lateral;H;E4;I4;3;0,1;0,1;2,95;6
+Espesor base;V;E1;I1;10;0,15;0,15;;-5
+Taladro tornillo;D;C1;;4,2;0,1;0;4,18;6
+Radio exterior;R;E3;;3;0,3;0,3;;4

@@ -1,0 +1,10 @@
+Contorno;Punto;Tipo;X;Y;Longitud;Angulo;Radio;Diametro
+Exterior;E1;P;0;0;;;3;
+Exterior;E2;P;40;0;;;3;
+Exterior;E3;P;40;30;;;3;
+Exterior;E4;P;0;30;;;3;
+Interior;I1;P;3;10;;;1;
+Interior;I2;P;37;10;;;1;
+Interior;I3;P;37;27;;;1;
+Interior;I4;P;3;27;;;1;
+;C1;C;20;5;;;;4,2

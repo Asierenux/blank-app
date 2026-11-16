@@ -1,0 +1,9 @@
+Contorno;Punto;X;Y;Longitud;Angulo;Radio
+Perfil U;A;0;0;;;
+Perfil U;B;;;50;0;
+Perfil U;C;;;25;90;
+Perfil U;D;;;2;180;
+Perfil U;E;;;23;270;1,5
+Perfil U;F;;;46;180;1,5
+Perfil U;G;;;23;90;
+Perfil U;H;;;2;180;

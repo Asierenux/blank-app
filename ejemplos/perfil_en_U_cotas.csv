@@ -1,0 +1,5 @@
+Nombre;Tipo;Desde;Hasta;Nominal;Tol+;Tol-;Medido;Offset
+Ancho;H;A;B;50;0,3;0,3;50,1;-5
+Alto ala;V;B;C;25;0,2;0,2;25,3;5
+Espesor;V;A;F;2;0,1;0,1;;-4
+Radio interior;R;E;;1,5;0,2;0,2;;3
