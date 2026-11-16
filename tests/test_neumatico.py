@@ -186,10 +186,29 @@ def test_bt_con_falaise_hace_de_tope_y_envuelve_el_aro(consigna, tmp_path):
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
     xb, yc, r = info["aro"]
-    assert xb == pytest.approx(156 + 3)            # pegado a la HF
+    assert xb == pytest.approx(320.5 / 2)          # centro del aro en entre aros / 2
     assert info["pared"] == ("BT", 156)
     v = {v["cod"]: v for v in info["vueltas"]}["BT"]
     # 10 mm de BT, de 3 a 0 mm de espesor, sobre un aro de r = 3 → radio medio ≈ 3,75
     assert v["ang"] == pytest.approx(math.degrees(10 / 3.75), rel=0.08)
     capa_bt = next(k for k in capas if k["prod"].codigo == "BT")
     assert capa_bt["t"][x > 156.05].max() == 0      # la parte plana termina en la pared
+
+
+def test_bt_vuelto_con_la_nc(consigna, tmp_path):
+    """Variante: el BT se vuelve junto con la NC y queda entre el aro y la NC."""
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 6
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
+    ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
+    ruta = tmp_path / "bt2.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    arriba = neumatico._calcular_plano(c, prods, neumatico.Ajustes(vuelta_bt="arriba"))[4]
+    con_nc = neumatico._calcular_plano(c, prods, neumatico.Ajustes(vuelta_bt="con_nc"))[4]
+    # con el BT dentro de la vuelta, la NC envuelve con más radio y vuelve menos hacia el centro
+    assert con_nc["retournement"][1] > arriba["retournement"][1]
+    assert {b[1] for b in con_nc["bandas"]} >= {"BT", "NC"}

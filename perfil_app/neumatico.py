@@ -28,6 +28,8 @@ class Ajustes:
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
+    vuelta_bt: str = "arriba"     # «arriba»: el BT envuelve el aro desde la HF por encima;
+                                  # «con_nc»: el BT se vuelve junto con la NC (por dentro de ella)
 
 
 @dataclass
@@ -697,9 +699,6 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         if p.es_aro:
             xb = (a + b) / 2
             r = cons.diam_aro / 2 if cons.diam_aro else (p.espesor or 4) / 2
-            con_hf = [c["prod"].hf_efectivo for c in capas if c["prod"].hf_efectivo is not None]
-            if con_hf:
-                xb = con_hf[-1] + r  # el aro va pegado a la HF del BT: la falaise hace de tope
             ib = int(np.searchsorted(x, xb))
             if cons.radio_int_aro and cons.radio_int_aro > y0:
                 yc = cons.radio_int_aro + r   # posición exacta de la consigna
@@ -714,18 +713,27 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             aro_ext = {"xb": xb, "yc": yc, "r": r}
             # 1) BT (producto con falaise): plano hasta la HF, que hace de pared/tope del aro, y el resto
             #    de su anchura envuelve el aro por encima, adelgazando hasta 0.
+            bt_con_nc = []
             for c in capas:
                 pr = c["prod"]
                 if pr.hf_efectivo is None:
                     continue
                 hf = pr.hf_efectivo
                 c["t"][x > hf] = 0
-                alto_bt = float((c["abajo"] + c["t"])[max(int(np.searchsorted(x, hf)) - 1, 0)])
+                # asiento: el BT no puede ocupar el sitio del aro (la falaise hace de pared)
+                cara = yc - np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None))
+                en_aro = np.abs(x - xb) < r
+                c["t"] = np.where(en_aro, np.minimum(c["t"], np.clip(cara - c["abajo"], 0, None)), c["t"])
+                info["pared"] = (pr.codigo, hf)
+                largo = c["fin"] - hf
+                if aj.vuelta_bt == "con_nc":
+                    bt_con_nc.append((pr, largo))
+                    continue
+                i_hf = max(int(np.searchsorted(x, min(hf, xb - r))) - 1, 0)
+                alto_bt = float((c["abajo"] + c["t"])[i_hf])
                 seno = max(-1.0, min(1.0, (alto_bt - yc) / r))
                 th0 = 180 - math.degrees(math.asin(seno))  # punto del aro a la altura de la cara del BT
-                largo = c["fin"] - hf
                 usado, th_fin = envolver_polar(pr, th0, -1, largo, pr.espesor or 1.0, 0.0, -90)
-                info["pared"] = (pr.codigo, hf)
                 info["vueltas"].append({"cod": pr.codigo, "ang": th0 - th_fin, "resto": 0.0, "falta_media": 0.0,
                                         "solo_angulo": True})
             cruzan = [c for c in capas if c["prod"].hf is None
@@ -747,6 +755,11 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             # 2) retournement (NC): sube por fuera del aro desde abajo y vuelve por encima hacia el centro
             h_vuelta = silueta(h)
             vueltas = []
+            for pr, largo in bt_con_nc:
+                # el BT va sobre la NC: al volverse queda entre el aro y la NC, adelgazando hasta 0
+                usado, th_fin = envolver_polar(pr, -90, +1, largo, pr.espesor or 1.0, 0.0, 270)
+                info["vueltas"].append({"cod": pr.codigo, "ang": th_fin + 90, "resto": 0.0, "falta_media": 0.0,
+                                        "solo_angulo": True})
             for c in reversed(plegar):  # la más cercana al aro primero
                 ti = c["prod"].espesor or 1.0
                 largo = c["fin"] - xb
@@ -876,7 +889,8 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     for v in info.get("vueltas", []):
         sol = v.get("solape_gi")
         if v.get("solo_angulo"):
-            lineas.append(f"{v['cod']}: desde la HF envuelve {v['ang']:.0f}° del aro")
+            modo = "vuelto con la NC" if aj.vuelta_bt == "con_nc" else "desde la HF, por encima"
+            lineas.append(f"{v['cod']} ({modo}): envuelve {v['ang']:.0f}° del aro")
         elif sol is None:
             lineas.append(f"{v['cod']}: envuelve {v['ang']:.0f}° del aro")
         elif sol > 0:
