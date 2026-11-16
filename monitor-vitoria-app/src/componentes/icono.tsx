@@ -86,6 +86,16 @@ const CIELO: Record<string, [string, [string, string]]> = {
   "🌫️": ["cloud.fog.fill", ["#A1ABB8", "#7D8896"]],
 };
 
+/** Colores del cielo (arriba, abajo) para un emoji de la previsión. */
+export const coloresCielo = (emoji: string): [string, string] => CIELO[emoji]?.[1] ?? ["#4FA3F7", "#2D7FD8"];
+
+/** Solo el símbolo a todo color, sin baldosa (para ponerlo sobre un fondo de color). */
+export function SimboloCielo({ emoji, tam = 24 }: { emoji: string; tam?: number }) {
+  const def = CIELO[emoji];
+  if (Platform.OS !== "ios" || !def) return <Text style={{ fontSize: tam * 0.85, lineHeight: tam * 1.1 }}>{emoji}</Text>;
+  return <SymbolView name={def[0] as SFSymbol} size={tam} type="multicolor" fallback={<Text style={{ fontSize: tam * 0.85 }}>{emoji}</Text>} />;
+}
+
 export function IconoCielo({ emoji, tam = 24 }: { emoji: string; tam?: number }) {
   const def = CIELO[emoji];
   const lado = Math.round(tam * 1.3);

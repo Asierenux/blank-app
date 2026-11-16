@@ -11,14 +11,20 @@ import { Aviso, Cifra, Etiqueta, Hoja, Insignia, Pantalla, Tarjeta } from "../co
 import { MejorGasolina, MisParadas } from "../componentes/novedades";
 import { AgendaCompleta } from "../componentes/agenda";
 import { Icono } from "../componentes/icono";
-import { Lanzador, type Apartado } from "../componentes/lanzador";
+import { Widgets, type Apartado } from "../componentes/widgets";
 import { Ajustes } from "../componentes/ajustes";
 import { useDatos } from "../datos";
-import { fechaMadrid, hora, num } from "../lib/formato";
+import { fechaMadrid, hora, num, partesMadrid } from "../lib/formato";
 import type { Panel } from "../lib/panel";
-import { alfa, colorNivel, mezcla, useColores } from "../lib/tema";
+import { useColores } from "../lib/tema";
 
 const TRAMO = { barato: "Barata", medio: "Media", caro: "Cara" } as const;
+
+const saludo = () => {
+  const h = partesMadrid(Date.now()).hora;
+  return h < 6 || h >= 21 ? "Buenas noches" : h < 13 ? "Buenos días" : "Buenas tardes";
+};
+const fechaLarga = () => new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", weekday: "long", day: "numeric", month: "long" }).format(new Date());
 
 /** La luz: precio de ahora, gráfica del día y las mejores horas. */
 function Luz({ panel }: { panel: Panel }) {
@@ -64,19 +70,15 @@ export default function Inicio() {
   if (!listo || !panel) {
     return <View style={{ flex: 1, backgroundColor: c.fondo, justifyContent: "center" }}><ActivityIndicator /></View>;
   }
-  const { global, agua, fuentes } = panel;
-  const color = colorNivel(c, global.nivel);
+  const { fuentes } = panel;
   const sinConfigurar = fuentes.filter(f => f.texto === "Sin configurar");
   const conProblemas = fuentes.filter(f => f.nivel === "aviso" && f.texto !== "Sin configurar");
-  const detalle = [...panel.avisos.map(a => ({ nivel: "aviso", etiqueta: `Aviso ${a.nivel}`, texto: a.fenomeno.toLowerCase() })), ...panel.indicadores, ...agua.embalses.map(e => ({ nivel: e.nivelEstado, etiqueta: e.corto, texto: e.texto })),
-    ...agua.rios.map(r => ({ nivel: r.nivelEstado, etiqueta: r.nombre, texto: r.texto }))]
-    .filter(i => i.nivel === "aviso" || i.nivel === "critico").map(i => `${i.etiqueta}: ${i.texto}`).join(" · ");
 
   const abrir = (a: Apartado) => {
     const ir = (pathname: "/clima" | "/agua" | "/trenes" | "/movilidad", params?: Record<string, string>) =>
       router.navigate(params ? { pathname, params: { ...params, t: String(Date.now()) } } : pathname);
     switch (a) {
-      case "tiempo": return ir("/clima");
+      case "tiempo": case "aire": return ir("/clima");
       case "agua": return ir("/agua");
       case "trenes": return ir("/trenes");
       case "bus": return ir("/movilidad", { modo: "transporte", vehiculo: "bus" });
@@ -90,7 +92,7 @@ export default function Inicio() {
   };
 
   return (
-    <Pantalla titulo="Vitoria-Gasteiz" derecha={
+    <Pantalla titulo={saludo()} subtitulo={fechaLarga()} derecha={
       <Pressable onPress={() => setAjustes(true)} hitSlop={10} accessibilityLabel="Ajustes"
         style={({ pressed }) => ({ width: 40, height: 40, borderRadius: 20, backgroundColor: c.tarjeta, alignItems: "center",
           justifyContent: "center", marginBottom: 4, opacity: pressed ? 0.6 : 1 })}>
@@ -101,17 +103,7 @@ export default function Inicio() {
         <Ajustes cerrar={() => setAjustes(false)} />
       </Modal>
 
-      {/* Cómo está Vitoria, en una frase (al tocarla, el tiempo y los avisos con detalle) */}
-      <Tarjeta onPress={() => router.navigate("/clima")} estilo={{ backgroundColor: mezcla(color, c.tarjeta, 0.14), borderColor: alfa(color, 0.35), gap: 2, paddingVertical: 12 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: color, shadowColor: color, shadowOpacity: 0.8, shadowRadius: 6 }} />
-          <Text style={{ color: c.texto, fontSize: 18, fontWeight: "800", flex: 1, letterSpacing: -0.3 }}>{global.texto}</Text>
-          {detalle ? <Icono n="flecha" color={c.tenue} tam={14} /> : null}
-        </View>
-        {detalle ? <Text numberOfLines={2} style={{ color: c.suave, fontSize: 14, paddingLeft: 22 }}>{detalle}</Text> : null}
-      </Tarjeta>
-
-      <Lanzador panel={panel} nParadas={preferencias.paradas.length} abrir={abrir} />
+      <Widgets panel={panel} abrir={abrir} />
 
       {sinConfigurar.length > 0 && (
         <Tarjeta onPress={() => setAjustes(true)}>
