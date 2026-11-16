@@ -557,3 +557,15 @@ test("Vías: los trenes van por la vía real (red de la IDEE)", async () => {
   assert.ok(Math.abs(p.km - 300) < 0.5 && p.error < 0.01);
   assert.ok(distKm(bm.puntos[0], [41.3798632, 2.14101688]) < 1);
 });
+
+test("Agenda: planes para niños y familias", async () => {
+  const { paraFamilias } = await import("../src/lib/fuentes/agenda");
+  assert.deepEqual(paraFamilias("Teatro", "Cuentacuentos: \"El brillo de Lucinda\"", "A partir de 5 años."), { familia: true, edad: "+5 años" });
+  assert.deepEqual(paraFamilias("Formación", "Taller creativo", "Para niños y niñas de 6 a 13 años"), { familia: true, edad: "6-13 años" });
+  assert.equal(paraFamilias("Actividad Infantil", "Lo que sea", "").familia, true);
+  // «a partir de 8 años» en un concierto es solo la edad mínima, no un plan infantil
+  assert.equal(paraFamilias("Concierto", "CANDLELIGHT: Queen vs. ABBA", "Edad mínima: a partir de 8 años").familia, false);
+  assert.equal(paraFamilias("Concurso", "Gazte Talent", "Jóvenes entre 14 y 35 años").familia, false);
+  assert.equal(paraFamilias("Teatro", "Cuentacuentos para adultos", "Hotzikara, cuentos para adultos").familia, false);
+  assert.equal(paraFamilias("Conferencia", "Club de cómic: \"Santa Familia\"", "").familia, false);
+});

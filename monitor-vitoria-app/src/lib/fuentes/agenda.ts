@@ -9,13 +9,36 @@ import { ErrorFuente, type Descargar } from "../tipos";
 import { bajarJson, type Resultado } from "./comun";
 
 const URL = "https://api.euskadi.eus/culture/events/v1.0/events/upcoming";
-const PAGINAS = 8;            // 400 eventos de Álava ≈ dos semanas
+const PAGINAS = 12;           // hasta 600 eventos de Álava (≈ toda la agenda publicada)
 
 export interface Evento {
   id: string; tipo: string; nombre: string;
   desde: string; hasta: string;       // "2026-11-06" (día en Vitoria)
   hora: string | null; lugar: string | null; precio: string | null;
   url: string | null; entradas: string | null; imagen: string | null; descripcion: string;
+  familia?: boolean;                  // para niños o en familia
+  edad?: string | null;               // "3-6 años", "+5 años"
+}
+
+// Niños y familias: la agenda casi nunca usa el tipo «Actividad Infantil», así que se mira el título y la descripción
+const TITULO_FAMILIA = /infantil|niñ[oa]s|en familia|familiar|familias|familiak|txiki|haur|cuentacuentos|ipuin|t[íi]teres|marioneta|payas[oa]s?|peques|beb[ée]s|ludoteca|bor-bor/i;
+const TEXTO_FAMILIA = /p[úu]blico (familiar|infantil)|toda la familia|en familia|para familias|niñ[oa]s y niñ[oa]s|haurrentzat|familientzat|familian|actividad familiar|taller familiar/i;
+const SOLO_ADULTOS = /para adultos|helduentzat|\+18|mayores de (16|18)/i;
+const RANGO = /(?:de|entre) (\d{1,2}) (?:a|y) (\d{1,2}) años/i;
+const DESDE = /(?:a partir de|desde los) (\d{1,2}) años/i;
+
+/** ¿Es para niños o familias? Y, si lo dice, la edad. */
+export function paraFamilias(tipo: string, nombre: string, descripcion: string): { familia: boolean; edad: string | null } {
+  const todo = `${nombre} ${descripcion}`;
+  if (SOLO_ADULTOS.test(todo)) return { familia: false, edad: null };
+  const r = RANGO.exec(descripcion) ?? RANGO.exec(nombre);
+  const d = DESDE.exec(descripcion) ?? DESDE.exec(nombre);
+  let edad: string | null = null;
+  let porEdad = false;
+  if (r && +r[1] <= 12) { edad = `${r[1]}-${r[2]} años`; porEdad = +r[2] <= 14; }
+  else if (d && +d[1] <= 12) { edad = `+${d[1]} años`; porEdad = +d[1] <= 6; }   // «a partir de 8» suele ser solo la edad mínima
+  const familia = tipo === "Actividad Infantil" || TITULO_FAMILIA.test(nombre) || TEXTO_FAMILIA.test(descripcion) || porEdad;
+  return { familia, edad: familia ? edad : null };
 }
 
 const ENTIDADES: Record<string, string> = {
@@ -44,8 +67,11 @@ export function parsearAgenda(paginas: any[], ahora = Date.now()): Evento[] {
       const desde = dia(x.startDate), hasta = dia(x.endDate) || desde;
       if (!desde || hasta < hoy) continue;
       const hora = String(x.openingHoursEs ?? "").trim();
+      const tipo = String(x.typeEs ?? "Evento");
+      const nombre = textoPlano(String(x.nameEs ?? ""), 120).replace(/^"(.*)"$/, "$1");
+      const fam = paraFamilias(tipo, nombre, textoPlano(String(x.descriptionEs ?? ""), 5000));
       porId.set(String(x.id), {
-        id: String(x.id), tipo: String(x.typeEs ?? "Evento"), nombre: textoPlano(String(x.nameEs ?? ""), 120).replace(/^"(.*)"$/, "$1"),
+        id: String(x.id), tipo, nombre, familia: fam.familia, edad: fam.edad,
         desde, hasta, hora: hora || null, lugar: x.establishmentEs ?? null, precio: x.priceEs ? String(x.priceEs) : null,
         url: x.sourceUrlEs ?? x.urlEventEs ?? null, entradas: x.purchaseUrlEs ?? null,
         imagen: x.images?.[0]?.imageUrl ?? null, descripcion: textoPlano(String(x.descriptionEs ?? "")),
