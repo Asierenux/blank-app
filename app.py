@@ -92,6 +92,8 @@ class App(tk.Tk):
             sp.bind("<FocusOut>", lambda e: self._actualizar_neumatico())
         ttk.Checkbutton(self.barra_aire, text="Simular ruletaje (apliques)", variable=self.var_ruletaje,
                         command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(16, 0))
+        ttk.Button(self.barra_aire, text="⚙ Optimizar posiciones (±2 mm)…",
+                   command=self.dialogo_optimizar).pack(side=tk.LEFT, padx=(16, 0))
         self.var_total_aire = tk.StringVar()
         ttk.Label(self.barra_aire, textvariable=self.var_total_aire, foreground="#b00000",
                   font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT, padx=(16, 0))
@@ -259,7 +261,15 @@ class App(tk.Tk):
         if aro:
             txt += f"   (+ {f(round(aro, 1))} mm² en zona aro, aprox.)"
         self.var_total_aire.set(txt + ("  · con ruletaje" if self.var_ruletaje.get() else ""))
+        desp = {p.codigo: p.desplazamiento for p in cons.productos if p.desplazamiento}
+        if desp:
+            info.insert(0, "PROPUESTA: " + ", ".join(f"{k} {v:+g} mm" for k, v in desp.items()))
         self.estado.set(f"{os.path.basename(self.ruta)}  ·  {len(prods)} productos  ·  " + "  ·  ".join(info))
+
+    def dialogo_optimizar(self):
+        if not isinstance(self.consigna, neumatico.ConsignaNeumatico):
+            return
+        DialogoOptimizar(self)
 
     def ajustes(self) -> neumatico.Ajustes:
         def leer(var, defecto):
@@ -341,6 +351,116 @@ class App(tk.Tk):
 TABLA_COTAS = (("nombre", "Cota", 180), ("tipo", "Tipo", 50), ("puntos", "Puntos", 90),
                ("nominal", "Nominal", 80), ("tol", "Tolerancia", 100), ("min", "Mín", 70), ("max", "Máx", 70),
                ("dibujo", "Perfil dibujado", 110), ("medido", "Medido", 80), ("estado", "Estado", 70))
+class DialogoOptimizar(tk.Toplevel):
+    """Busca cuánto mover cada producto (como mucho X mm) para dejar el mínimo aire."""
+
+    def __init__(self, app: App):
+        super().__init__(app)
+        self.app = app
+        self.title("Optimizar posiciones de los productos")
+        self.transient(app)
+        self.resizable(True, True)
+        cons = app.consigna
+        seccion = app.var_seccion.get()
+        self.seccion = neumatico.CARCASA if seccion == "Todo" else seccion
+        self.resultado = None
+
+        f = ttk.Frame(self, padding=10)
+        f.pack(fill=tk.BOTH, expand=True)
+        ttk.Label(f, text=f"Sección: {self.seccion}.  Busca el desplazamiento de cada producto sobre su TRAZO "
+                          "que deja menos aire entre productos\n(fuera de la zona del aro), con la rigidez y el "
+                          "chaflán actuales. No cambia la consigna: es una propuesta.",
+                  justify=tk.LEFT).pack(anchor=tk.W)
+        fila = ttk.Frame(f)
+        fila.pack(anchor=tk.W, pady=6)
+        self.var_max = tk.DoubleVar(value=2.0)
+        self.var_paso = tk.DoubleVar(value=0.5)
+        ttk.Label(fila, text="Mover como mucho (mm):").pack(side=tk.LEFT)
+        ttk.Spinbox(fila, from_=0.5, to=10, increment=0.5, width=5, textvariable=self.var_max).pack(side=tk.LEFT)
+        ttk.Label(fila, text="  en pasos de (mm):").pack(side=tk.LEFT)
+        ttk.Spinbox(fila, from_=0.1, to=2, increment=0.1, width=5, textvariable=self.var_paso).pack(side=tk.LEFT)
+
+        ttk.Label(f, text="Productos que se pueden mover:").pack(anchor=tk.W)
+        cajas = ttk.Frame(f)
+        cajas.pack(anchor=tk.W)
+        self.vars = {}
+        for p in cons.de(self.seccion):
+            if p.movible:
+                v = tk.BooleanVar(value=True)
+                self.vars[p.codigo] = v
+                ttk.Checkbutton(cajas, text=f"{p.codigo} ({p.trazo_tipo} {neumatico._f(p.trazo)})",
+                                variable=v).pack(side=tk.LEFT, padx=(0, 8))
+
+        self.boton = ttk.Button(f, text="Calcular", command=self.calcular)
+        self.boton.pack(anchor=tk.W, pady=6)
+        self.barra = ttk.Progressbar(f, mode="determinate", maximum=1.0)
+        self.barra.pack(fill=tk.X)
+        self.var_res = tk.StringVar()
+        ttk.Label(f, textvariable=self.var_res, foreground="#b00000",
+                  font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W, pady=(8, 4))
+        cols = (("prod", "Producto", 90), ("orig", "TRAZO consigna", 120), ("nuevo", "TRAZO propuesto", 130),
+                ("delta", "Mover (mm)", 90), ("sentido", "Sentido", 140))
+        self.tabla = ttk.Treeview(f, columns=[c for c, _, _ in cols], show="headings", height=8)
+        for c, t, a in cols:
+            self.tabla.heading(c, text=t)
+            self.tabla.column(c, width=a, anchor=tk.CENTER)
+        self.tabla.pack(fill=tk.BOTH, expand=True)
+        bot = ttk.Frame(f)
+        bot.pack(fill=tk.X, pady=(8, 0))
+        self.b_ver = ttk.Button(bot, text="Ver propuesta en el dibujo", command=self.ver, state=tk.DISABLED)
+        self.b_ver.pack(side=tk.LEFT)
+        ttk.Button(bot, text="Volver a la consigna original", command=self.original).pack(side=tk.LEFT, padx=6)
+        ttk.Button(bot, text="Cerrar", command=self.destroy).pack(side=tk.RIGHT)
+
+    def calcular(self):
+        cods = [c for c, v in self.vars.items() if v.get()]
+        if not cods:
+            messagebox.showinfo("Optimizar", "Marca al menos un producto.", parent=self)
+            return
+        try:
+            max_mm, paso = float(self.var_max.get()), float(self.var_paso.get())
+        except (tk.TclError, ValueError):
+            messagebox.showerror("Optimizar", "Valores de mm no válidos.", parent=self)
+            return
+        self.boton.configure(state=tk.DISABLED)
+        self.var_res.set("Calculando…")
+
+        def progreso(vuelta, frac):
+            self.barra["value"] = frac
+            self.var_res.set(f"Calculando… (vuelta {vuelta + 1})")
+            self.update()
+
+        try:
+            r = neumatico.optimizar(self.app.consigna, self.seccion, self.app.ajustes(), max_mm, paso, cods, progreso)
+        finally:
+            self.boton.configure(state=tk.NORMAL)
+        self.resultado = r
+        self.barra["value"] = 1.0
+        f = neumatico._f
+        mejora = (1 - r.aire_despues / r.aire_antes) * 100 if r.aire_antes else 0
+        self.var_res.set(f"Aire entre productos: {f(round(r.aire_antes, 2))} → {f(round(r.aire_despues, 2))} mm²"
+                         f"  (−{mejora:.0f} %)     zona aro (aprox.): {f(round(r.aro_antes, 1))} → "
+                         f"{f(round(r.aro_despues, 1))} mm²")
+        self.tabla.delete(*self.tabla.get_children())
+        for p in self.app.consigna.de(self.seccion):
+            if p.codigo not in self.vars:
+                continue
+            d = r.desplazamientos.get(p.codigo, 0.0)
+            self.tabla.insert("", tk.END, values=(
+                p.codigo, f"{p.trazo_tipo} {f(p.trazo)}", f"{p.trazo_tipo} {f(round(p.trazo + d, 2))}",
+                f"{d:+g}" if d else "0", "hacia fuera" if d > 0 else ("hacia el centro" if d < 0 else "—")))
+        self.b_ver.configure(state=tk.NORMAL)
+
+    def ver(self):
+        if self.resultado:
+            neumatico.aplicar_desplazamientos(self.app.consigna, self.resultado.desplazamientos)
+            self.app._actualizar_neumatico()
+
+    def original(self):
+        neumatico.aplicar_desplazamientos(self.app.consigna, {})
+        self.app._actualizar_neumatico()
+
+
 TABLA_AIRE = (("entre", "Entre (debajo → encima), ESP", 230), ("x0", "Desde (mm desde 0)", 130),
               ("x1", "Hasta (mm desde 0)", 130), ("area", "Área sección (mm²)", 130),
               ("alto", "Altura máx. (mm)", 110), ("vol", "Volumen por lado (cm³)", 150),

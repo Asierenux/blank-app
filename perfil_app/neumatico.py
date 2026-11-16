@@ -70,6 +70,13 @@ class Producto:
     # calculado
     tramos: list[tuple[float, float]] = field(default_factory=list)  # (x0, x1) en mm
     es_aro: bool = False
+    desplazamiento: float = 0.0  # mm sobre el TRAZO de la consigna (+ = hacia fuera)
+
+    @property
+    def movible(self) -> bool:
+        """Se puede desplazar: tiene TRAZO IN/EX, o C con eje fuera del centro."""
+        return (not self.es_aro and bool(self.anchura)
+                and (self.trazo_tipo.startswith(("IN", "EX")) or (self.trazo_tipo == "C" and bool(self.trazo))))
 
     @property
     def trazo_texto(self) -> str:
@@ -77,7 +84,10 @@ class Producto:
             return ""
         if self.trazo is None:
             return self.trazo_tipo
-        return f"{self.trazo_tipo} {_f(self.trazo)}"
+        txt = f"{self.trazo_tipo} {_f(self.trazo)}"
+        if self.desplazamiento:
+            txt += f" → {_f(round(self.trazo + self.desplazamiento, 2))}"
+        return txt
 
     @property
     def borde_int(self) -> float | None:
@@ -101,6 +111,8 @@ class ConsignaNeumatico:
     notas: dict[str, str]  # todas las notas de texto (clave → valor)
     entre_tringles: float | None = None
     hors_tout: float | None = None
+    diam_aro: float | None = None        # Ø Burlete
+    radio_int_aro: float | None = None   # Radio interior burlete (desde el eje)
     avisos: list[str] = field(default_factory=list)
 
     def de(self, seccion: str | None) -> list[Producto]:
@@ -254,6 +266,19 @@ def cargar(ruta: str) -> ConsignaNeumatico:
         productos.append(p)
 
     cons = ConsignaNeumatico(titulo, cabecera, productos, notas)
+    # Datos del aro (burlete) en la parte de abajo de la consigna
+    for row in ws.iter_rows():
+        celdas = [c for c in row if c.value not in (None, "")]
+        for i, c in enumerate(celdas):
+            if not isinstance(c.value, str) or "BURLETE" not in c.value.upper():
+                continue
+            valor = next((_num(d.value) for d in celdas[i + 1:] if _num(d.value) is not None), None)
+            if valor is None:
+                continue
+            if "RADIO" in c.value.upper():
+                cons.radio_int_aro = valor
+            elif "Ø" in c.value or "DIAM" in c.value.upper():
+                cons.diam_aro = valor
     for k, v in notas.items():
         n = _num(v.split()[0]) if v else None
         if "ENTRE-TRINGLES" in k.upper() or "ENTRE TRINGLES" in k.upper():
@@ -276,7 +301,7 @@ def _calcular_posiciones(cons: ConsignaNeumatico) -> None:
                 d = p.espesor or 4
                 p.tramos = [(-x - d / 2, -x + d / 2), (x - d / 2, x + d / 2)]
             continue
-        v = v or 0.0
+        v = (v or 0.0) + (p.desplazamiento if p.movible else 0.0)
         if t in ("", "C"):
             if v == 0:
                 p.tramos = [(-w / 2, w / 2)]
@@ -329,7 +354,11 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
         _dibujar_posiciones(ax, cons, prods, mostrar_cotas)
     sub = " · ".join(f"{k}: {cons.cabecera[k]}" for k in ("DIMENSIÓN", "CBL", "C.A.I.")
                      if cons.cabecera.get(k))
-    ax.set_title(f"{seccion} — {sub}" if sub else seccion, fontsize=10)
+    titulo = f"{seccion} — {sub}" if sub else seccion
+    desp = {p.codigo: p.desplazamiento for p in cons.productos if p.desplazamiento}
+    if desp:
+        titulo += "\nPROPUESTA (no es la consigna): " + ", ".join(f"{k} {v:+g} mm" for k, v in desp.items())
+    ax.set_title(titulo, fontsize=10, color="#b00000" if desp else "black")
     fig.tight_layout()
     return ax
 
@@ -476,6 +505,16 @@ def _hay_retournement(cons: ConsignaNeumatico) -> bool:
     return any("RETOURN" in k.upper() for k in cons.notas)
 
 
+def _productos_retournes(cons: ConsignaNeumatico) -> set[str] | None:
+    """Productos que se vuelven alrededor del aro («RETOURNER PRODUIT NC»). None = no lo dice."""
+    cods = set()
+    for k in cons.notas:
+        m = re.search(r"RETOURNER\s+PRODUITS?\s+([A-Z0-9 ,/]+)", k.upper())
+        if m:
+            cods |= {c for c in re.split(r"[ ,/]+", m.group(1).strip()) if c}
+    return cods or None
+
+
 def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0):
     """Espesor del producto en cada x: trapecio con los bordes achaflanados."""
     import numpy as np
@@ -526,12 +565,41 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
     capas = []   # dict(prod, color, abajo, t)
     cuñas = []   # (color, xc, yc, rin, rout, ang0, ang1)
     aros = []    # (xc, yc, r)
-    info = {"y0": y0, "diametro": d, "retournement": None}
+    info = {"y0": y0, "diametro": d, "retournement": None, "vueltas": []}
     aro_ext = None
+    colas = []   # (color, x0, x1, y_abajo, y_arriba, codigo): cola de un producto que vuelve bajo el aro
     bolsas: list[Bolsa] = []
     aire = []  # (abajo_previo, abajo_producto, mascara)
     encima = np.full(x.shape, "tambor", dtype=object)  # qué producto queda arriba en cada x
     paso = x[1] - x[0]
+
+    def envolver(p, a, b, h):
+        """Producto que pasa del aro: la parte de fuera envuelve el aro por el exterior y, si le
+        sobra, vuelve por debajo hacia el centro (donde solapa con la GI)."""
+        xb, yc, rin = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
+        t = _espesor_x(x, max(a, 0.0), b, p.espesor, a > 0, k_chaflan=aj.chaflan)
+        ti = p.espesor or 1.0
+        t[x > xb] = 0
+        abajo = apoyar(p, t, h)
+        capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
+        h = np.where(t > 0, abajo + t, h)
+        ro = rin + ti
+        rm = (rin + ro) / 2
+        largo = b - xb
+        ang = math.degrees(largo / rm)
+        if ang <= 180:
+            cuñas.append((color(p), xb, yc, rin, ro, 90 - ang, 90))
+            info["vueltas"].append({"cod": p.codigo, "ang": ang, "resto": 0.0, "falta_media": math.pi * rm - largo,
+                                    "y": (yc - ro, yc - rin)})
+        else:
+            cuñas.append((color(p), xb, yc, rin, ro, -90, 90))
+            resto = largo - math.pi * rm
+            colas.append((color(p), xb - resto, xb, yc - ro, yc - rin, p.codigo))
+            info["vueltas"].append({"cod": p.codigo, "ang": 180.0, "resto": resto, "falta_media": 0.0,
+                                    "y": (yc - ro, yc - rin)})
+        aro_ext["r"] = ro
+        fuera = (x > xb) & (x <= xb + ro)
+        return np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(ro**2 - (x - xb) ** 2, 0, None))), h)
 
     def apoyar(p, t, h):
         """Coloca el producto de espesor t sobre h; devuelve su cara inferior y registra el aire."""
@@ -541,7 +609,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         hueco = (abajo - h) * (t > 0)
         m = hueco > aj.aire_min
         if m.any():
-            aire.append((h.copy(), abajo.copy(), m))
+            aire.append((h.copy(), abajo.copy(), m, p.codigo))
             ini = np.flatnonzero(np.diff(np.r_[0, m.astype(int)]) == 1)
             fin = np.flatnonzero(np.diff(np.r_[m.astype(int), 0]) == -1)
             for i0, i1 in zip(ini, fin):
@@ -569,14 +637,28 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             continue
         a, b = p.tramos[-1]
         if p.es_aro:
-            xb, r = (a + b) / 2, (p.espesor or 4) / 2
+            xb = (a + b) / 2
+            r = cons.diam_aro / 2 if cons.diam_aro else (p.espesor or 4) / 2
             ib = int(np.searchsorted(x, xb))
-            yc = h[ib] + r
+            if cons.radio_int_aro and cons.radio_int_aro > y0:
+                yc = cons.radio_int_aro + r   # posición exacta de la consigna
+            else:
+                yc = h[ib] + r
+            info["aro"] = (xb, yc, r)
             aros.append((xb, yc, r))
             if not _hay_retournement(cons):
                 h = np.maximum(h, np.where(np.abs(x - xb) <= r, yc + np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None)), h))
                 continue
-            plegar = [c for c in capas if c["t"][x > xb + 0.2].max(initial=0) > 0]
+            cruzan = [c for c in capas if c["t"][x > xb - r].max(initial=0) > 0 and c["fin"] > xb + 0.2]
+            ret = _productos_retournes(cons)
+            plegar = [c for c in cruzan if ret is None or c["prod"].codigo.upper() in ret]
+            # los que no se vuelven pero pasan por el aro se colocan después, por encima de la vuelta
+            aplazados = [c for c in cruzan if c not in plegar]
+            for c in aplazados:
+                capas.remove(c)
+                cod = c["prod"].codigo
+                bolsas[:] = [bo for bo in bolsas if bo.arriba != cod]
+                aire[:] = [ai for ai in aire if ai[3] != cod]
             rin = r
             vueltas = []
             for c in reversed(plegar):  # la más cercana al aro primero
@@ -618,24 +700,12 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             fuera = (x > xb) & (x <= xb + rin)
             h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(rin**2 - (x - xb) ** 2, 0, None))), h)
             aro_ext = {"xb": xb, "yc": yc, "r": rin}
+            for c in aplazados:
+                ca, cb = c["prod"].tramos[-1]
+                h = envolver(c["prod"], ca, cb, h)
             continue
         if aro_ext and b > aro_ext["xb"] + 0.2:
-            # producto que pasa del aro: la parte de fuera se envuelve por el exterior del aro
-            xb, yc, rin = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
-            t = _espesor_x(x, max(a, 0.0), b, p.espesor, a > 0, k_chaflan=aj.chaflan)
-            ti = p.espesor or 1.0
-            t[x > xb] = 0
-            abajo = apoyar(p, t, h)
-            capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
-            h = np.where(t > 0, abajo + t, h)
-            ro = rin + ti
-            rm = (rin + ro) / 2
-            largo = b - xb
-            ang = min(math.degrees(largo / rm), 270)
-            cuñas.append((color(p), xb, yc, rin, ro, 90 - ang, 90))
-            aro_ext["r"] = ro
-            fuera = (x > xb) & (x <= xb + ro)
-            h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(ro**2 - (x - xb) ** 2, 0, None))), h)
+            h = envolver(p, a, b, h)
             continue
         chaflan_ini = a > 0
         t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan)
@@ -652,6 +722,18 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         info["limite_aro"] = limite
     info["bolsas"] = bolsas
     info["aire"] = aire
+    info["colas"] = colas
+    # solape con la GI (el producto que da la vuelta debería llegar a la GI por debajo)
+    gi = next((p for p in prods if p.codigo.upper() == "GI" and p.tramos), None)
+    if gi and info.get("vueltas") and "aro" in info:
+        fin_gi = gi.tramos[-1][1]
+        xb = info["aro"][0]
+        for v in info["vueltas"]:
+            # > 0: mm que solapa con la GI por debajo del aro;  < 0: mm que le faltan para llegar
+            if v["resto"] > 0:
+                v["solape_gi"] = fin_gi - (xb - v["resto"])
+            else:
+                v["solape_gi"] = -(v["falta_media"] + max(0.0, xb - fin_gi))
     return x, capas, cuñas, aros, info, colores, h
 
 
@@ -677,7 +759,7 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     x, capas, cuñas, aros, info, colores, h = _calcular_plano(cons, prods, aj)
     y0 = info["y0"]
     # aire atrapado (debajo de los productos)
-    for h_prev, abajo, m in info["aire"]:
+    for h_prev, abajo, m, _cod in info["aire"]:
         ax.fill_between(x, h_prev, abajo, where=m, facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
                         linewidth=0.4, zorder=4)
     bolsas = info["bolsas"]
@@ -707,8 +789,27 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     for col, xc, yc, rin, ro, a0, a1 in cuñas:
         ax.add_patch(Wedge((xc, yc), ro, a0, a1, width=ro - rin, facecolor=col, edgecolor="#1b1b1b",
                            linewidth=0.5, zorder=3))
+    from matplotlib.patches import Rectangle
+    for col, x0c, x1c, ylo, yhi, cod in info.get("colas", []):
+        ax.add_patch(Rectangle((x0c, ylo), x1c - x0c, yhi - ylo, facecolor=col, edgecolor="#1b1b1b",
+                               linewidth=0.5, zorder=3))
     for xc, yc, r in aros:
         ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
+    if aros and cons.diam_aro:
+        xc, yc, r = aros[0]
+        ax.annotate(f"Aro Ø{_f(cons.diam_aro)}\nR int. {_f(cons.radio_int_aro)}", (xc, yc), xytext=(xc + 22, yc + 12),
+                    fontsize=6.5, ha="center", arrowprops=dict(arrowstyle="-", lw=0.5, color="#555"), zorder=7)
+    lineas = []
+    for v in info.get("vueltas", []):
+        sol = v.get("solape_gi")
+        if sol is None:
+            lineas.append(f"{v['cod']}: envuelve {v['ang']:.0f}° del aro")
+        elif sol > 0:
+            lineas.append(f"{v['cod']}: da la vuelta y solapa con la GI {_f(round(sol, 1))} mm")
+        else:
+            lineas.append(f"{v['cod']}: envuelve {v['ang']:.0f}° del aro, le faltan {_f(round(-sol, 1))} mm "
+                          f"para llegar a la GI")
+
 
     ax.set_aspect("equal")
     alto = max(h.max(), max((yc + r for xc, yc, r in aros), default=y0)) - y0
@@ -764,6 +865,9 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     else:
         ybajo = y0 - 6
 
+    if lineas:
+        ax.text(x[-1] - 2, ytxt + 15, "\n".join(lineas), fontsize=7, ha="left", va="top", color="#b00000",
+                fontweight="bold", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#b00000", lw=0.5), zorder=8)
     xfin = x[-1]
     ax.set_xlim(xfin, -2)  # el 0 (centro) a la derecha, como en el plano
     ax.set_ylim(ybajo, ytxt + 18)
@@ -778,4 +882,81 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     asas = [Patch(facecolor=col, edgecolor="#1b1b1b", label=cod) for cod, col in colores.items()]
     asas.append(Patch(facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
                       label=f"Aire ({_f(round(total, 1))} mm²{', con ruletaje' if aj.ruletaje else ''})"))
-    ax.legend(handles=asas, fontsize=7, ncol=min(len(asas), 11), loc="upper left", frameon=False)
+    ax.legend(handles=asas, fontsize=7, ncol=min(len(asas), 6), loc="upper right", frameon=False)
+
+
+# ---------------------------------------------------------------------------
+# Optimización: mover los productos (± pocos mm) para dejar el mínimo aire
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ResultadoOptimizacion:
+    desplazamientos: dict[str, float]
+    aire_antes: float
+    aire_despues: float
+    aro_antes: float
+    aro_despues: float
+    evaluaciones: int
+    max_mm: float
+
+
+def _aire(cons, seccion, aj):
+    bolsas = bolsas_de_aire(cons, seccion, aj)
+    return (sum(b.area for b in bolsas if not b.zona_aro), sum(b.area for b in bolsas if b.zona_aro))
+
+
+def aplicar_desplazamientos(cons: ConsignaNeumatico, desp: dict[str, float]) -> None:
+    for p in cons.productos:
+        p.desplazamiento = desp.get(p.codigo, 0.0) if p.movible else 0.0
+    _calcular_posiciones(cons)
+
+
+def optimizar(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | None = None, max_mm: float = 2.0,
+              paso: float = 0.5, codigos: list[str] | None = None, progreso=None) -> ResultadoOptimizacion:
+    """Busca el desplazamiento de cada producto (≤ max_mm) que deja menos aire entre productos.
+
+    Descenso por coordenadas: prueba cada desplazamiento de cada producto manteniendo los demás,
+    se queda con el mejor y repite hasta que nada mejora. A igualdad de aire prefiere mover menos.
+    No modifica ``cons``.
+    """
+    import copy
+
+    aj = copy.deepcopy(aj) if aj else Ajustes()
+    aj.ruletaje = False
+    trabajo = copy.deepcopy(cons)
+    aplicar_desplazamientos(trabajo, {})
+    seccion_prods = trabajo.de(seccion)
+    movibles = [p.codigo for p in seccion_prods if p.movible and (codigos is None or p.codigo in codigos)]
+    pasos = int(round(max_mm / paso))
+    opciones = [k * paso for k in range(-pasos, pasos + 1)]
+    desp = {c: 0.0 for c in movibles}
+    evals = 0
+
+    def coste(d):
+        nonlocal evals
+        evals += 1
+        aplicar_desplazamientos(trabajo, d)
+        principal, aro = _aire(trabajo, seccion, aj)
+        return principal + 1e-3 * sum(abs(v) for v in d.values()), principal, aro
+
+    base, aire0, aro0 = coste(desp)
+    mejor = base
+    total_pasos = len(movibles) * len(opciones)
+    for vuelta in range(8):
+        mejoro = False
+        for i, cod in enumerate(movibles):
+            for k, v in enumerate(opciones):
+                if v == desp[cod]:
+                    continue
+                prueba = dict(desp, **{cod: v})
+                c, _, _ = coste(prueba)
+                if c < mejor - 1e-9:
+                    mejor, desp, mejoro = c, prueba, True
+                if progreso:
+                    progreso(vuelta, (i * len(opciones) + k + 1) / max(total_pasos, 1))
+        if not mejoro:
+            break
+    _, aire1, aro1 = coste(desp)
+    desp = {c: v for c, v in desp.items() if v}
+    return ResultadoOptimizacion(desp, aire0, aire1, aro0, aro1, evals, max_mm)

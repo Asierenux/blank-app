@@ -120,3 +120,32 @@ def test_bolsas_de_aire_en_consigna(consigna):
     assert sum(b.area for b in rigida) > sum(b.area for b in ruletaje)
     assert all(b.abajo != b.arriba for b in rigida)
     assert all(b.volumen_cm3 > 0 for b in rigida)
+
+
+def test_aro_exacto_y_vuelta_hasta_la_gi(consigna, tmp_path):
+    """Con Ø y radio interior del burlete el aro va en su sitio; un producto largo da la vuelta
+    completa por fuera y vuelve por debajo solapando con la GI."""
+    import math
+
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 6
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 202.5
+    # fila 21 (BJ) pasa a ser un PTR de 120 a 200 (IN 120, ANC 80, ESP 2)
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "PTR", 80, 2.0, "IN", 120
+    ruta = tmp_path / "con_aro.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    assert c.diam_aro == 6 and c.radio_int_aro == 202.5
+    assert neumatico._productos_retournes(c) == {"NC"}
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
+    xb, yc, r = info["aro"]
+    assert xb == pytest.approx(160.25) and r == pytest.approx(3) and yc == pytest.approx(205.5)
+    # el PTR envuelve por fuera de la NC vuelta: radio interior 3 + 1,5
+    v = {v["cod"]: v for v in info["vueltas"]}["PTR"]
+    rm = 3 + 1.5 + 1.0
+    resto = (200 - 160.25) - math.pi * rm
+    assert v["ang"] == 180 and v["resto"] == pytest.approx(resto)
+    assert v["solape_gi"] == pytest.approx(150 - (160.25 - resto))  # la GI acaba en 150
+    assert v["solape_gi"] > 0

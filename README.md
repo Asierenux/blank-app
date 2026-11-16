@@ -57,6 +57,15 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *Entre-tringles* y 
     *Rigidez goma* (radio con el que la goma puentea los escalones × ESP). **Simular ruletaje**
     aprieta los productos para ver cuánto aire quedaría tras pasar los apliques. El aire junto al
     aro se muestra aparte, como aproximado, porque el pliegue del retournement es un esquema.
+  - **Aro y vuelta de los productos:** el aro se dibuja con el **Ø Burlete** y el **Radio interior
+    burlete** de la consigna. Solo se vuelve alrededor del aro el producto que indica la consigna
+    («RETOURNER PRODUIT NC»), pegado al aro. Los demás que pasan del aro (BT, PTR…) lo envuelven por
+    fuera con su espesor real y, si les sobra, vuelven por debajo. La app indica cuántos grados
+    envuelve cada uno y si **solapa con la GI** (o cuántos mm le faltan).
+  - **Optimizar posiciones (±2 mm):** busca cuánto mover cada producto sobre su TRAZO (como
+    mucho X mm, en pasos de 0,5 mm) para dejar el mínimo aire entre productos. Muestra el TRAZO
+    propuesto de cada producto y el aire antes/después, y se puede ver la propuesta en el dibujo
+    (sale en rojo como «PROPUESTA, no es la consigna») o volver a la consigna original.
   - *Posiciones (TRAZO)*: una fila por producto, con la flecha desde el 0 hasta su trazo.
   - *Sección apilada*: los productos apilados por espesor (escala exagerada), a ambos lados.
 - La tabla de abajo muestra el borde interior y exterior de cada producto en mm desde el 0.
