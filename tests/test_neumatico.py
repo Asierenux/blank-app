@@ -146,6 +146,50 @@ def test_aro_exacto_y_vuelta_hasta_la_gi(consigna, tmp_path):
     v = {v["cod"]: v for v in info["vueltas"]}["PTR"]
     rm = 3 + 1.5 + 1.0
     resto = (200 - 160.25) - math.pi * rm
-    assert v["ang"] == 180 and v["resto"] == pytest.approx(resto)
-    assert v["solape_gi"] == pytest.approx(150 - (160.25 - resto))  # la GI acaba en 150
+    assert v["ang"] == pytest.approx(180, abs=0.5) and v["resto"] == pytest.approx(resto, abs=0.05)
+    assert v["solape_gi"] == pytest.approx(150 - (160.25 - resto), abs=0.05)  # la GI acaba en 150
     assert v["solape_gi"] > 0
+
+
+def test_perfil_con_falaise():
+    """BT con HF: lleno hasta la haut falaise y desde ahí baja en rampa hasta su borde."""
+    import numpy as np
+
+    x = np.arange(160, 220, 0.1)
+    t = neumatico._espesor_x(x, 168, 215, 4.3, k_chaflan=1, hf=195)
+    def en(v):
+        return t[int(round((v - 160) / 0.1))]
+    assert en(180) == pytest.approx(4.3)
+    assert en(195) == pytest.approx(4.3, abs=0.05)
+    assert en(205) == pytest.approx(4.3 * 10 / 20, abs=0.05)
+    assert en(214.9) < 0.1
+
+
+def test_bt_con_falaise_hace_de_tope_y_envuelve_el_aro(consigna, tmp_path):
+    """El aro va pegado a la HF del BT y el resto del BT (ANC − BTU) envuelve el aro."""
+    import math
+
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 6
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    # fila 21 (BJ) pasa a ser un BT: IN 130, ANC 36 → 130..166, HF a 156 (BTU 26) → 10 mm envuelven
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
+    ws["E16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;"
+    ws["A16"] = "."
+    ruta = tmp_path / "bt.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    assert c.haut_falaise == 156 and c.btu == 26
+    bt = next(p for p in c.productos if p.codigo == "BT")
+    assert bt.hf == 156
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
+    xb, yc, r = info["aro"]
+    assert xb == pytest.approx(156 + 3)            # pegado a la HF
+    assert info["pared"] == ("BT", 156)
+    v = {v["cod"]: v for v in info["vueltas"]}["BT"]
+    # 10 mm de BT, de 3 a 0 mm de espesor, sobre un aro de r = 3 → radio medio ≈ 3,75
+    assert v["ang"] == pytest.approx(math.degrees(10 / 3.75), rel=0.08)
+    capa_bt = next(k for k in capas if k["prod"].codigo == "BT")
+    assert capa_bt["t"][x > 156.05].max() == 0      # la parte plana termina en la pared
