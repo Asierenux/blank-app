@@ -192,3 +192,62 @@ def test_duplicate_paths_detected(core, tmp_path):
 def test_fmt_duration(core):
     assert core.fmt_duration(3661) == "01:01:01"
     assert core.fmt_duration(90061) == "1d 01h 01m"
+
+
+def test_flapping_hang_is_one_episode(core, tmp_path, monkeypatch):
+    """Cortes intermitentes (como HMI PT a las 03:10) = un solo episodio, sin reinicio."""
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.detect_hang, cfg.hang_timeout_s, cfg.hang_recover_s = True, 60, 3
+    hung = {"v": False}
+    monkeypatch.setattr(core, "is_hung", lambda pid: hung["v"])
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: wd.snapshot()["status"] == core.Status.RUNNING)
+        for _ in range(4):                      # 4 cortes de ~2 s con ~1,5 s entre medias
+            hung["v"] = True
+            assert wait_for(lambda: wd.snapshot()["status"] == core.Status.HUNG)
+            time.sleep(1.2)
+            hung["v"] = False
+            assert wait_for(lambda: wd.snapshot()["status"] == core.Status.UNSTABLE)
+        assert wd.snapshot()["episode_cuts"] == 4
+        assert wait_for(lambda: wd.snapshot()["status"] == core.Status.RUNNING, timeout=8)
+        rows = [r for r in core.read_history() if "NO RESPONDE" in r[2] or "Bloqueo" in r[2]]
+        assert len(rows) == 1 and "4 cortes" in rows[0][2], rows
+        assert wd.state.hang_episodes == 1 and wd.state.restart_count == 0
+    finally:
+        wd.stop()
+
+
+def test_continuous_hang_restarts(core, tmp_path, monkeypatch):
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.detect_hang, cfg.hang_timeout_s = True, 2
+    monkeypatch.setattr(core, "is_hung", lambda pid: True)
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: wd.state.restart_count >= 1, timeout=15)
+        assert wd.state.last_reason == "No responde" and wd.state.hang_kills >= 1
+    finally:
+        wd.stop()
+
+
+def test_short_hangs_not_logged_below_minimum(core, tmp_path, monkeypatch):
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.detect_hang, cfg.hang_recover_s, cfg.hang_log_min_s = True, 2, 30
+    hung = {"v": False}
+    monkeypatch.setattr(core, "is_hung", lambda pid: hung["v"])
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: wd.snapshot()["status"] == core.Status.RUNNING)
+        hung["v"] = True
+        assert wait_for(lambda: wd.snapshot()["status"] == core.Status.HUNG)
+        hung["v"] = False
+        assert wait_for(lambda: wd.state.hang_episodes == 1, timeout=8)
+        assert not [r for r in core.read_history() if "Bloqueo" in r[2]]
+    finally:
+        wd.stop()

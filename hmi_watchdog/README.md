@@ -31,7 +31,7 @@ Interfaz con la identidad visual de Michelin, a partir del material corporativo:
 | **Configuración persistente** | Se guarda en `%LOCALAPPDATA%\HMIWatchdog\config.json`. Se escribe de forma atómica para que un corte de luz no la corrompa. |
 | **Arranque con Windows** | Se registra solo en `HKCU\...\CurrentVersion\Run`. Tras encender el PC espera unos segundos configurables y abre la HMI. |
 | **Contador de reinicios** | Por aplicación: número de reinicios y fecha, hora y motivo del último (*Cerrada* / *No responde*). Se conserva tras reiniciar el PC. |
-| **Detección de "No responde"** | Si la ventana de la HMI está colgada más de N segundos, se cierra a la fuerza y se relanza. |
+| **Detección de "No responde"** | Si la ventana de una aplicación está colgada más de N segundos **seguidos** (60 por defecto), se cierra a la fuerza y se relanza. Los cortes intermitentes se agrupan en **un solo bloqueo** (estado *INESTABLE*), que se da por superado cuando la app lleva X segundos respondiendo. Se anota en una sola línea: duración, número de cortes, tiempo sin responder y **pico de CPU y memoria**. |
 | **Protección anti-bucle** | Si la app se cierra N veces en M minutos (falta un fichero, falla la licencia…), espera un tiempo antes de reintentar en lugar de relanzarla sin parar. |
 | **Pausa de mantenimiento** | Se puede pausar la vigilancia para cerrar la HMI a propósito. La vigilancia **se reanuda sola** pasado el tiempo indicado, para que nadie se olvide de reactivarla. |
 | **PIN de protección** | Opcional. Se pide para cerrar el supervisor, pausar, reiniciar, poner el contador a cero o cambiar la configuración. |
@@ -62,6 +62,28 @@ cuentan aparte (*Arranques al iniciar el PC*) y no suman en el contador de reini
 pip install -r requirements.txt
 pythonw hmi_watchdog.py
 ```
+
+## Qué hacer si una HMI se bloquea a ratos
+
+El supervisor reinicia una HMI que se queda colgada del todo, pero no puede quitar
+la causa de los bloqueos cortos. Para encontrarla:
+
+1. **Mira la hora.** Si siempre pasa a la misma hora (p.ej. 03:10 u 08:00), es una
+   tarea programada. Revisa el *Programador de tareas* de Windows, las copias de
+   seguridad, el antivirus (análisis programados), Windows Update y las tareas de la
+   propia HMI (purgado de base de datos, exportación de informes, cambio de turno).
+2. **Mira el resumen del bloqueo** en el historial:
+   - *CPU equipo* cerca de 100 %: otro proceso acapara el PC a esa hora.
+   - *CPU app* alta: la propia HMI está haciendo un trabajo pesado.
+   - *Memoria* que crece día a día: posible fuga de memoria en la HMI. Un reinicio
+     programado (p.ej. en un cambio de turno) lo mitiga.
+   - CPU baja y aun así bloqueada: suele estar esperando a disco o red (carpeta
+     compartida, base de datos remota, PLC/perfilómetro que no contesta).
+3. **Visor de eventos de Windows** → *Registros de Windows → Aplicación*: busca
+   eventos «Application Hang» (ID 1002) de la HMI a esa hora.
+4. **Antivirus**: añade exclusiones para la carpeta de la HMI y sus datos.
+5. Si la causa está en la propia HMI, pasa al fabricante el resumen del historial
+   (horas, duración, CPU y memoria).
 
 ## Recomendaciones para un puesto que nunca debe parar
 

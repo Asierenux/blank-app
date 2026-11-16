@@ -144,6 +144,8 @@ class Config:
     launch_gap_s: int = 5           # separación entre el arranque de una app y la siguiente
     detect_hang: bool = True        # reiniciar si la ventana "No responde"
     hang_timeout_s: int = 60        # segundos seguidos colgada antes de matarla
+    hang_recover_s: int = 20        # respondiendo X s seguidos = bloqueo terminado
+    hang_log_min_s: int = 0         # no anotar bloqueos con menos de X s sin responder
     loop_max_restarts: int = 5      # protección anti-bucle: N reinicios...
     loop_window_min: int = 10       # ...en M minutos...
     loop_cooldown_min: int = 2      # ...=> esperar X minutos antes de reintentar
@@ -215,6 +217,8 @@ class State:
     boot_launches: int = 0          # lanzamientos al iniciar el PC/supervisor
     last_boot_launch: str = ""
     hang_kills: int = 0             # veces que se mató por "No responde"
+    hang_episodes: int = 0          # bloqueos "No responde" (agrupados por episodio)
+    last_hang: str = ""             # resumen del último bloqueo
 
     @staticmethod
     def path(app_id: str) -> Path:
@@ -465,6 +469,7 @@ class Status:
     WAITING = "ESPERANDO INICIO"
     RUNNING = "EN EJECUCIÓN"
     HUNG = "NO RESPONDE"
+    UNSTABLE = "INESTABLE"           # responde, pero se ha bloqueado hace poco
     RESTARTING = "REINICIANDO"
     STOPPED = "CERRADA"
     PAUSED = "VIGILANCIA PAUSADA"
@@ -473,6 +478,41 @@ class Status:
 
 
 OK_STATUSES = {Status.RUNNING, Status.WAITING, Status.PAUSED}
+
+
+class HangEpisode:
+    """Agrupa cortes "No responde" seguidos en un único episodio.
+
+    Una HMI puede alternar colgada/responde durante minutos (p.ej. por una tarea
+    pesada). En vez de anotar cada corte, se cuenta un episodio que termina
+    cuando la aplicación lleva `hang_recover_s` segundos respondiendo sin parar.
+    Durante el episodio se guarda el pico de CPU y memoria para diagnosticar.
+    """
+
+    def __init__(self, now: float):
+        self.start = now
+        self.cuts = 0
+        self.hung_total = 0.0
+        self.longest = 0.0
+        self.responsive_since: float | None = None
+        self.peak_cpu_proc = 0.0
+        self.peak_cpu_sys = 0.0
+        self.peak_mem = 0
+
+    def summary(self, end: float) -> str:
+        parts = [f"duración {fmt_duration(end - self.start)}",
+                 f"{self.cuts} corte{'s' if self.cuts != 1 else ''}",
+                 f"{int(self.hung_total)} s sin responder"]
+        if self.cuts > 1:
+            parts.append(f"el más largo {int(self.longest)} s")
+        diag = []
+        if self.peak_cpu_proc:
+            diag.append(f"CPU app máx {self.peak_cpu_proc:.0f} %")
+        if self.peak_cpu_sys:
+            diag.append(f"CPU equipo máx {self.peak_cpu_sys:.0f} %")
+        if self.peak_mem:
+            diag.append(f"memoria {self.peak_mem / 2**20:.0f} MB")
+        return ", ".join(parts) + (" | " + ", ".join(diag) if diag else "")
 
 
 class Watchdog(threading.Thread):
@@ -494,6 +534,9 @@ class Watchdog(threading.Thread):
         self.paused_until: float | None = None
         self.loop_block_until: float | None = None
         self.hung_since: float | None = None
+        self.episode: HangEpisode | None = None
+        self._pobj: psutil.Process | None = None      # para medir CPU entre ticks
+        self._last_cpu_times = None
         self.last_error = ""
         self._restart_times: deque[float] = deque()
         self._first_check = True
@@ -519,6 +562,10 @@ class Watchdog(threading.Thread):
                 boot_launches=self.state.boot_launches,
                 last_boot_launch=self.state.last_boot_launch,
                 hang_kills=self.state.hang_kills,
+                hang_episodes=self.state.hang_episodes,
+                last_hang=self.state.last_hang,
+                episode_for=(now - self.episode.start) if self.episode else None,
+                episode_cuts=self.episode.cuts if self.episode else 0,
                 paused_left=(self.paused_until - now) if self.paused_until else None,
                 loop_block_left=(self.loop_block_until - now) if self.loop_block_until else None,
                 hung_for=(now - self.hung_since) if self.hung_since else None,
@@ -655,32 +702,18 @@ class Watchdog(threading.Thread):
         with self._lock:
             if proc:
                 self._track(proc)
-                if cfg.detect_hang and is_hung(proc.pid):
-                    if self.hung_since is None:
-                        self.hung_since = now
-                        self._event("La aplicación NO RESPONDE", history=True, pid=proc.pid)
-                    self.status = Status.HUNG
-                    if now - self.hung_since >= cfg.hang_timeout_s:
-                        self._event(
-                            f"Sin responder {int(now - self.hung_since)}s: se fuerza el cierre",
-                            history=True, pid=proc.pid,
-                        )
-                        kill_tree(proc)
-                        self.state.hang_kills += 1
-                        self.hung_since = None
-                        self._do_launch("No responde", count=True)
-                else:
-                    if self.hung_since is not None:
-                        self._event("La aplicación vuelve a responder", history=True, pid=proc.pid)
-                    self.hung_since = None
-                    self.status = Status.RUNNING
+                self._check_hang(proc, now)
                 return
 
             # --- la aplicación NO está abierta
             if self.pid is not None:
-                self._event("La aplicación se ha CERRADO", history=True, pid=self.pid)
+                extra = ""
+                if self.episode:
+                    extra = f" (estaba bloqueándose: {self.episode.summary(now)})"
+                self._event(f"La aplicación se ha CERRADO{extra}", history=True, pid=self.pid)
             self._track(None)
             self.hung_since = None
+            self.episode = None
             self.status = Status.STOPPED
 
             # protección anti-bucle
@@ -708,6 +741,84 @@ class Watchdog(threading.Thread):
                 self.status = Status.RUNNING
                 return
             self._do_launch("Cerrada", count=True)
+
+    # ---- "No responde" ---------------------------------------------------
+    def _check_hang(self, proc: psutil.Process, now: float) -> None:
+        cfg = self.cfg
+        hung = cfg.detect_hang and is_hung(proc.pid)
+        ep = self.episode
+
+        if hung:
+            if ep is None:
+                ep = self.episode = HangEpisode(now)
+                self._event("Bloqueo: la aplicación NO RESPONDE", pid=proc.pid)
+            if self.hung_since is None:
+                self.hung_since = now
+                ep.cuts += 1
+            ep.responsive_since = None
+            self._sample(proc, ep)
+            self.status = Status.HUNG
+            if now - self.hung_since >= cfg.hang_timeout_s:
+                ep.hung_total += now - self.hung_since
+                ep.longest = max(ep.longest, now - self.hung_since)
+                self._event(
+                    f"Sin responder {int(now - self.hung_since)} s seguidos: se fuerza el cierre "
+                    f"({ep.summary(now)})", history=True, pid=proc.pid)
+                kill_tree(proc)
+                self.state.hang_kills += 1
+                self.state.hang_episodes += 1
+                self.state.last_hang = f"{now_str()} · reiniciada · {ep.summary(now)}"
+                self.hung_since = None
+                self.episode = None
+                self._do_launch("No responde", count=True)
+            return
+
+        # responde
+        if self.hung_since is not None and ep is not None:
+            ep.hung_total += now - self.hung_since
+            ep.longest = max(ep.longest, now - self.hung_since)
+            ep.responsive_since = now
+        self.hung_since = None
+        if ep is None:
+            self.status = Status.RUNNING
+            return
+        if ep.responsive_since is None:
+            ep.responsive_since = now
+        self._sample(proc, ep)
+        if now - ep.responsive_since < cfg.hang_recover_s:
+            self.status = Status.UNSTABLE
+            return
+        # episodio terminado: una sola línea en el historial
+        end = ep.responsive_since
+        self.episode = None
+        self.status = Status.RUNNING
+        self.state.hang_episodes += 1
+        self.state.last_hang = f"{now_str()} · {ep.summary(end)}"
+        self.state.save(self.app.id)
+        self._event(f"Bloqueo superado, vuelve a responder ({ep.summary(end)})",
+                    history=ep.hung_total >= cfg.hang_log_min_s, pid=proc.pid)
+
+    def _sample(self, proc: psutil.Process, ep: HangEpisode) -> None:
+        """Pico de CPU (app y equipo) y memoria durante el episodio."""
+        try:
+            if self._pobj is None or self._pobj.pid != proc.pid:
+                self._pobj = proc
+                proc.cpu_percent(None)  # la 1ª lectura solo fija la referencia
+            else:
+                cpu = self._pobj.cpu_percent(None) / (psutil.cpu_count() or 1)
+                ep.peak_cpu_proc = max(ep.peak_cpu_proc, min(cpu, 100.0))
+            ep.peak_mem = max(ep.peak_mem, self._pobj.memory_info().rss)
+        except (psutil.Error, OSError):
+            pass
+        # CPU del equipo calculada con referencia propia (hay un hilo por app)
+        t = psutil.cpu_times()
+        if self._last_cpu_times is not None:
+            prev = self._last_cpu_times
+            total = sum(t) - sum(prev)
+            idle = (t.idle - prev.idle) + (getattr(t, "iowait", 0) - getattr(prev, "iowait", 0))
+            if total > 0:
+                ep.peak_cpu_sys = max(ep.peak_cpu_sys, 100.0 * (1 - idle / total))
+        self._last_cpu_times = t
 
     # ---- utilidades internas --------------------------------------------
     def _booted_recently(self) -> bool:
