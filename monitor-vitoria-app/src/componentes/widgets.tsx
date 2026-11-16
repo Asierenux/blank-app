@@ -25,34 +25,43 @@ export type Apartado =
 const BLANCO = "#FFFFFF";
 const BLANCO_SUAVE = "rgba(255,255,255,0.78)";
 const TRAMO = { barato: "Barata", medio: "Media", caro: "Cara" } as const;
+/** Solo la hora (sin minutos): 21, 0, 9… */
+const horaSola = (t: number) => String(Number(hora(t).split(":")[0]));
 
-/** Superficie con degradado, esquinas continuas y efecto al pulsar. */
+/**
+ * Superficie con degradado, esquinas continuas y efecto al pulsar.
+ * El degradado se dibuja con el tamaño medido del widget (en el iPhone, un SVG «100 %» no ocupa todo el hueco).
+ */
 function Widget({ colores, onPress, children, estilo, marca }: {
   colores: [string, string]; onPress: () => void; children: ReactNode; estilo?: ViewStyle; marca?: NombreIcono;
 }) {
   const id = `g${useId().replace(/[^a-zA-Z0-9]/g, "")}`;
+  const [tam, setTam] = useState<{ w: number; h: number } | null>(null);
   return (
     <Pressable onPress={onPress}
+      onLayout={e => {
+        const { width: w, height: h } = e.nativeEvent.layout;
+        if (!tam || Math.abs(tam.w - w) > 0.5 || Math.abs(tam.h - h) > 0.5) setTam({ w, h });
+      }}
       style={({ pressed }) => [{ borderRadius: 24, borderCurve: "continuous", overflow: "hidden", padding: 14,
-        transform: [{ scale: pressed ? 0.97 : 1 }],
-        shadowColor: colores[1], shadowOpacity: 0.28, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } }, estilo]}>
-      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
-        <Defs>
-          <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor={colores[0]} /><Stop offset="1" stopColor={colores[1]} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id})`} />
-        {/* Brillo suave arriba (sensación de cristal) */}
-        <Defs>
-          <LinearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.16} /><Stop offset="0.6" stopColor="#FFFFFF" stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${id}b)`} />
-      </Svg>
+        backgroundColor: colores[1], transform: [{ scale: pressed ? 0.97 : 1 }] }, estilo]}>
+      {tam && (
+        <Svg width={tam.w} height={tam.h} style={{ position: "absolute", top: 0, left: 0 }} pointerEvents="none">
+          <Defs>
+            <LinearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={colores[0]} /><Stop offset="1" stopColor={colores[1]} />
+            </LinearGradient>
+            <LinearGradient id={`${id}b`} x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.16} /><Stop offset="0.6" stopColor="#FFFFFF" stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          <Rect x={0} y={0} width={tam.w} height={tam.h} fill={`url(#${id})`} />
+          {/* Brillo suave arriba (sensación de cristal) */}
+          <Rect x={0} y={0} width={tam.w} height={tam.h} fill={`url(#${id}b)`} />
+        </Svg>
+      )}
       {marca && (
-        <View pointerEvents="none" style={{ position: "absolute", right: -14, bottom: -14, opacity: 0.14 }}>
+        <View pointerEvents="none" style={{ position: "absolute", right: -14, bottom: -14, opacity: 0.1 }}>
           <Icono n={marca} color={BLANCO} tam={96} />
         </View>
       )}
@@ -93,11 +102,11 @@ function Portada({ panel, abrir }: { panel: Panel; abrir: (a: Apartado) => void 
   return (
     <Widget colores={coloresCielo(emoji)} onPress={() => abrir("tiempo")} estilo={{ padding: 18, gap: 10 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ color: BLANCO_SUAVE, fontSize: 12, fontWeight: "800", letterSpacing: 1 }}>VITORIA-GASTEIZ</Text>
+        <Text numberOfLines={1} style={{ color: BLANCO_SUAVE, fontSize: 12, fontWeight: "800", letterSpacing: 1, flexShrink: 1, marginRight: 8 }}>VITORIA-GASTEIZ</Text>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(0,0,0,0.18)", borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 }}>
           <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: g.nivel === "ok" ? "#4ADE80" : g.nivel === "critico" ? "#F87171" : "#FBBF24" }} />
-          <Text numberOfLines={1} style={{ color: BLANCO, fontSize: 12, fontWeight: "700", maxWidth: 190 }}>
-            {aviso ? `Aviso ${aviso.nivel} · ${aviso.fenomeno.toLowerCase()}` : g.texto}
+          <Text numberOfLines={1} style={{ color: BLANCO, fontSize: 12, fontWeight: "700", maxWidth: 170 }}>
+            {aviso ? `Aviso ${aviso.nivel} · ${aviso.fenomeno.toLowerCase().replace(/^aviso (de|por) /, "")}` : g.texto}
           </Text>
         </View>
       </View>
@@ -115,7 +124,7 @@ function Portada({ panel, abrir }: { panel: Panel; abrir: (a: Apartado) => void 
         <View style={{ flexDirection: "row", justifyContent: "space-between", borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: "rgba(255,255,255,0.35)", paddingTop: 10 }}>
           {horas.map(h => (
             <View key={h.t} style={{ alignItems: "center", gap: 4, minWidth: 40 }}>
-              <Text style={{ color: BLANCO_SUAVE, fontSize: 12, fontWeight: "700" }}>{hora(h.t).split(":")[0]}h</Text>
+              <Text style={{ color: BLANCO_SUAVE, fontSize: 12, fontWeight: "700" }}>{horaSola(h.t)}h</Text>
               <SimboloCielo emoji={iconoCielo(h.cielo)} tam={22} />
               <Text style={{ color: BLANCO, fontSize: 15, fontWeight: "700" }}>{h.temp != null ? `${Math.round(h.temp)}°` : "—"}</Text>
             </View>
@@ -144,7 +153,7 @@ function WidgetLuz({ panel, ancho, abrir }: { panel: Panel; ancho: number; abrir
         </Text>
         <Text style={{ color: BLANCO, fontSize: 13, fontWeight: "700" }}>
           {pvpc.actual ? TRAMO[pvpc.actual.tramo] : "Sin precios"}
-          {pvpc.mejorFranja ? <Text style={{ color: BLANCO_SUAVE, fontWeight: "600" }}>{`  ·  mejor ${hora(pvpc.mejorFranja.inicio).slice(0, 2)}–${hora(pvpc.mejorFranja.fin).slice(0, 2)} h`}</Text> : null}
+          {pvpc.mejorFranja ? <Text style={{ color: BLANCO_SUAVE, fontWeight: "600" }}>{`  ·  mejor ${horaSola(pvpc.mejorFranja.inicio)}–${horaSola(pvpc.mejorFranja.fin)} h`}</Text> : null}
         </Text>
       </View>
       {/* Las 24 horas del día; la de ahora, en blanco entero */}
