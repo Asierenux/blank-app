@@ -28,7 +28,8 @@ class Ajustes:
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
-    vuelta_bt: str = "con_nc"     # «con_nc»: tras la falaise el BT sigue como labio fino bajo el aro y
+    vuelta_bt: str = "burlete"    # «burlete»: el BT envuelve todo el aro (Ø Burlete = aro + 2 × BT);
+                                  # «con_nc»: tras la falaise el BT sigue como labio fino bajo el aro y
                                   # se vuelve junto con la NC (por dentro de ella);
                                   # «arriba»: el resto del BT envuelve el aro por encima desde la HF
     labio_bt: float = 0.8         # mm: espesor del BT después de la falaise (labio)
@@ -701,13 +702,18 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         if p.es_aro:
             xb = (a + b) / 2
             r = cons.diam_aro / 2 if cons.diam_aro else (p.espesor or 4) / 2
+            hay_bt = any(c["prod"].hf_efectivo is not None for c in capas)
+            burlete = aj.vuelta_bt == "burlete" and hay_bt and cons.diam_aro and p.espesor and p.espesor < cons.diam_aro
+            # Ø Burlete = aro (ESP del TT) + el BT que lo envuelve entero
+            r_alambre = p.espesor / 2 if burlete else r
             ib = int(np.searchsorted(x, xb))
             if cons.radio_int_aro and cons.radio_int_aro > y0:
                 yc = cons.radio_int_aro + r   # posición exacta de la consigna
             else:
                 yc = h[ib] + r
             info["aro"] = (xb, yc, r)
-            aros.append((xb, yc, r))
+            info["burlete"] = (xb, yc, r) if burlete else None
+            aros.append((xb, yc, r_alambre))
             if not _hay_retournement(cons):
                 h = np.maximum(h, np.where(np.abs(x - xb) <= r, yc + np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None)), h))
                 continue
@@ -721,6 +727,19 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
                 if pr.hf_efectivo is None:
                     continue
                 hf = pr.hf_efectivo
+                if burlete:
+                    # el BT llega hasta la falaise y desde ahí envuelve todo el aro (forma el burlete)
+                    c["t"][x > hf] = 0
+                    cara = yc - np.sqrt(np.clip(r**2 - (x - xb) ** 2, 0, None))
+                    en_aro = np.abs(x - xb) < r
+                    c["t"] = np.where(en_aro, np.minimum(c["t"], np.clip(cara - c["abajo"], 0, None)), c["t"])
+                    ang = np.radians(np.arange(0, 360.5, 2.0))
+                    bandas.append((c["color"], pr.codigo,
+                                   np.c_[xb + r * np.cos(ang), yc + r * np.sin(ang)]))
+                    info["pared"] = (pr.codigo, hf)
+                    info["vueltas"].append({"cod": pr.codigo, "ang": 360.0, "resto": 0.0, "falta_media": 0.0,
+                                            "solo_angulo": True, "burlete": True})
+                    continue
                 if aj.vuelta_bt == "con_nc":
                     # después de la falaise el BT sigue como labio fino hasta el aro
                     c["t"] = np.where((x > hf) & (x <= xb), np.minimum(c["t"], aj.labio_bt), c["t"])
@@ -803,7 +822,8 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         if p.es_aro:
             colores.setdefault(p.codigo, "#f2d600")
     if aros:
-        limite = min(xc - r for xc, yc, r in aros) - 1  # solo el propio aro y su vuelta
+        xa, _ya, ra = info["aro"]
+        limite = xa - ra - 1  # solo el propio aro (burlete) y su vuelta
         for bo in bolsas:
             bo.zona_aro = bo.x1 >= limite
         info["limite_aro"] = limite
@@ -890,12 +910,18 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
         ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
     if aros and cons.diam_aro:
         xc, yc, r = aros[0]
-        ax.annotate(f"Aro Ø{_f(cons.diam_aro)}\nR int. {_f(cons.radio_int_aro)}", (xc, yc), xytext=(xc + 22, yc + 12),
+        txt_aro = (f"Aro Ø{_f(2 * r)} + BT\nBurlete Ø{_f(cons.diam_aro)}, R int. {_f(cons.radio_int_aro)}"
+                   if info.get("burlete") else f"Aro Ø{_f(cons.diam_aro)}\nR int. {_f(cons.radio_int_aro)}")
+        ax.annotate(txt_aro, (xc, yc), xytext=(xc + 22, yc + 12),
                     fontsize=6.5, ha="center", arrowprops=dict(arrowstyle="-", lw=0.5, color="#555"), zorder=7)
     lineas = []
     for v in info.get("vueltas", []):
         sol = v.get("solape_gi")
-        if v.get("solo_angulo"):
+        if v.get("burlete"):
+            esp_tt = next((p.espesor for p in prods if p.es_aro), None)
+            lineas.append(f"{v['cod']}: envuelve todo el aro → burlete Ø{_f(cons.diam_aro)} "
+                          f"(aro Ø{_f(esp_tt)} + 2 × {v['cod']})")
+        elif v.get("solo_angulo"):
             modo = "vuelto con la NC" if aj.vuelta_bt == "con_nc" else "desde la HF, por encima"
             lineas.append(f"{v['cod']} ({modo}): envuelve {v['ang']:.0f}° del aro")
         elif sol is None:

@@ -226,7 +226,7 @@ def test_labio_del_bt_bajo_el_aro_y_vuelto_con_la_nc(consigna, tmp_path):
     wb.save(ruta)
     c = neumatico.cargar(str(ruta))
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
-    aj = neumatico.Ajustes(labio_bt=0.5)
+    aj = neumatico.Ajustes(labio_bt=0.5, vuelta_bt="con_nc")
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods, aj)
     bt = next(k for k in capas if k["prod"].codigo == "BT")
     entre = (x > 156.5) & (x < 157)          # justo después de la falaise, antes del aro
@@ -234,3 +234,24 @@ def test_labio_del_bt_bajo_el_aro_y_vuelto_con_la_nc(consigna, tmp_path):
     assert bt["t"][x < 150].max() == pytest.approx(3.0)
     orden = [b[1] for b in info["bandas"]]
     assert orden.index("BT") < orden.index("NC")   # el labio va pegado al aro, la NC por fuera
+
+
+def test_burlete_bt_envuelve_todo_el_aro(consigna, tmp_path):
+    """Ø Burlete = aro (ESP del TT) + 2 × BT: el aro se dibuja con su ESP y el BT lo cubre entero."""
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 10            # aro 4 + 2 × 3
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 36, 3.0, "IN", 130
+    ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
+    ruta = tmp_path / "bur.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
+    x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)   # por defecto
+    (xa, ya, r_aro), = aros
+    assert r_aro == pytest.approx(2.0)                  # ESP del TT = 4
+    xb, yc, r = info["burlete"]
+    assert r == pytest.approx(5.0) and yc == pytest.approx(208.0)
+    assert {v["cod"]: v for v in info["vueltas"]}["BT"]["ang"] == 360
+    assert "BT" in [b[1] for b in info["bandas"]]

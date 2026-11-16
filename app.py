@@ -46,7 +46,7 @@ class App(tk.Tk):
         self.var_chaflan = tk.DoubleVar(value=aj.chaflan)
         self.var_rigidez = tk.DoubleVar(value=aj.rigidez)
         self.var_ruletaje = tk.BooleanVar(value=False)
-        self.var_vuelta_bt = tk.StringVar(value="BT vuelto con la NC")
+        self.var_vuelta_bt = tk.StringVar(value="BT envuelve todo el aro")
         self.var_labio = tk.DoubleVar(value=neumatico.Ajustes().labio_bt)
 
         self._construir_ui()
@@ -95,7 +95,7 @@ class App(tk.Tk):
         ttk.Checkbutton(self.barra_aire, text="Simular ruletaje (apliques)", variable=self.var_ruletaje,
                         command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(16, 0))
         cbv = ttk.Combobox(self.barra_aire, textvariable=self.var_vuelta_bt, state="readonly", width=22,
-                           values=("BT vuelto con la NC", "BT por encima del aro"))
+                           values=("BT envuelve todo el aro", "BT vuelto con la NC", "BT por encima del aro"))
         cbv.pack(side=tk.LEFT, padx=(16, 0))
         cbv.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
         ttk.Label(self.barra_aire, text="labio BT (mm):").pack(side=tk.LEFT, padx=(6, 0))
@@ -291,7 +291,8 @@ class App(tk.Tk):
         d = neumatico.Ajustes()
         return neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
                                  ruletaje=self.var_ruletaje.get(),
-                                 vuelta_bt="con_nc" if "NC" in self.var_vuelta_bt.get() else "arriba",
+                                 vuelta_bt=("burlete" if "todo" in self.var_vuelta_bt.get() else
+                                            "con_nc" if "NC" in self.var_vuelta_bt.get() else "arriba"),
                                  labio_bt=leer(self.var_labio, d.labio_bt))
 
     def redibujar(self):
