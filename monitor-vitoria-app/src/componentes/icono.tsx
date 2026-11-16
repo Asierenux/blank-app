@@ -33,6 +33,7 @@ const ICONOS = {
   ubicacion: ["location.fill", "📍"],
   diana: ["scope", "🎯"],
   pie: ["figure.walk", "🚶"],
+  nube: ["cloud.sun.fill", "⛅"],
   ruta: ["arrow.triangle.turn.up.right.diamond.fill", "🧭"],
   lupa: ["magnifyingglass", "🔍"],
   destino: ["mappin.and.ellipse", "📍"],

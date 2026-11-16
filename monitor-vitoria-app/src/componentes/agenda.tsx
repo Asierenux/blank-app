@@ -78,7 +78,7 @@ function FilaEvento({ e, dia }: { e: Evento; dia: string }) {
 
 type Filtro = "hoy" | "manana" | "finde" | "todo";
 
-function AgendaCompleta({ eventos, visible, cerrar, familiaAlAbrir }: {
+export function AgendaCompleta({ eventos, visible, cerrar, familiaAlAbrir }: {
   eventos: Evento[]; visible: boolean; cerrar: () => void; familiaAlAbrir: boolean;
 }) {
   const c = useColores();

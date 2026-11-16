@@ -121,7 +121,7 @@ export default function Movilidad() {
   const [cargando, setCargando] = useState(false);
   const [linea, setLinea] = useState<string | null>(null);
   // Seguir un tranvía o autobús concreto (se llega aquí tocándolo en "Mis paradas" de Inicio)
-  const params = useLocalSearchParams<{ seguir?: string; viaje?: string; tipo?: string; parada?: string; linea?: string; destino?: string; llega?: string; t?: string }>();
+  const params = useLocalSearchParams<{ seguir?: string; viaje?: string; tipo?: string; parada?: string; linea?: string; destino?: string; llega?: string; t?: string; modo?: string; vehiculo?: string }>();
   const [siguiendo, setSiguiendo] = useState<{ id: string; viaje: string; parada: string; linea: string; destino: string; llega: number } | null>(null);
   const [carburante, setCarburante] = useState<"gasoleo" | "gasolina95">("gasoleo");
   const [camaraVista, setCamaraVista] = useState<Camara | null>(null);
@@ -212,6 +212,11 @@ export default function Movilidad() {
     setVehiculo(params.tipo === "bus" ? "bus" : "tranvia");
     setSiguiendo({ id: params.seguir ?? "", viaje: params.viaje ?? "", parada: params.parada ?? "", linea: params.linea ?? "",
       destino: params.destino ?? "", llega: Number(params.llega) || 0 });
+  }, [params.t]);
+  useEffect(() => {
+    if (!params.t || !params.modo) return;
+    setModo(params.modo as Modo);
+    if (params.vehiculo) setTimeout(() => setVehiculo(params.vehiculo as Vehiculos), 0);
   }, [params.t]);
   const amplio = modo === "gasolina" || (modo === "trafico" && zona === "carreteras");
   useEffect(() => {

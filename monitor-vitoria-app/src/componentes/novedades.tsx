@@ -180,7 +180,7 @@ function ElegirParada({ visible, cerrar }: { visible: boolean; cerrar: () => voi
   );
 }
 
-export function MisParadas() {
+export function MisParadas({ alIr }: { alIr?: () => void } = {}) {
   const c = useColores();
   const { transporte, preferencias, ponerPreferencias } = useDatos();
   const [eligiendo, setEligiendo] = useState(false);
@@ -231,10 +231,10 @@ export function MisParadas() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {lista.map((l, i) => (
                   // Al tocarlo: Movilidad, con el mapa siguiendo a ESE tranvía o autobús
-                  <Pressable key={i} onPress={() => router.navigate({ pathname: "/movilidad", params: {
+                  <Pressable key={i} onPress={() => { alIr?.(); router.navigate({ pathname: "/movilidad", params: {
                     seguir: l.vehiculo ?? "", viaje: l.viaje ?? "", tipo: p.operador === "tuvisa" ? "bus" : "tranvia",
                     parada: p.nombre, linea: l.linea, destino: l.destino, llega: String(Date.now() + Math.max(0, l.enS - pasado) * 1000), t: String(Date.now()),
-                  } })}
+                  } }); }}
                     style={({ pressed }) => ({ backgroundColor: c.tarjetaAlta, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 8, minWidth: 92, gap: 2, opacity: pressed ? 0.6 : 1 })}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                       <View style={{ backgroundColor: l.color ?? c.bus, borderRadius: 8, paddingHorizontal: 6, paddingVertical: 1 }}>

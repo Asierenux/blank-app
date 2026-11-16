@@ -1,7 +1,7 @@
 /** Piezas de interfaz comunes. Estilo iOS: tarjetas redondeadas, títulos grandes, mucho aire. */
 import * as Haptics from "expo-haptics";
 import type { ReactNode } from "react";
-import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from "react-native";
+import { Alert, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, useWindowDimensions, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient, Rect, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -229,5 +229,22 @@ export function Ficha({ etiqueta, valor, unidad, nivel, texto, detalle, children
       {detalle ? <Text numberOfLines={1} style={{ color: c.suave, fontSize: 12 }}>{detalle}</Text> : null}
       {children}
     </Tarjeta>
+  );
+}
+
+/** Pantalla que sube desde abajo (como Ajustes): un apartado de Inicio con su título y «Cerrar». */
+export function Hoja({ visible, titulo, cerrar, children }: { visible: boolean; titulo: string; cerrar: () => void; children: ReactNode }) {
+  const c = useColores();
+  const ins = useSafeAreaInsets();
+  return (
+    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={cerrar}>
+      <View style={{ flex: 1, backgroundColor: c.fondo }}>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 }}>
+          <Text style={{ color: c.texto, fontSize: 26, fontWeight: "800", letterSpacing: -0.4 }}>{titulo}</Text>
+          <Pressable onPress={cerrar} hitSlop={10}><Text style={{ color: c.acento, fontSize: 17, fontWeight: "600" }}>Cerrar</Text></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: ins.bottom + 30, gap: 14 }}>{children}</ScrollView>
+      </View>
+    </Modal>
   );
 }
