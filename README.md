@@ -38,7 +38,7 @@ Abre directamente el Excel de la consigna (`.xlsx` / `.xlsm`): la app encuentra 
 | TT (aro)   | Sin ANC: se coloca en ±ENTRE-TRINGLES / 2. |
 
 Cada producto se dibuja en los dos lados (AR a la izquierda, R a la derecha), con una flecha
-desde el 0 hasta su trazo. Se marcan también las líneas de *Entre-tringles* y *Hors tout carcasse*.
+desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE-TRINGLES) y *ancho total de carcasa* (HORS TOUT CARCASSE).
 
 - **Sección:** Carcasa (GI → FE, hasta «FORME AU DIAMETRE»), Bandaje o Todo.
 - **Vista:**

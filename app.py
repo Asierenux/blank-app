@@ -243,7 +243,7 @@ class App(tk.Tk):
                 p.longitud, f(p.peso)))
         info = [f"{k}: {v}" for k, v in cons.cabecera.items() if k in ("DIMENSIÓN", "CBL", "C.A.I.") and v]
         if cons.entre_tringles:
-            info.append(f"Entre-tringles {f(cons.entre_tringles)}")
+            info.append(f"Entre aros {f(cons.entre_tringles)}")
         # bolsas de aire
         self.tabla_aire.delete(*self.tabla_aire.get_children())
         bolsas = neumatico.bolsas_de_aire(cons, self.var_seccion.get(), self.ajustes())
@@ -473,7 +473,7 @@ TABLA_NEUMATICO = (("prod", "PROD.", 70), ("apel", "Apelación", 110), ("anc", "
 AYUDA = """CONSIGNA DE NEUMÁTICO (hoja CONSIGNA con tabla PROD. / ANC. / ESP. / TRAZO):
 se detecta sola. Cada producto se dibuja desde el 0 (centro) según su TRAZO:
 • C = centrado · IN x = borde interior a x mm del centro · EX x = borde exterior a x mm.
-• TT (aro) se coloca en ±ENTRE-TRINGLES/2. Lados AR (izquierda) y R (derecha).
+• TT (aro) se coloca en ±ENTRE-TRINGLES/2 (entre aros / 2). Lados AR (izquierda) y R (derecha).
 
 AIRE ENTRE PRODUCTOS (vista Plano): cada producto se apoya sobre los anteriores como una lámina
 con cierta rigidez: no entra en los rincones de los escalones y el hueco que queda es aire

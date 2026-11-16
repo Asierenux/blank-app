@@ -368,9 +368,9 @@ def _referencias(ax, cons, xmax, arriba):
     ax.text(0, arriba, "0 (CENTRO)", ha="center", va="bottom", fontsize=8, fontweight="bold")
     refs = []
     if cons.entre_tringles:
-        refs.append((cons.entre_tringles / 2, f"Entre-tringles {_f(cons.entre_tringles)}", "#8b0000"))
+        refs.append((cons.entre_tringles / 2, f"Entre aros {_f(cons.entre_tringles)} (entre-tringles)", "#8b0000"))
     if cons.hors_tout:
-        refs.append((cons.hors_tout / 2, f"Hors tout {_f(cons.hors_tout)}", "#555"))
+        refs.append((cons.hors_tout / 2, f"Ancho total carcasa {_f(cons.hors_tout)} (hors tout)", "#555"))
     for k, (x, txt, col) in enumerate(refs):
         for s in (-1, 1):
             ax.axvline(s * x, color=col, lw=0.8, ls="--", zorder=1)
@@ -403,7 +403,7 @@ def _dibujar_posiciones(ax, cons, prods, cotas):
         # cota del TRAZO desde el 0
         yc = y + 0.36
         if p.es_aro:
-            x_ref, etiqueta = (a + b) / 2, f"{_f(round((a + b) / 2, 3))} (entre-tringles/2)"
+            x_ref, etiqueta = (a + b) / 2, f"{_f(round((a + b) / 2, 3))} (entre aros / 2)"
         elif p.trazo_tipo in ("", "C") and not p.trazo:
             x_ref, etiqueta = p.anchura / 2, f"C  (ANC/2 = {_f(p.anchura / 2)})"
         elif p.trazo_tipo in ("", "C"):
@@ -826,17 +826,17 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
 
     niveles = iter([0, 4.5, 9, 13.5])
     if cons.entre_tringles and any(p.es_aro for p in prods):
-        vline(cons.entre_tringles / 2, f"ET/2 = {_f(round(cons.entre_tringles / 2, 2))}", "#8b0000",
+        vline(cons.entre_tringles / 2, f"Aro: entre aros/2 = {_f(round(cons.entre_tringles / 2, 2))}", "#8b0000",
               dy=next(niveles))
     cr = _cota_retournement(cons)
     if info["retournement"] and any(p.es_aro for p in prods):
         cod, xr = info["retournement"]
-        txt = f"Retournement {cod} estimado ≈ {_f(round(xr, 1))}"
+        txt = f"Vuelta {cod} (retournement) estimada ≈ {_f(round(xr, 1))}"
         if cr:
             txt += f"\n(consigna {_f(cr)}, Δ {_f(round(xr - cr, 1))})"
         vline(xr, txt, "#2e7d32", ls=":", dy=next(niveles))
     if cons.hors_tout and any(p.es_aro for p in prods):
-        vline(cons.hors_tout / 2, f"Hors tout/2 = {_f(cons.hors_tout / 2)}", "#555", dy=next(niveles))
+        vline(cons.hors_tout / 2, f"Ancho total carcasa/2 = {_f(cons.hors_tout / 2)} (hors tout)", "#555", dy=next(niveles))
 
     if cotas:
         # etiqueta de cada producto en su zona más gruesa, repartidas para no pisarse
@@ -866,11 +866,11 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
         ybajo = y0 - 6
 
     if lineas:
-        ax.text(x[-1] - 2, ytxt + 15, "\n".join(lineas), fontsize=7, ha="left", va="top", color="#b00000",
+        ax.text(x[-1] - 2, ytxt + 24, "\n".join(lineas), fontsize=7, ha="left", va="top", color="#b00000",
                 fontweight="bold", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="#b00000", lw=0.5), zorder=8)
     xfin = x[-1]
     ax.set_xlim(xfin, -2)  # el 0 (centro) a la derecha, como en el plano
-    ax.set_ylim(ybajo, ytxt + 18)
+    ax.set_ylim(ybajo, ytxt + (27 if lineas else 18))
     ax.set_xticks(range(0, int(xfin) + 1, 10))
     ax.tick_params(axis="x", labelsize=7, rotation=90)
     ax.tick_params(axis="y", labelsize=7)
