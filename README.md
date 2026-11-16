@@ -1,8 +1,10 @@
 # Dibujador de Perfiles
 
-App de escritorio para **Windows** que dibuja un perfil/sección a partir de las medidas de una
-**consigna de calidad** (Excel o CSV), con sus cotas, tolerancias y el estado **OK / NOK** de cada
-medida.
+App de escritorio para **Windows** que dibuja a partir de las medidas de una **consigna de calidad**:
+
+- **Consigna de neumático** (Excel CONSIGNA): coloca cada producto desde el centro según su TRAZO.
+- **Perfil genérico** (Excel/CSV con puntos y cotas): dibuja el perfil con cotas, tolerancias y
+  estado **OK / NOK** de cada medida.
 
 > 🔒 **Funciona sin conexión.** La app no se conecta a internet: tus consignas y medidas no salen
 > de tu equipo.
@@ -22,7 +24,28 @@ Con Python 3.11+ instalado, doble clic en `build_exe.bat`. El ejecutable queda e
 
 Para usarlo sin compilar: `pip install -r requirements.txt` y `python app.py`.
 
-## Formato de la consigna
+## Consigna de calidad de neumático (CONSIGNA / QXAX)
+
+Abre directamente el Excel de la consigna (`.xlsx` / `.xlsm`): la app encuentra sola la tabla
+`PROD. · APELACIÓN · ANC. · ESP. · ANG. · TRAZO · LONG. · PESO` y dibuja cada producto
+**desde el 0 (centro del tambor)** según su **TRAZO**:
+
+| TRAZO      | Cómo se coloca |
+|------------|----------------|
+| `C`        | Centrado en 0 (ANC/2 a cada lado). `C 100` → eje del producto a ±100 mm. |
+| `IN 80`    | Borde **interior** a 80 mm del centro; el producto va de 80 a 80 + ANC. |
+| `EX 190`   | Borde **exterior** a 190 mm del centro; el producto va de 190 − ANC a 190. |
+| TT (aro)   | Sin ANC: se coloca en ±ENTRE-TRINGLES / 2. |
+
+Cada producto se dibuja en los dos lados (AR a la izquierda, R a la derecha), con una flecha
+desde el 0 hasta su trazo. Se marcan también las líneas de *Entre-tringles* y *Hors tout carcasse*.
+
+- **Sección:** Carcasa (GI → FE, hasta «FORME AU DIAMETRE»), Bandaje o Todo.
+- **Vista:** *Posiciones (TRAZO)*, una fila por producto, o *Sección apilada*, los productos
+  apilados por espesor en el orden de colocación.
+- La tabla de abajo muestra el borde interior y exterior de cada producto en mm desde el 0.
+
+## Formato de la consigna (perfil genérico)
 
 Un Excel con dos hojas, **Perfil** y **Cotas** (mira `ejemplos/perfil_tubo.xlsx`, o usa el botón
 *Guardar plantilla de ejemplo* dentro de la app).

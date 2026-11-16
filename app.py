@@ -18,7 +18,7 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from perfil_app import core  # noqa: E402
+from perfil_app import core, neumatico  # noqa: E402
 
 APP_NOMBRE = "Dibujador de Perfiles"
 
@@ -40,12 +40,14 @@ class App(tk.Tk):
         self.consigna: core.Consigna | None = None
         self.var_puntos = tk.BooleanVar(value=True)
         self.var_cotas = tk.BooleanVar(value=True)
+        self.var_seccion = tk.StringVar(value=neumatico.CARCASA)
+        self.var_vista = tk.StringVar(value="Posiciones (TRAZO)")
 
         self._construir_ui()
         self.bind("<Control-o>", lambda e: self.abrir())
         self.bind("<F5>", lambda e: self.recargar())
 
-        if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
+        if len(sys.argv) > 1 and os.path.isfile(sys.argv[1]):
             self.cargar(sys.argv[1])
 
     # ------------------------------------------------------------------ UI
@@ -60,6 +62,18 @@ class App(tk.Tk):
                         command=self.redibujar).pack(side=tk.LEFT)
         ttk.Checkbutton(barra, text="Cotas", variable=self.var_cotas,
                         command=self.redibujar).pack(side=tk.LEFT, padx=6)
+        # Opciones para consignas de neumático
+        self.barra_neum = ttk.Frame(barra)
+        ttk.Label(self.barra_neum, text="Sección:").pack(side=tk.LEFT, padx=(8, 2))
+        cb = ttk.Combobox(self.barra_neum, textvariable=self.var_seccion, state="readonly", width=9,
+                          values=(neumatico.CARCASA, neumatico.BANDAJE, "Todo"))
+        cb.pack(side=tk.LEFT)
+        cb.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
+        ttk.Label(self.barra_neum, text="Vista:").pack(side=tk.LEFT, padx=(8, 2))
+        cb2 = ttk.Combobox(self.barra_neum, textvariable=self.var_vista, state="readonly", width=20,
+                           values=("Posiciones (TRAZO)", "Sección apilada"))
+        cb2.pack(side=tk.LEFT)
+        cb2.bind("<<ComboboxSelected>>", lambda e: self.redibujar())
         ttk.Button(barra, text="Guardar plantilla de ejemplo…",
                    command=self.guardar_plantilla).pack(side=tk.RIGHT)
         ttk.Button(barra, text="? Ayuda", command=self.ayuda).pack(side=tk.RIGHT, padx=4)
@@ -77,14 +91,8 @@ class App(tk.Tk):
 
         # Tabla de cotas
         marco_tabla = ttk.Frame(panel)
-        cols = ("nombre", "tipo", "puntos", "nominal", "tol", "min", "max", "dibujo", "medido", "estado")
-        titulos = ("Cota", "Tipo", "Puntos", "Nominal", "Tolerancia", "Mín", "Máx",
-                   "Perfil dibujado", "Medido", "Estado")
-        anchos = (180, 50, 90, 80, 100, 70, 70, 110, 80, 70)
-        self.tabla = ttk.Treeview(marco_tabla, columns=cols, show="headings", height=7)
-        for c, t, a in zip(cols, titulos, anchos):
-            self.tabla.heading(c, text=t)
-            self.tabla.column(c, width=a, anchor=tk.W if c in ("nombre", "puntos") else tk.CENTER)
+        self.tabla = ttk.Treeview(marco_tabla, show="headings", height=7)
+        self._columnas_tabla(TABLA_COTAS)
         self.tabla.tag_configure("OK", foreground=core.COLOR_OK)
         self.tabla.tag_configure("NOK", foreground=core.COLOR_NOK)
         self.tabla.tag_configure("AVISO", foreground=core.COLOR_AVISO)
@@ -101,12 +109,19 @@ class App(tk.Tk):
 
         self._pantalla_inicio()
 
+    def _columnas_tabla(self, defin):
+        cols = [c for c, _, _ in defin]
+        self.tabla.configure(columns=cols)
+        for c, t, a in defin:
+            self.tabla.heading(c, text=t)
+            self.tabla.column(c, width=a, anchor=tk.W if c in ("nombre", "puntos", "apel") else tk.CENTER)
+
     def _pantalla_inicio(self):
         self.fig.clear()
         ax = self.fig.add_subplot(111)
         ax.axis("off")
         ax.text(0.5, 0.55, APP_NOMBRE, ha="center", fontsize=20, color=core.COLOR_PERFIL)
-        ax.text(0.5, 0.45, "Archivo ▸ Abrir consigna…  (Ctrl+O)", ha="center", fontsize=11, color="#666")
+        ax.text(0.5, 0.45, "Pulsa «Abrir consigna…» (Ctrl+O): Excel de perfil o consigna de neumático", ha="center", fontsize=11, color="#666")
         self.canvas.draw()
 
     # ------------------------------------------------------------ acciones
@@ -125,6 +140,8 @@ class App(tk.Tk):
 
     def cargar(self, ruta: str):
         try:
+            if neumatico.es_consigna_neumatico(ruta):
+                return self._cargar_neumatico(ruta)
             consigna = core.cargar(ruta)
         except core.ErrorConsigna as e:
             messagebox.showerror("Error en la consigna", str(e))
@@ -137,6 +154,8 @@ class App(tk.Tk):
             messagebox.showerror("Error al abrir", f"{type(e).__name__}: {e}")
             return
         self.ruta, self.consigna = ruta, consigna
+        self.barra_neum.pack_forget()
+        self._columnas_tabla(TABLA_COTAS)
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
         self.redibujar()
         self._rellenar_tabla()
@@ -150,8 +169,48 @@ class App(tk.Tk):
             messagebox.showwarning("Avisos", "\n\n".join(consigna.avisos))
         self.estado.set(msg)
 
+    def _cargar_neumatico(self, ruta: str):
+        try:
+            cons = neumatico.cargar(ruta)
+        except PermissionError:
+            messagebox.showerror("No se puede leer",
+                                 "El archivo está abierto en otro programa (¿Excel?). Ciérralo y recarga.")
+            return
+        except Exception as e:  # noqa: BLE001
+            messagebox.showerror("Error al abrir", f"{type(e).__name__}: {e}")
+            return
+        self.ruta, self.consigna = ruta, cons
+        self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
+        self.barra_neum.pack(side=tk.LEFT)
+        self._columnas_tabla(TABLA_NEUMATICO)
+        self._actualizar_neumatico()
+        if cons.avisos:
+            messagebox.showwarning("Avisos", "\n\n".join(cons.avisos))
+
+    def _actualizar_neumatico(self):
+        cons = self.consigna
+        self.redibujar()
+        self.tabla.delete(*self.tabla.get_children())
+        f = neumatico._f
+        prods = cons.de(self.var_seccion.get())
+        for p in prods:
+            self.tabla.insert("", tk.END, values=(
+                p.codigo, p.apelacion, f(p.anchura), f(p.espesor), p.angulo, p.trazo_texto,
+                f(round(p.borde_int, 3)) if p.borde_int is not None else "",
+                f(round(p.borde_ext, 3)) if p.borde_ext is not None else "",
+                p.longitud, f(p.peso)))
+        info = [f"{k}: {v}" for k, v in cons.cabecera.items() if k in ("DIMENSIÓN", "CBL", "C.A.I.") and v]
+        if cons.entre_tringles:
+            info.append(f"Entre-tringles {f(cons.entre_tringles)}")
+        self.estado.set(f"{os.path.basename(self.ruta)}  ·  {len(prods)} productos  ·  " + "  ·  ".join(info))
+
     def redibujar(self):
         if not self.consigna:
+            return
+        if isinstance(self.consigna, neumatico.ConsignaNeumatico):
+            vista = "seccion" if self.var_vista.get().startswith("Secc") else "posiciones"
+            neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get())
+            self.canvas.draw()
             return
         core.dibujar(self.fig, self.consigna, self.var_puntos.get(), self.var_cotas.get())
         self.canvas.draw()
@@ -185,6 +244,8 @@ class App(tk.Tk):
         if not ruta:
             return
         try:
+            if ruta.lower().endswith(".dxf") and isinstance(self.consigna, neumatico.ConsignaNeumatico):
+                raise ValueError("El DXF solo está disponible para perfiles; usa PDF, PNG o SVG.")
             if ruta.lower().endswith(".dxf"):
                 core.exportar_dxf(self.consigna, ruta, con_cotas=self.var_cotas.get())
             else:
@@ -208,7 +269,20 @@ class App(tk.Tk):
         messagebox.showinfo("Formato de la consigna", AYUDA)
 
 
-AYUDA = """Excel con dos hojas: «Perfil» y «Cotas».
+TABLA_COTAS = (("nombre", "Cota", 180), ("tipo", "Tipo", 50), ("puntos", "Puntos", 90),
+               ("nominal", "Nominal", 80), ("tol", "Tolerancia", 100), ("min", "Mín", 70), ("max", "Máx", 70),
+               ("dibujo", "Perfil dibujado", 110), ("medido", "Medido", 80), ("estado", "Estado", 70))
+TABLA_NEUMATICO = (("prod", "PROD.", 70), ("apel", "Apelación", 110), ("anc", "ANC.", 70),
+                   ("esp", "ESP.", 60), ("ang", "ANG.", 60), ("trazo", "TRAZO", 80),
+                   ("bint", "Borde int. (mm desde 0)", 150), ("bext", "Borde ext. (mm desde 0)", 150),
+                   ("long", "LONG.", 80), ("peso", "PESO", 70))
+
+AYUDA = """CONSIGNA DE NEUMÁTICO (hoja CONSIGNA con tabla PROD. / ANC. / ESP. / TRAZO):
+se detecta sola. Cada producto se dibuja desde el 0 (centro) según su TRAZO:
+• C = centrado · IN x = borde interior a x mm del centro · EX x = borde exterior a x mm.
+• TT (aro) se coloca en ±ENTRE-TRINGLES/2. Lados AR (izquierda) y R (derecha).
+
+PERFIL GENÉRICO: Excel con dos hojas: «Perfil» y «Cotas».
 (En CSV: perfil.csv + perfil_cotas.csv en la misma carpeta; separador ; o ,)
 
 HOJA PERFIL — una fila por punto, en orden:
