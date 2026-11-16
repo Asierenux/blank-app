@@ -21,6 +21,36 @@ BANDAJE = "Bandaje"
 
 
 @dataclass
+class Ajustes:
+    """Parámetros del dibujo de la semisección (la consigna no da el perfil real de cada goma)."""
+    chaflan: float = 4.0          # largo del chaflán de los bordes = chaflan × espesor
+    rigidez: float = 6.0          # radio con el que un producto «puentea» escalones = rigidez × espesor
+    ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
+    rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
+    aire_min: float = 0.05        # mm: huecos más finos no se cuentan
+
+
+@dataclass
+class Bolsa:
+    """Bolsa de aire atrapada bajo un producto."""
+    arriba: str
+    abajo: str
+    x0: float
+    x1: float
+    area: float      # mm² en la sección
+    alto: float      # mm, altura máxima
+    radio: float     # mm, radio medio (para el volumen)
+    xc: float = 0.0
+    yc: float = 0.0
+    zona_aro: bool = False  # junto al aro/retournement: geometría aproximada
+
+    @property
+    def volumen_cm3(self) -> float:
+        """Volumen de aire en una vuelta completa, en un lado (AR o R)."""
+        return self.area * 2 * math.pi * self.radio / 1000
+
+
+@dataclass
 class Producto:
     fila: int
     codigo: str
@@ -273,7 +303,7 @@ PALETA = ["#2a6fdb", "#e07a1f", "#2e9e5b", "#c23b5a", "#7a4fc9", "#178f8f", "#b8
 
 
 def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "plano",
-            mostrar_cotas: bool = True):
+            mostrar_cotas: bool = True, ajustes: Ajustes | None = None):
     fig.clear()
     prods = [p for p in cons.de(seccion) if p.tramos]
     ax = fig.add_subplot(111)
@@ -288,11 +318,11 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
             ax = None
             for k, sc in enumerate(secs):
                 ax = fig.add_subplot(len(secs), 1, k + 1)
-                _dibujar_plano(ax, cons, [p for p in cons.de(sc) if p.tramos], mostrar_cotas)
+                _dibujar_plano(ax, cons, [p for p in cons.de(sc) if p.tramos], mostrar_cotas, ajustes)
                 ax.set_title(sc, fontsize=9)
             fig.tight_layout()
             return ax
-        _dibujar_plano(ax, cons, prods, mostrar_cotas)
+        _dibujar_plano(ax, cons, prods, mostrar_cotas, ajustes)
     elif vista == "seccion":
         _dibujar_apilado(ax, cons, prods, mostrar_cotas)
     else:
@@ -446,7 +476,7 @@ def _hay_retournement(cons: ConsignaNeumatico) -> bool:
     return any("RETOURN" in k.upper() for k in cons.notas)
 
 
-def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True):
+def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0):
     """Espesor del producto en cada x: trapecio con los bordes achaflanados."""
     import numpy as np
 
@@ -454,7 +484,7 @@ def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True):
     if esp is None or esp <= 0 or b <= a:
         return t
     ancho = b - a
-    bev = min(max(2.5 * esp, 2.0), ancho / 3)
+    bev = min(max(k_chaflan * esp, 1.0), ancho / 2.2)
     sube = (x - a) / bev if chaflan_ini else np.full_like(x, np.inf)
     baja = (b - x) / bev if chaflan_fin else np.full_like(x, np.inf)
     t = esp * np.clip(np.minimum(sube, baja), 0, 1)
@@ -462,19 +492,31 @@ def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True):
     return t
 
 
-def _puentear(h, paso=0.1, mm=2.0):
-    """Las gomas no se meten en huecos pequeños: envolvente máxima en ±mm."""
+def _asentar(h, radio, paso=0.1):
+    """Superficie inferior de un producto que se apoya sobre ``h`` sin poder entrar en los rincones.
+
+    Es un cierre morfológico con una bola de ``radio`` mm: el producto toca los salientes pero
+    puentea los escalones y huecos más estrechos que su radio de curvatura. Lo que queda entre
+    esta superficie y ``h`` es aire.
+    """
     import numpy as np
     from numpy.lib.stride_tricks import sliding_window_view
 
-    k = max(int(mm / paso), 1)
-    hp = np.pad(h, k, mode="edge")
-    return sliding_window_view(hp, 2 * k + 1).max(axis=1)
+    k = int(radio / paso)
+    if k < 1:
+        return h.copy()
+    u = np.arange(-k, k + 1) * paso
+    tapa = np.sqrt(np.clip(radio**2 - u**2, 0, None))
+    centro = (sliding_window_view(np.pad(h, k, mode="edge"), 2 * k + 1) + tapa).max(axis=1)
+    abajo = (sliding_window_view(np.pad(centro, k, mode="edge"), 2 * k + 1) - tapa).min(axis=1)
+    return np.maximum(abajo, h)
 
 
-def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
-    """Apila los productos (lado R, desde el 0) y pliega el retournement alrededor del aro."""
+def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes | None = None):
+    """Apila los productos (lado R, desde el 0), pliega el retournement y localiza el aire."""
     import numpy as np
+
+    aj = aj or Ajustes()
 
     xmax = max(max(abs(a), abs(b)) for p in prods for a, b in p.tramos) + 20
     x = np.arange(0, xmax, 0.1)
@@ -486,6 +528,35 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
     aros = []    # (xc, yc, r)
     info = {"y0": y0, "diametro": d, "retournement": None}
     aro_ext = None
+    bolsas: list[Bolsa] = []
+    aire = []  # (abajo_previo, abajo_producto, mascara)
+    encima = np.full(x.shape, "tambor", dtype=object)  # qué producto queda arriba en cada x
+    paso = x[1] - x[0]
+
+    def apoyar(p, t, h):
+        """Coloca el producto de espesor t sobre h; devuelve su cara inferior y registra el aire."""
+        k = aj.rigidez_ruletaje if aj.ruletaje else aj.rigidez
+        radio = max(k * (p.espesor or 1.0), 0.0)
+        abajo = np.where(t > 0, _asentar(h, radio), h)
+        hueco = (abajo - h) * (t > 0)
+        m = hueco > aj.aire_min
+        if m.any():
+            aire.append((h.copy(), abajo.copy(), m))
+            ini = np.flatnonzero(np.diff(np.r_[0, m.astype(int)]) == 1)
+            fin = np.flatnonzero(np.diff(np.r_[m.astype(int), 0]) == -1)
+            for i0, i1 in zip(ini, fin):
+                seg = slice(i0, i1 + 1)
+                j = i0 + int(hueco[seg].argmax())
+                if str(encima[j]) == p.codigo:
+                    continue  # el producto sobre sí mismo (vuelta del retournement): no es aire real
+                area = float(hueco[seg].sum() * paso)
+                j = i0 + int(hueco[seg].argmax())
+                bolsas.append(Bolsa(arriba=p.codigo, abajo=str(encima[j]), x0=float(x[i0]), x1=float(x[i1]),
+                                    area=area, alto=float(hueco[j]), radio=float(abajo[j]),
+                                    xc=float(x[j]), yc=float((abajo[j] + h[j]) / 2)))
+        encima[t > 0] = p.codigo
+        return abajo
+
     colores = {}
 
     def color(p):
@@ -537,11 +608,12 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
             for c, ti, resto in vueltas:
                 if resto <= 0:
                     continue
-                t = _espesor_x(x, xb - resto, xb, ti, chaflan_fin=False)
+                t = _espesor_x(x, xb - resto, xb, ti, chaflan_fin=False, k_chaflan=aj.chaflan)
                 t[x > xb] = 0
-                capas.append({"prod": c["prod"], "color": c["color"], "abajo": h.copy(), "t": t,
+                abajo = apoyar(c["prod"], t, h)
+                capas.append({"prod": c["prod"], "color": c["color"], "abajo": abajo, "t": t,
                               "fin": xb, "vuelta": True})
-                h = h + t
+                h = np.where(t > 0, abajo + t, h)
             # por fuera del aro, la superficie es la última vuelta
             fuera = (x > xb) & (x <= xb + rin)
             h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(rin**2 - (x - xb) ** 2, 0, None))), h)
@@ -550,11 +622,10 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
         if aro_ext and b > aro_ext["xb"] + 0.2:
             # producto que pasa del aro: la parte de fuera se envuelve por el exterior del aro
             xb, yc, rin = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
-            t = _espesor_x(x, max(a, 0.0), b, p.espesor, a > 0)
-            ib = int(np.searchsorted(x, xb))
+            t = _espesor_x(x, max(a, 0.0), b, p.espesor, a > 0, k_chaflan=aj.chaflan)
             ti = p.espesor or 1.0
             t[x > xb] = 0
-            abajo = _puentear(h)
+            abajo = apoyar(p, t, h)
             capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
             h = np.where(t > 0, abajo + t, h)
             ro = rin + ti
@@ -567,22 +638,66 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto]):
             h = np.where(fuera, np.maximum(h, yc + np.sqrt(np.clip(ro**2 - (x - xb) ** 2, 0, None))), h)
             continue
         chaflan_ini = a > 0
-        t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini)
-        abajo = _puentear(h) if aro_ext else h.copy()
+        t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan)
+        abajo = apoyar(p, t, h)
         capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
         h = np.where(t > 0, abajo + t, h)
     for p in prods:
         if p.es_aro:
             colores.setdefault(p.codigo, "#f2d600")
+    if aros:
+        limite = min(xc - 3 * r for xc, yc, r in aros) - 12  # zona del talón
+        for bo in bolsas:
+            bo.zona_aro = bo.x1 >= limite
+        info["limite_aro"] = limite
+    info["bolsas"] = bolsas
+    info["aire"] = aire
     return x, capas, cuñas, aros, info, colores, h
 
 
-def _dibujar_plano(ax, cons, prods, cotas):
+def bolsas_de_aire(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | None = None) -> list[Bolsa]:
+    """Bolsas de aire de una sección (o de las dos con «Todo»), de mayor a menor."""
+    secciones = (CARCASA, BANDAJE) if seccion in (None, "Todo") else (seccion,)
+    res: list[Bolsa] = []
+    for sc in secciones:
+        prods = [p for p in cons.de(sc) if p.tramos]
+        if prods:
+            res += _calcular_plano(cons, prods, aj)[4]["bolsas"]
+    return sorted(res, key=lambda b: -b.area)
+
+
+COLOR_AIRE = "#ff2d2d"
+
+
+def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     import numpy as np
     from matplotlib.patches import Circle, Patch, Wedge
 
-    x, capas, cuñas, aros, info, colores, h = _calcular_plano(cons, prods)
+    aj = aj or Ajustes()
+    x, capas, cuñas, aros, info, colores, h = _calcular_plano(cons, prods, aj)
     y0 = info["y0"]
+    # aire atrapado (debajo de los productos)
+    for h_prev, abajo, m in info["aire"]:
+        ax.fill_between(x, h_prev, abajo, where=m, facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
+                        linewidth=0.4, zorder=4)
+    bolsas = info["bolsas"]
+    grandes = sorted([b for b in bolsas if b.area >= 0.3 and not b.zona_aro], key=lambda b: -b.area)[:6]
+    ytop = max(h.max(), max((yc + r for xc, yc, r in aros), default=y0))
+    # etiquetas repartidas en horizontal para que no se pisen
+    pos = []
+    for bo in sorted(grandes, key=lambda b: -b.xc):
+        xt = bo.xc
+        while any(abs(xt - q) < 16 for q in pos):
+            xt -= 4
+        pos.append(xt)
+        ax.annotate(f"aire {bo.abajo}→{bo.arriba}\n{_f(round(bo.area, 1))} mm²", (bo.xc, bo.yc),
+                    xytext=(xt, ytop + 3), fontsize=6.5, ha="center", va="bottom",
+                    color="#b00000", arrowprops=dict(arrowstyle="-", color="#b00000", lw=0.6), zorder=7,
+                    bbox=dict(boxstyle="round,pad=0.15", fc="white", ec="#b00000", lw=0.5, alpha=0.95))
+    if "limite_aro" in info and any(b.zona_aro for b in bolsas):
+        za = sum(b.area for b in bolsas if b.zona_aro)
+        ax.text(info["limite_aro"], y0 - 1.5, f"← zona aro (aprox.): {_f(round(za, 1))} mm² aire", fontsize=6.5,
+                color="#b00000", ha="left", va="top", style="italic")
     for c in capas:
         m = c["t"] > 1e-6
         if not m.any():
@@ -601,7 +716,7 @@ def _dibujar_plano(ax, cons, prods, cotas):
     ax.text(x[-1], y0 - 0.6, f"Tambor Ø{_f(info['diametro'])}  (R {_f(round(y0, 2))})", fontsize=7,
             color="#3a8dde", ha="left", va="top")
     ax.axvline(0, color="#111", lw=1.4, zorder=2)
-    ytxt = y0 + alto + 6
+    ytxt = y0 + alto + (16 if grandes else 6)
 
     def vline(xv, txt, col, ls="--", dy=0.0):
         ax.plot([xv, xv], [y0 - 4, ytxt - 1 + dy], color=col, lw=0.9, ls=ls, zorder=2)
@@ -641,11 +756,11 @@ def _dibujar_plano(ax, cons, prods, cotas):
             i, fila = elegido
             usados.append((x[i], fila))
             xi, yi = x[i], c["abajo"][i] + c["t"][i] / 2
-            yt = y0 - 6 - fila * 3.2
-            ax.annotate(c["prod"].codigo, (xi, yi), xytext=(xi, yt), fontsize=7, ha="center", va="top",
+            yt = y0 - 6 - fila * 5
+            ax.annotate(f"{c['prod'].codigo}\n{_f(c['prod'].espesor)}", (xi, yi), xytext=(xi, yt), fontsize=7, ha="center", va="top",
                         color=c["color"], fontweight="bold",
                         arrowprops=dict(arrowstyle="-", color=c["color"], lw=0.6), zorder=6)
-        ybajo = y0 - 6 - max((f for _, f in usados), default=0) * 3.2 - 6
+        ybajo = y0 - 6 - max((f for _, f in usados), default=0) * 5 - 8
     else:
         ybajo = y0 - 6
 
@@ -659,5 +774,8 @@ def _dibujar_plano(ax, cons, prods, cotas):
     ax.set_ylabel("radio (mm)")
     ax.grid(True, color="#ececec", lw=0.5)
     ax.set_axisbelow(True)
-    ax.legend(handles=[Patch(facecolor=col, edgecolor="#1b1b1b", label=cod) for cod, col in colores.items()],
-              fontsize=7, ncol=min(len(colores), 10), loc="upper left", frameon=False)
+    total = sum(b.area for b in bolsas if not b.zona_aro)
+    asas = [Patch(facecolor=col, edgecolor="#1b1b1b", label=cod) for cod, col in colores.items()]
+    asas.append(Patch(facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
+                      label=f"Aire ({_f(round(total, 1))} mm²{', con ruletaje' if aj.ruletaje else ''})"))
+    ax.legend(handles=asas, fontsize=7, ncol=min(len(asas), 11), loc="upper left", frameon=False)

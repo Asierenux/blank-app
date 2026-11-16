@@ -48,6 +48,15 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *Entre-tringles* y 
     dice «RETOURNER PRODUIT NC», la NC (y lo que pasa del aro) se pliega alrededor del aro. Se
     muestra el retournement estimado junto a la COTE RETOURNEMENT de la consigna. Es un esquema:
     los productos se dibujan como trapecios con los bordes achaflanados, no con su perfil real.
+  - **Aire entre productos** (en la vista Plano): cada producto se apoya sobre los anteriores con
+    su **espesor (ESP)** y no entra en los rincones de los escalones que dejan los de debajo; el
+    hueco que queda es aire (rayado rojo). Se ve sobre todo entre PS, BJ, PTR y FE. La pestaña
+    *Aire entre productos* lista cada bolsa (entre qué productos y con qué ESP, dónde en mm desde el
+    0, área en la sección y volumen por lado), y arriba sale el total. Dos ajustes, porque la
+    consigna no da el perfil real de cada goma: *Chaflán bordes* (largo del chaflán × ESP) y
+    *Rigidez goma* (radio con el que la goma puentea los escalones × ESP). **Simular ruletaje**
+    aprieta los productos para ver cuánto aire quedaría tras pasar los apliques. El aire junto al
+    aro se muestra aparte, como aproximado, porque el pliegue del retournement es un esquema.
   - *Posiciones (TRAZO)*: una fila por producto, con la flecha desde el 0 hasta su trazo.
   - *Sección apilada*: los productos apilados por espesor (escala exagerada), a ambos lados.
 - La tabla de abajo muestra el borde interior y exterior de cada producto en mm desde el 0.

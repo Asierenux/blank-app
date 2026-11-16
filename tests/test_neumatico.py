@@ -97,3 +97,26 @@ def test_plano_tambor_y_retournement(consigna):
     # nada de la NC queda fuera del aro en plano
     nc = next(k for k in capas if k["prod"].codigo == "NC" and not k["vuelta"])
     assert nc["t"][x > xb + 0.1].max() == 0
+
+
+def test_aire_en_escalon_y_ruletaje():
+    """Un producto que cruza un escalón deja aire en el rincón; el ruletaje lo reduce."""
+    import numpy as np
+
+    x = np.arange(0, 60, 0.1)
+    h = np.where(x < 30, 4.0, 0.0)          # escalón de 4 mm
+    sin = neumatico._asentar(h, 12.0)        # goma rígida
+    con = neumatico._asentar(h, 1.0)         # tras el ruletaje
+    aire_sin = ((sin - h) * 0.1).sum()
+    aire_con = ((con - h) * 0.1).sum()
+    assert aire_sin > 1.0 and aire_con < aire_sin / 10
+    assert np.all(sin >= h - 1e-9)           # nunca atraviesa los productos de debajo
+
+
+def test_bolsas_de_aire_en_consigna(consigna):
+    c = neumatico.cargar(consigna)
+    rigida = neumatico.bolsas_de_aire(c, neumatico.CARCASA, neumatico.Ajustes(rigidez=12))
+    ruletaje = neumatico.bolsas_de_aire(c, neumatico.CARCASA, neumatico.Ajustes(rigidez=12, ruletaje=True))
+    assert sum(b.area for b in rigida) > sum(b.area for b in ruletaje)
+    assert all(b.abajo != b.arriba for b in rigida)
+    assert all(b.volumen_cm3 > 0 for b in rigida)

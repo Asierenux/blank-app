@@ -42,6 +42,10 @@ class App(tk.Tk):
         self.var_cotas = tk.BooleanVar(value=True)
         self.var_seccion = tk.StringVar(value=neumatico.CARCASA)
         self.var_vista = tk.StringVar(value="Plano (semisección)")
+        aj = neumatico.Ajustes()
+        self.var_chaflan = tk.DoubleVar(value=aj.chaflan)
+        self.var_rigidez = tk.DoubleVar(value=aj.rigidez)
+        self.var_ruletaje = tk.BooleanVar(value=False)
 
         self._construir_ui()
         self.bind("<Control-o>", lambda e: self.abrir())
@@ -52,7 +56,7 @@ class App(tk.Tk):
 
     # ------------------------------------------------------------------ UI
     def _construir_ui(self):
-        barra = ttk.Frame(self, padding=(6, 6))
+        barra = self.barra = ttk.Frame(self, padding=(6, 6))
         barra.pack(side=tk.TOP, fill=tk.X)
         ttk.Button(barra, text="📂 Abrir consigna…", command=self.abrir).pack(side=tk.LEFT)
         ttk.Button(barra, text="⟳ Recargar (F5)", command=self.recargar).pack(side=tk.LEFT, padx=4)
@@ -74,6 +78,23 @@ class App(tk.Tk):
                            values=("Plano (semisección)", "Posiciones (TRAZO)", "Sección apilada"))
         cb2.pack(side=tk.LEFT)
         cb2.bind("<<ComboboxSelected>>", lambda e: self.redibujar())
+        # Segunda fila: parámetros del aire (solo neumático)
+        self.barra_aire = ttk.Frame(self, padding=(6, 0, 6, 6))
+        ttk.Label(self.barra_aire, text="Chaflán bordes (× espesor):").pack(side=tk.LEFT)
+        for var, de, a in ((self.var_chaflan, 1, 12), (self.var_rigidez, 0.5, 20)):
+            if var is self.var_rigidez:
+                ttk.Label(self.barra_aire, text="Rigidez goma (radio puente × espesor):").pack(side=tk.LEFT,
+                                                                                            padx=(12, 0))
+            sp = ttk.Spinbox(self.barra_aire, from_=de, to=a, increment=0.5, width=5, textvariable=var,
+                             command=self._actualizar_neumatico)
+            sp.pack(side=tk.LEFT, padx=(4, 0))
+            sp.bind("<Return>", lambda e: self._actualizar_neumatico())
+            sp.bind("<FocusOut>", lambda e: self._actualizar_neumatico())
+        ttk.Checkbutton(self.barra_aire, text="Simular ruletaje (apliques)", variable=self.var_ruletaje,
+                        command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(16, 0))
+        self.var_total_aire = tk.StringVar()
+        ttk.Label(self.barra_aire, textvariable=self.var_total_aire, foreground="#b00000",
+                  font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT, padx=(16, 0))
         ttk.Button(barra, text="Guardar plantilla de ejemplo…",
                    command=self.guardar_plantilla).pack(side=tk.RIGHT)
         ttk.Button(barra, text="? Ayuda", command=self.ayuda).pack(side=tk.RIGHT, padx=4)
@@ -89,8 +110,23 @@ class App(tk.Tk):
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         panel.add(marco_dibujo, weight=4)
 
-        # Tabla de cotas
-        marco_tabla = ttk.Frame(panel)
+        # Tablas: cotas/productos y bolsas de aire
+        self.pestanas = ttk.Notebook(panel)
+        marco_tabla = ttk.Frame(self.pestanas)
+        self.pestanas.add(marco_tabla, text="Cotas / Productos")
+        marco_aire = self.marco_aire = ttk.Frame(self.pestanas)
+        self.pestanas.add(marco_aire, text="Aire entre productos")
+        self.tabla_aire = ttk.Treeview(marco_aire, show="headings", height=7)
+        self.tabla_aire.configure(columns=[c for c, _, _ in TABLA_AIRE])
+        for c, t, a in TABLA_AIRE:
+            self.tabla_aire.heading(c, text=t)
+            self.tabla_aire.column(c, width=a, anchor=tk.CENTER)
+        self.tabla_aire.tag_configure("GRANDE", foreground="#b00000")
+        self.tabla_aire.tag_configure("ARO", foreground="#888888")
+        sba = ttk.Scrollbar(marco_aire, orient=tk.VERTICAL, command=self.tabla_aire.yview)
+        self.tabla_aire.configure(yscrollcommand=sba.set)
+        self.tabla_aire.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sba.pack(side=tk.RIGHT, fill=tk.Y)
         self.tabla = ttk.Treeview(marco_tabla, show="headings", height=7)
         self._columnas_tabla(TABLA_COTAS)
         self.tabla.tag_configure("OK", foreground=core.COLOR_OK)
@@ -100,7 +136,7 @@ class App(tk.Tk):
         self.tabla.configure(yscrollcommand=sb.set)
         self.tabla.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
-        panel.add(marco_tabla, weight=1)
+        panel.add(self.pestanas, weight=1)
 
         self.estado = tk.StringVar(value="Abre una consigna (.xlsx o .csv) para empezar.  "
                                          "Todo se procesa en este equipo, sin conexión.")
@@ -155,6 +191,8 @@ class App(tk.Tk):
             return
         self.ruta, self.consigna = ruta, consigna
         self.barra_neum.pack_forget()
+        self.barra_aire.pack_forget()
+        self.pestanas.hide(1)
         self._columnas_tabla(TABLA_COTAS)
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
         self.redibujar()
@@ -182,6 +220,8 @@ class App(tk.Tk):
         self.ruta, self.consigna = ruta, cons
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
         self.barra_neum.pack(side=tk.LEFT)
+        self.barra_aire.pack(side=tk.TOP, fill=tk.X, after=self.barra)
+        self.pestanas.add(self.marco_aire)
         self._columnas_tabla(TABLA_NEUMATICO)
         self._actualizar_neumatico()
         if cons.avisos:
@@ -202,7 +242,34 @@ class App(tk.Tk):
         info = [f"{k}: {v}" for k, v in cons.cabecera.items() if k in ("DIMENSIÓN", "CBL", "C.A.I.") and v]
         if cons.entre_tringles:
             info.append(f"Entre-tringles {f(cons.entre_tringles)}")
+        # bolsas de aire
+        self.tabla_aire.delete(*self.tabla_aire.get_children())
+        bolsas = neumatico.bolsas_de_aire(cons, self.var_seccion.get(), self.ajustes())
+        esp = {p.codigo: p.espesor for p in cons.productos}
+        for b in sorted(bolsas, key=lambda b: (b.zona_aro, -b.area)):
+            tag = ("ARO",) if b.zona_aro else (("GRANDE",) if b.area >= 1 else ())
+            self.tabla_aire.insert("", tk.END, tags=tag, values=(
+                f"{b.abajo} ({f(esp.get(b.abajo))}) → {b.arriba} ({f(esp.get(b.arriba))})",
+                f(round(b.x0, 1)), f(round(b.x1, 1)), f(round(b.area, 2)),
+                f(round(b.alto, 2)), f(round(b.volumen_cm3, 2)), "aro (aprox.)" if b.zona_aro else ""))
+        total = sum(b.area for b in bolsas if not b.zona_aro)
+        vol = sum(b.volumen_cm3 for b in bolsas if not b.zona_aro)
+        aro = sum(b.area for b in bolsas if b.zona_aro)
+        txt = f"Aire: {f(round(total, 1))} mm² en sección · {f(round(vol, 1))} cm³ por lado"
+        if aro:
+            txt += f"   (+ {f(round(aro, 1))} mm² en zona aro, aprox.)"
+        self.var_total_aire.set(txt + ("  · con ruletaje" if self.var_ruletaje.get() else ""))
         self.estado.set(f"{os.path.basename(self.ruta)}  ·  {len(prods)} productos  ·  " + "  ·  ".join(info))
+
+    def ajustes(self) -> neumatico.Ajustes:
+        def leer(var, defecto):
+            try:
+                return max(float(var.get()), 0.1)
+            except (tk.TclError, ValueError):
+                return defecto
+        d = neumatico.Ajustes()
+        return neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
+                                 ruletaje=self.var_ruletaje.get())
 
     def redibujar(self):
         if not self.consigna:
@@ -210,7 +277,8 @@ class App(tk.Tk):
         if isinstance(self.consigna, neumatico.ConsignaNeumatico):
             v = self.var_vista.get()
             vista = "plano" if v.startswith("Plano") else ("seccion" if v.startswith("Secc") else "posiciones")
-            neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get())
+            neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get(),
+                              self.ajustes())
             self.canvas.draw()
             return
         core.dibujar(self.fig, self.consigna, self.var_puntos.get(), self.var_cotas.get())
@@ -273,6 +341,10 @@ class App(tk.Tk):
 TABLA_COTAS = (("nombre", "Cota", 180), ("tipo", "Tipo", 50), ("puntos", "Puntos", 90),
                ("nominal", "Nominal", 80), ("tol", "Tolerancia", 100), ("min", "Mín", 70), ("max", "Máx", 70),
                ("dibujo", "Perfil dibujado", 110), ("medido", "Medido", 80), ("estado", "Estado", 70))
+TABLA_AIRE = (("entre", "Entre (debajo → encima), ESP", 230), ("x0", "Desde (mm desde 0)", 130),
+              ("x1", "Hasta (mm desde 0)", 130), ("area", "Área sección (mm²)", 130),
+              ("alto", "Altura máx. (mm)", 110), ("vol", "Volumen por lado (cm³)", 150),
+              ("zona", "Zona", 110))
 TABLA_NEUMATICO = (("prod", "PROD.", 70), ("apel", "Apelación", 110), ("anc", "ANC.", 70),
                    ("esp", "ESP.", 60), ("ang", "ANG.", 60), ("trazo", "TRAZO", 80),
                    ("bint", "Borde int. (mm desde 0)", 150), ("bext", "Borde ext. (mm desde 0)", 150),
@@ -282,6 +354,14 @@ AYUDA = """CONSIGNA DE NEUMÁTICO (hoja CONSIGNA con tabla PROD. / ANC. / ESP. /
 se detecta sola. Cada producto se dibuja desde el 0 (centro) según su TRAZO:
 • C = centrado · IN x = borde interior a x mm del centro · EX x = borde exterior a x mm.
 • TT (aro) se coloca en ±ENTRE-TRINGLES/2. Lados AR (izquierda) y R (derecha).
+
+AIRE ENTRE PRODUCTOS (vista Plano): cada producto se apoya sobre los anteriores como una lámina
+con cierta rigidez: no entra en los rincones de los escalones y el hueco que queda es aire
+(rayado rojo). «Rigidez» = radio con el que la goma puentea los escalones (× su espesor);
+«Chaflán» = largo de los bordes achaflanados (× espesor). Ajústalos para que el dibujo se
+parezca a lo que veis en máquina. «Simular ruletaje» aprieta los productos (radio pequeño)
+para ver cuánto aire quedaría tras pasar los apliques. La pestaña «Aire entre productos»
+lista cada bolsa: entre qué productos, dónde (mm desde el 0), área y volumen por lado.
 
 PERFIL GENÉRICO: Excel con dos hojas: «Perfil» y «Cotas».
 (En CSV: perfil.csv + perfil_cotas.csv en la misma carpeta; separador ; o ,)
