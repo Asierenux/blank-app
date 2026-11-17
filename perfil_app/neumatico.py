@@ -1149,8 +1149,8 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
     ax.set_ylim(ybot, ytop)
     ax.axhline(y0, color="#3a8dde", lw=1.0, zorder=1)
     for g in range(50, int(xmax) + 1, 50):
-        ax.plot([g, g], [ybot + 6, ytop - 9], color="#8a96a8", lw=0.6, zorder=0)
-        ax.text(g, ytop - 8, str(g), ha="center", va="bottom", fontsize=9)
+        ax.plot([g, g], [ybot + 6, ytop - 11], color="#8a96a8", lw=0.6, zorder=0)
+        ax.text(g, ytop - 10, str(g), ha="center", va="bottom", fontsize=9)
     ax.plot([0, 0], [ybot, ytop], color="#111111", lw=1.2, zorder=1)
     ax.set_xticks(range(0, int(xmax) + 1, 10))
     ax.tick_params(axis="x", labelsize=7, direction="inout", length=6)
@@ -1169,7 +1169,7 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
     if aros and cons.entre_tringles:
         xb, yc, r = aros[0]
         ax.plot([xb, xb], [ybot + 4, ytop - 4], color="#111111", lw=1.1, zorder=2)
-        ya = ytop - 3
+        ya = ytop - 5
         ax.annotate("", xy=(xb, ya), xytext=(xb - 55, ya),
                     arrowprops=dict(arrowstyle="-|>", color="#7a3b10", lw=0.9, mutation_scale=8), zorder=6)
         ax.text(xb - 27, ya + 0.5, f"ET = {_f(cons.entre_tringles)} mm", ha="center", va="bottom", **estilo_cota)
