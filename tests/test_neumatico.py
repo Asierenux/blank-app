@@ -267,7 +267,7 @@ def test_rfid_no_se_tiene_en_cuenta(consigna, tmp_path):
 
 
 def test_bt_cubre_el_aro_por_arriba_hasta_la_falaise(consigna, tmp_path):
-    """Lo que pasa del aro se vuelve con la NC y cubre el aro por arriba hasta la punta de la falaise."""
+    """La falaise hace tope con el aro y el resto del BT, fino, da la vuelta al aro hasta la cota HF."""
     wb = openpyxl.load_workbook(consigna)
     ws = wb.active
     ws["R60"], ws["V60"] = "Ø Burlete :", 10
@@ -279,5 +279,6 @@ def test_bt_cubre_el_aro_por_arriba_hasta_la_falaise(consigna, tmp_path):
     c = neumatico.cargar(str(ruta))
     info = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos])[4]
     bt = {v["cod"]: v for v in info["vueltas"]}["BT"]
-    assert bt["bt_punta"]                      # llega a la punta de la falaise
-    assert 90 < bt["ang"] < 360                # cubre por fuera y por arriba, no la vuelta entera
+    assert bt["bt_punta"]                      # llega a la cota HF (punta de la pared)
+    assert 180 < bt["ang"] < 360               # por abajo, por fuera y por arriba
+    assert bt["bt_espesor"] == pytest.approx(neumatico.Ajustes().base_bt)   # igual de fino
