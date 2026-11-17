@@ -77,7 +77,7 @@ class App(tk.Tk):
         cb.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
         ttk.Label(self.barra_neum, text="Vista:").pack(side=tk.LEFT, padx=(8, 2))
         cb2 = ttk.Combobox(self.barra_neum, textvariable=self.var_vista, state="readonly", width=20,
-                           values=("Plano (semisección)", "Posiciones (TRAZO)", "Sección apilada"))
+                           values=("Plano (semisección)", "Plano con detalle de aire", "Posiciones (TRAZO)", "Sección apilada"))
         cb2.pack(side=tk.LEFT)
         cb2.bind("<<ComboboxSelected>>", lambda e: self.redibujar())
         # Segunda fila: parámetros del aire (solo neumático)
@@ -296,7 +296,8 @@ class App(tk.Tk):
             return
         if isinstance(self.consigna, neumatico.ConsignaNeumatico):
             v = self.var_vista.get()
-            vista = "plano" if v.startswith("Plano") else ("seccion" if v.startswith("Secc") else "posiciones")
+            vista = ("detalle" if "detalle" in v else "plano" if v.startswith("Plano")
+                     else "seccion" if v.startswith("Secc") else "posiciones")
             neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get(),
                               self.ajustes())
             self.canvas.draw()

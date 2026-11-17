@@ -360,18 +360,23 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
         ax.axis("off")
         ax.text(0.5, 0.5, "No hay productos en esta sección", ha="center")
         return ax
-    if vista == "plano":
+    if vista in ("plano", "detalle"):
+        def pinta(eje, ps):
+            if vista == "plano":
+                _dibujar_plano_maquina(eje, cons, ps, ajustes, mostrar_aire=mostrar_cotas)
+            else:
+                _dibujar_plano(eje, cons, ps, mostrar_cotas, ajustes)
         if seccion == "Todo":
             fig.clear()
             secs = [sc for sc in (CARCASA, BANDAJE) if any(p.tramos for p in cons.de(sc))]
             ax = None
             for k, sc in enumerate(secs):
                 ax = fig.add_subplot(len(secs), 1, k + 1)
-                _dibujar_plano(ax, cons, [p for p in cons.de(sc) if p.tramos], mostrar_cotas, ajustes)
+                pinta(ax, [p for p in cons.de(sc) if p.tramos])
                 ax.set_title(sc, fontsize=9)
             fig.tight_layout()
             return ax
-        _dibujar_plano(ax, cons, prods, mostrar_cotas, ajustes)
+        pinta(ax, prods)
     elif vista == "seccion":
         _dibujar_apilado(ax, cons, prods, mostrar_cotas)
     else:
@@ -899,8 +904,8 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
                            linewidth=0.5, zorder=3))
     from matplotlib.patches import Rectangle
     for col, x0c, x1c, ylo, yhi, cod in info.get("colas", []):
-        ax.add_patch(Rectangle((x0c, ylo), x1c - x0c, yhi - ylo, facecolor=col, edgecolor="#1b1b1b",
-                               linewidth=0.5, zorder=3))
+        ax.add_patch(Polygon([(x1c, ylo), (x1c, yhi), (x0c, yhi), (x0c, yhi - 0.15)], closed=True,
+                             facecolor=col, edgecolor="#1b1b1b", linewidth=0.5, zorder=3))
     for xc, yc, r in aros:
         ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
     if aros and cons.diam_aro:
@@ -1075,3 +1080,118 @@ def optimizar(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | Non
     _, aire1, aro1 = coste(desp)
     desp = {c: v for c, v in desp.items() if v}
     return ResultadoOptimizacion(desp, aire0, aire1, aro0, aro1, evals, max_mm)
+
+
+# ---------------------------------------------------------------------------
+# Plano con el aspecto del plano de máquina (escala 1:1, 0 a la derecha, colores de producto)
+# ---------------------------------------------------------------------------
+
+COLORES_PLANO = {
+    "GI": "#9cc9f2", "NC": "#ffffff", "BT": "#d8d8d8", "RFI": "#f7c58f", "RFD": "#9b7fd0",
+    "PS": "#c21f8e", "BJ": "#f08a24", "PTR": "#2f9a5c", "FE": "#1f86e0", "TT": "#f6e600",
+    "NST1": "#7d7d7d", "NST2": "#9a9a9a", "NSF": "#c9b47a", "B74": "#e2a06b", "CPX4": "#3a3a3a",
+    "KM1": "#5b5b5b", "KM2": "#4a4a4a", "CJK": "#c21f8e", "KMI": "#f08a24",
+}
+_FINAS = {"NC", "NST1", "NST2", "NSF"}   # se dibujan como en el plano: blanco con el cordón rojo
+
+
+def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_aire: bool = True):
+    import numpy as np
+    from matplotlib.patches import Circle, Polygon, Rectangle
+
+    aj = aj or Ajustes()
+    x, capas, _cunas, aros, info, colores, h = _calcular_plano(cons, prods, aj)
+    y0 = info["y0"]
+
+    def col(cod, defecto):
+        return COLORES_PLANO.get(cod.upper(), defecto)
+
+    def borde(cod):
+        return "#2f7fd0" if cod.upper() == "GI" else "#111111"
+
+    # productos planos
+    for c in capas:
+        m = c["t"] > 1e-6
+        if not m.any():
+            continue
+        cod = c["prod"].codigo
+        ax.fill_between(x, c["abajo"], c["abajo"] + c["t"], where=m, facecolor=col(cod, c["color"]),
+                        edgecolor=borde(cod), linewidth=0.6, zorder=3)
+        if cod.upper() in _FINAS:
+            ym = np.where(m, c["abajo"] + c["t"] / 2, np.nan)
+            ax.plot(x, ym, color="#d42a2a", lw=0.8, zorder=3.5)
+    # vueltas alrededor del aro
+    for color, cod, poli in info.get("bandas", []):
+        ax.add_patch(Polygon(poli, closed=True, facecolor=col(cod, color), edgecolor=borde(cod), linewidth=0.6,
+                             zorder=3))
+        if cod.upper() in _FINAS and len(poli) >= 4:
+            n = len(poli) // 2
+            medio = (poli[:n] + poli[n:][::-1]) / 2
+            ax.plot(medio[:, 0], medio[:, 1], color="#d42a2a", lw=0.8, zorder=3.5)
+    for color, x0c, x1c, ylo, yhi, cod in info.get("colas", []):
+        # la punta del producto que vuelve bajo el aro se afina hasta su borde
+        ax.add_patch(Polygon([(x1c, ylo), (x1c, yhi), (x0c, yhi), (x0c, yhi - 0.15)], closed=True,
+                             facecolor=col(cod, color), edgecolor="#111111", linewidth=0.6, zorder=3))
+    for xc, yc, r in aros:
+        ax.add_patch(Circle((xc, yc), r, facecolor=COLORES_PLANO["TT"], edgecolor="#111111", linewidth=0.9, zorder=4))
+    if mostrar_aire:
+        for h_prev, abajo, m, _cod in info["aire"]:
+            ax.fill_between(x, h_prev, abajo, where=m, facecolor="none", edgecolor="#ff3b3b", hatch="////",
+                            linewidth=0.0, zorder=4)
+
+    # marco, escalas y líneas de referencia como en el plano
+    xmax = float(x[-1])
+    arriba = max(float(h.max()), max((yc + r for xc, yc, r in aros), default=y0))
+    ytop = max(arriba + 20, y0 + 26)
+    ybot = y0 - 22
+    ax.set_aspect("equal")
+    ax.set_xlim(xmax, -1)
+    ax.set_ylim(ybot, ytop)
+    ax.axhline(y0, color="#3a8dde", lw=1.0, zorder=1)
+    for g in range(50, int(xmax) + 1, 50):
+        ax.plot([g, g], [ybot + 6, ytop - 9], color="#8a96a8", lw=0.6, zorder=0)
+        ax.text(g, ytop - 8, str(g), ha="center", va="bottom", fontsize=9)
+    ax.plot([0, 0], [ybot, ytop], color="#111111", lw=1.2, zorder=1)
+    ax.set_xticks(range(0, int(xmax) + 1, 10))
+    ax.tick_params(axis="x", labelsize=7, direction="inout", length=6)
+    ax.yaxis.tick_right()
+    base_tick = math.floor(ybot / 10) * 10
+    ax.set_yticks(range(base_tick, int(ytop) + 1, 10))
+    ax.tick_params(axis="y", labelsize=7, direction="inout", length=6)
+    ax.yaxis.set_label_position("right")
+    ax.set_ylabel(f"R = {_f(round(y0, 2))} mm", fontsize=8, color="#7a3b10")
+    for sp in ax.spines.values():
+        sp.set_linewidth(2.2)
+        sp.set_color("#1b2a4a")
+    ax.grid(False)
+
+    estilo_cota = dict(color="#7a3b10", fontsize=8, family="monospace")
+    if aros and cons.entre_tringles:
+        xb, yc, r = aros[0]
+        ax.plot([xb, xb], [ybot + 4, ytop - 4], color="#111111", lw=1.1, zorder=2)
+        ya = ytop - 3
+        ax.annotate("", xy=(xb, ya), xytext=(xb - 55, ya),
+                    arrowprops=dict(arrowstyle="-|>", color="#7a3b10", lw=0.9, mutation_scale=8), zorder=6)
+        ax.text(xb - 27, ya + 0.5, f"ET = {_f(cons.entre_tringles)} mm", ha="center", va="bottom", **estilo_cota)
+    cr = _cota_retournement(cons)
+    if cr and aros:
+        ax.plot([cr, cr], [ybot + 2, arriba + 2], color="#111111", lw=1.1, zorder=2)
+        yb = ybot + 2.5
+        ax.annotate("", xy=(cr, yb), xytext=(cr - 70, yb),
+                    arrowprops=dict(arrowstyle="-|>", color="#7a3b10", lw=0.9, mutation_scale=8), zorder=6)
+        ax.text(cr - 35, yb + 0.5, f"Cote retournement = {_f(cr)} mm", ha="center", va="bottom", **estilo_cota)
+
+    # leyenda discreta
+    from matplotlib.patches import Patch
+    vistos = []
+    for p in prods:
+        if p.codigo not in vistos:
+            vistos.append(p.codigo)
+    asas = [Patch(facecolor=col(cod, colores.get(cod, "#999")), edgecolor="#111111", label=cod) for cod in vistos]
+    if mostrar_aire:
+        total = sum(b.area for b in info["bolsas"])
+        asas.append(Patch(facecolor="none", edgecolor="#ff3b3b", hatch="////",
+                          label=f"aire {_f(round(total, 1))} mm²"))
+    ax.legend(handles=asas, fontsize=7, ncol=min(len(asas), 6), loc="lower left", frameon=False,
+              bbox_to_anchor=(0.0, 0.03))
+    return info

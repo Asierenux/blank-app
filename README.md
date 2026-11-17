@@ -42,7 +42,7 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
 
 - **Sección:** Carcasa (GI → FE, hasta «FORME AU DIAMETRE»), Bandaje o Todo.
 - **Vista:**
-  - *Plano (semisección)* (por defecto): como el plano de la máquina. Va a escala real, con el 0 a
+  - *Plano (semisección)* (por defecto): con el aspecto del plano de máquina (escala 1:1, 0 a la derecha, radio en el eje derecho, productos con sus colores: PTR verde, BJ naranja, FE azul, PS magenta, NC blanca con el cordón rojo, aro amarillo; flechas de ET y de la cote retournement). La vista *Plano con detalle de aire* añade las etiquetas de cada bolsa de aire y las cotas calculadas. Va a escala real, con el 0 a
     la derecha y el radio del tambor (TAMBOUR / FORME AU DIAMETRE) en vertical. Los productos se
     apilan con su espesor en el orden de la consigna, el aro (TT) va en ±ET/2 y, si la consigna
     dice «RETOURNER PRODUIT NC», la NC (y lo que pasa del aro) se pliega alrededor del aro. Se
