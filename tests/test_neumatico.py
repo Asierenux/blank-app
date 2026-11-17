@@ -251,3 +251,16 @@ def test_perfil_bt_base_fina_y_falaise():
     assert en(195) == pytest.approx(4.3, abs=0.05)     # pared en la HF
     assert en(196) == pytest.approx(0.5)               # después de la pared, base fina
     assert en(210) == pytest.approx(0.5)
+
+
+def test_rfid_no_se_tiene_en_cuenta(consigna, tmp_path):
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["B19"], ws["E19"], ws["M19"], ws["P19"], ws["Y19"], ws["Z19"] = "RFD", "RF 85040", 15, 2.6, "IN", 100
+    ruta = tmp_path / "rfid.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    rfd = next(p for p in c.productos if p.codigo == "RFD")
+    assert rfd.es_rfid and rfd.tramos == [] and not rfd.movible
+    x, capas, *_ = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos])
+    assert "RFD" not in {k["prod"].codigo for k in capas}

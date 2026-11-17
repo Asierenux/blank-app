@@ -83,9 +83,15 @@ class Producto:
         return None if self.hf is None else self.hf + (self.desplazamiento if self.movible else 0.0)
 
     @property
+    def es_rfid(self) -> bool:
+        """Chip RFID (RFD / «RF …»): es un parche corto, no una banda; no se tiene en cuenta."""
+        cod, ape = self.codigo.upper(), self.apelacion.upper()
+        return cod in ("RFD", "RFID") or "RFID" in ape or ape.startswith("RF ")
+
+    @property
     def movible(self) -> bool:
         """Se puede desplazar: tiene TRAZO IN/EX, o C con eje fuera del centro."""
-        return (not self.es_aro and bool(self.anchura)
+        return (not self.es_aro and not self.es_rfid and bool(self.anchura)
                 and (self.trazo_tipo.startswith(("IN", "EX")) or (self.trazo_tipo == "C" and bool(self.trazo))))
 
     @property
@@ -315,6 +321,9 @@ def cargar(ruta: str) -> ConsignaNeumatico:
 
 def _calcular_posiciones(cons: ConsignaNeumatico) -> None:
     for p in cons.productos:
+        if p.es_rfid:
+            p.tramos = []  # el RFID no se dibuja ni cuenta para el aire
+            continue
         w, t, v = p.anchura, p.trazo_tipo, p.trazo
         if not w:
             # Aro / tringle: sin anchura, va en la posición de entre-tringles

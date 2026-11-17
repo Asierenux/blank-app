@@ -247,7 +247,8 @@ class App(tk.Tk):
         for p in prods:
             self.tabla.insert("", tk.END, values=(
                 p.codigo, p.apelacion, f(p.anchura), f(p.espesor), p.angulo, p.trazo_texto,
-                f(round(p.borde_int, 3)) if p.borde_int is not None else "",
+                "no se tiene en cuenta (RFID)" if p.es_rfid else
+                (f(round(p.borde_int, 3)) if p.borde_int is not None else ""),
                 f(round(p.borde_ext, 3)) if p.borde_ext is not None else "",
                 p.longitud, f(p.peso)))
         info = [f"{k}: {v}" for k, v in cons.cabecera.items() if k in ("DIMENSIÓN", "CBL", "C.A.I.") and v]
