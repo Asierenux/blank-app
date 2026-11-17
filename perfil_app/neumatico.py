@@ -793,14 +793,53 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             h_vuelta = silueta(h)
             vueltas = []
             for pr, largo, t0, punta in bt_con_nc:
-                # La zona gruesa (falaise) hace tope con el aro; el resto del BT es igual de fino y da la vuelta
-                # al aro (por abajo, por fuera y por arriba) hasta volver a la cota HF (punta de la pared).
+                # La zona gruesa (falaise) hace tope con el aro; el resto del BT es igual de fino: da la vuelta
+                # al aro por abajo y por fuera hasta arriba, y desde ahí va EN LÍNEA RECTA hasta la punta de la
+                # falaise (cota HF). Debajo de ese tramo recto queda una cavidad cerrada (aro / pared / BT).
                 th_punta = math.degrees(math.atan2(punta[1] - yc, punta[0] - xb))
                 if th_punta < 0:
                     th_punta += 360
                 t_bt = max(t0, 0.1)
-                usado, th_fin = envolver_polar(pr, -90, +1, largo, t_bt, t_bt, th_punta)
-                llega = th_fin >= th_punta - 1.0
+                usado, th_fin = envolver_polar(pr, -90, +1, largo, t_bt, t_bt, 90)
+                llega = False
+                if th_fin >= 89.5:
+                    r_arriba = env[idx(90)] - t_bt   # cara interior del BT arriba del aro
+                    p1 = (xb, yc + r_arriba)
+                    p2 = (punta[0], punta[1])
+                    recto = math.hypot(p2[0] - p1[0], p2[1] - p1[1])
+                    llega = usado + recto <= largo + 1.0
+                    bandas.append((color(pr), pr.codigo,
+                                   np.array([p1, p2, (p2[0], p2[1] + t_bt), (p1[0], p1[1] + t_bt)])))
+                    # la envolvente (para la NC que va por encima) sigue el tramo recto
+                    for k in range(idx(90), idx(min(th_punta, 179.75)) + 1):
+                        ang = math.radians(th[k])
+                        dx, dy = math.cos(ang), math.sin(ang)
+                        ex, ey = p2[0] - p1[0], p2[1] - p1[1]
+                        den = dx * ey - dy * ex
+                        if abs(den) < 1e-9:
+                            continue
+                        # rayo desde el centro del aro: (xb, yc) + d·(dx, dy) corta la recta p1–p2
+                        d = ((p1[0] - xb) * ey - (p1[1] - yc) * ex) / den
+                        if d > 0:
+                            env[k] = max(env[k], d + t_bt)
+                    # cavidad cerrada entre el tramo recto, la pared de la falaise, la base y el aro
+                    i_b = min(int(np.searchsorted(x, punta[0] + 0.3)), len(x) - 1)
+                    y_base = float(next(k["abajo"][i_b] + k["t"][i_b] for k in capas if k["prod"] is pr))
+                    sen = max(-0.999, (y_base - yc) / r)
+                    if sen < 1:
+                        th_b = 180 - math.degrees(math.asin(sen))
+                        arco = [(xb + r * math.cos(math.radians(a)), yc + r * math.sin(math.radians(a)))
+                                for a in np.linspace(th_b, 90, 60)]
+                        poli = [p2, (punta[0], y_base)] + arco + [p1]
+                        area = 0.5 * abs(sum(poli[i][0] * poli[(i + 1) % len(poli)][1]
+                                             - poli[(i + 1) % len(poli)][0] * poli[i][1] for i in range(len(poli))))
+                        if area > 0.05:
+                            info.setdefault("cavidades", []).append(np.array(poli))
+                            ys = [q[1] for q in poli]
+                            bolsas.append(Bolsa(arriba=pr.codigo, abajo="aro", x0=float(punta[0]), x1=float(xb),
+                                                area=float(area), alto=float(max(ys) - min(ys)),
+                                                radio=float(np.mean(ys)), xc=float((punta[0] + xb) / 2),
+                                                yc=float(np.mean(ys))))
                 info["vueltas"].append({"cod": pr.codigo, "ang": th_fin + 90, "resto": 0.0, "falta_media": 0.0,
                                         "solo_angulo": True, "bt_punta": llega, "bt_espesor": t_bt,
                                         "bt_largo": largo})
@@ -918,6 +957,9 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     from matplotlib.patches import Polygon
     for col, _cod, poli in info.get("bandas", []):
         ax.add_patch(Polygon(poli, closed=True, facecolor=col, edgecolor="#1b1b1b", linewidth=0.5, zorder=3))
+    for poli in info.get("cavidades", []):
+        ax.add_patch(Polygon(poli, closed=True, facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
+                             linewidth=0.4, zorder=4))
     for col, xc, yc, rin, ro, a0, a1 in cuñas:
         ax.add_patch(Wedge((xc, yc), ro, a0, a1, width=ro - rin, facecolor=col, edgecolor="#1b1b1b",
                            linewidth=0.5, zorder=3))
@@ -936,8 +978,8 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     for v in info.get("vueltas", []):
         sol = v.get("solape_gi")
         if v.get("bt_punta") is not None:
-            lineas.append(f"{v['cod']}: fino ({_f(round(v['bt_espesor'], 2))} mm) da la vuelta al aro "
-                          + ("hasta la cota HF" if v["bt_punta"] else f"({v['ang']:.0f}°, no llega a la HF)"))
+            lineas.append(f"{v['cod']}: fino ({_f(round(v['bt_espesor'], 2))} mm) da la vuelta al aro y va recto "
+                          + ("hasta la punta de la falaise (HF)" if v["bt_punta"] else "(no llega a la HF)"))
         elif v.get("solo_angulo"):
             modo = "vuelto con la NC" if aj.vuelta_bt == "con_nc" else "desde la HF, por encima"
             lineas.append(f"{v['cod']} ({modo}): envuelve {v['ang']:.0f}° del aro")
@@ -1155,11 +1197,14 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
         ax.add_patch(Polygon([(x1c, ylo), (x1c, yhi), (x0c, yhi), (x0c, yhi - 0.15)], closed=True,
                              facecolor=col(cod, color), edgecolor="#111111", linewidth=0.6, zorder=3))
     for xc, yc, r in aros:
-        ax.add_patch(Circle((xc, yc), r, facecolor=COLORES_PLANO["TT"], edgecolor="#111111", linewidth=0.9, zorder=4))
+        ax.add_patch(Circle((xc, yc), r, facecolor=COLORES_PLANO["TT"], edgecolor="#111111", linewidth=0.9, zorder=5))
     if mostrar_aire:
         for h_prev, abajo, m, _cod in info["aire"]:
             ax.fill_between(x, h_prev, abajo, where=m, facecolor="none", edgecolor="#ff3b3b", hatch="////",
                             linewidth=0.0, zorder=4)
+        for poli in info.get("cavidades", []):
+            ax.add_patch(Polygon(poli, closed=True, facecolor="none", edgecolor="#ff3b3b", hatch="////",
+                                 linewidth=0.0, zorder=4))
 
     # marco, escalas y líneas de referencia como en el plano
     xmax = float(x[-1])
@@ -1203,11 +1248,31 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
                     arrowprops=dict(arrowstyle="-|>", color="#7a3b10", lw=0.9, mutation_scale=8), zorder=6)
         ax.text(cr - 35, yb + 0.5, f"Cote retournement = {_f(cr)} mm", ha="center", va="bottom", **estilo_cota)
 
+    # zonas de ruletaje propuestas (R1, R2…) encima de los productos
+    if mostrar_aire:
+        from .analisis import analizar
+        colores_riesgo = {"ALTO": "#d62828", "MEDIO": "#f08a24", "BAJO": "#c9a400"}
+        sec = prods[0].seccion if prods else CARCASA
+        try:
+            zonas = analizar(cons, sec, aj).zonas[:8]
+        except Exception:  # noqa: BLE001 - el dibujo no debe fallar por el análisis
+            zonas = []
+        yz = arriba + 4
+        for k, z in enumerate(sorted(zonas, key=lambda z: z.x0)):
+            colr = colores_riesgo[z.riesgo]
+            yk = yz + (k % 2) * 3.2
+            ax.plot([z.x0 - 1, z.x1 + 1], [yk, yk], color=colr, lw=4, solid_capstyle="butt", zorder=6, alpha=0.85)
+            ax.text(z.xc, yk + 0.9, z.nombre, ha="center", va="bottom", fontsize=7.5, color=colr,
+                    fontweight="bold", zorder=7)
+            largo_flecha = max(-12.0, min(12.0, z.hacia - z.xc))
+            ax.annotate("", xy=(z.xc + largo_flecha, yk - 1.4), xytext=(z.xc, yk - 1.4),
+                        arrowprops=dict(arrowstyle="-|>", color=colr, lw=1.0, mutation_scale=7), zorder=7)
+
     # resumen de las vueltas alrededor del aro (abajo a la derecha)
     resumen = []
     for v in info.get("vueltas", []):
         if v.get("bt_punta") is not None:
-            resumen.append(f"{v['cod']}: da la vuelta al aro hasta la HF" if v["bt_punta"]
+            resumen.append(f"{v['cod']}: vuelta al aro y recto hasta la HF" if v["bt_punta"]
                            else f"{v['cod']}: cubre {v['ang']:.0f}° del aro")
         elif v.get("solape_gi") is not None:
             sol = v["solape_gi"]

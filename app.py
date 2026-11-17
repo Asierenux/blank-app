@@ -18,7 +18,7 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from perfil_app import core, neumatico  # noqa: E402
+from perfil_app import analisis, core, neumatico  # noqa: E402
 
 APP_NOMBRE = "Dibujador de Perfiles"
 
@@ -138,6 +138,16 @@ class App(tk.Tk):
         self.tabla_aire.configure(yscrollcommand=sba.set)
         self.tabla_aire.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sba.pack(side=tk.RIGHT, fill=tk.Y)
+        marco_an = self.marco_analisis = ttk.Frame(self.pestanas)
+        self.pestanas.add(marco_an, text="Análisis y ruletaje")
+        barra_an = ttk.Frame(marco_an)
+        barra_an.pack(side=tk.TOP, fill=tk.X)
+        ttk.Button(barra_an, text="💾 Guardar informe…", command=self.guardar_informe).pack(side=tk.LEFT, pady=2)
+        self.texto_analisis = tk.Text(marco_an, wrap=tk.WORD, height=8, font=("TkFixedFont", 9))
+        sbt = ttk.Scrollbar(marco_an, orient=tk.VERTICAL, command=self.texto_analisis.yview)
+        self.texto_analisis.configure(yscrollcommand=sbt.set)
+        self.texto_analisis.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sbt.pack(side=tk.RIGHT, fill=tk.Y)
         self.tabla = ttk.Treeview(marco_tabla, show="headings", height=7)
         self._columnas_tabla(TABLA_COTAS)
         self.tabla.tag_configure("OK", foreground=core.COLOR_OK)
@@ -204,6 +214,7 @@ class App(tk.Tk):
         self.barra_neum.pack_forget()
         self.barra_aire.pack_forget()
         self.pestanas.hide(1)
+        self.pestanas.hide(2)
         self._columnas_tabla(TABLA_COTAS)
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
         self.redibujar()
@@ -233,6 +244,7 @@ class App(tk.Tk):
         self.barra_neum.pack(side=tk.LEFT)
         self.barra_aire.pack(side=tk.TOP, fill=tk.X, after=self.barra)
         self.pestanas.add(self.marco_aire)
+        self.pestanas.add(self.marco_analisis)
         self._columnas_tabla(TABLA_NEUMATICO)
         self._actualizar_neumatico()
         if cons.avisos:
@@ -271,10 +283,34 @@ class App(tk.Tk):
         if aro:
             txt += f"   (+ {f(round(aro, 1))} mm² en zona aro, aprox.)"
         self.var_total_aire.set(txt + ("  · con ruletaje" if self.var_ruletaje.get() else ""))
+        # análisis de aire y propuesta de ruletajes
+        sec = self.var_seccion.get()
+        sec = neumatico.CARCASA if sec == "Todo" else sec
+        try:
+            self.analisis = analisis.analizar(cons, sec, self.ajustes())
+            texto = self.analisis.texto(cons)
+        except Exception as e:  # noqa: BLE001
+            self.analisis, texto = None, f"No se pudo analizar: {type(e).__name__}: {e}"
+        self.texto_analisis.configure(state=tk.NORMAL)
+        self.texto_analisis.delete("1.0", tk.END)
+        self.texto_analisis.insert("1.0", texto)
+        self.texto_analisis.configure(state=tk.DISABLED)
         desp = {p.codigo: p.desplazamiento for p in cons.productos if p.desplazamiento}
         if desp:
             info.insert(0, "PROPUESTA: " + ", ".join(f"{k} {v:+g} mm" for k, v in desp.items()))
         self.estado.set(f"{os.path.basename(self.ruta)}  ·  {len(prods)} productos  ·  " + "  ·  ".join(info))
+
+    def guardar_informe(self):
+        if not isinstance(self.consigna, neumatico.ConsignaNeumatico):
+            return
+        base = os.path.splitext(os.path.basename(self.ruta))[0]
+        ruta = filedialog.asksaveasfilename(title="Guardar informe de aire y ruletajes",
+                                            initialfile=f"{base}_analisis_aire.txt", defaultextension=".txt",
+                                            filetypes=[("Texto", "*.txt")])
+        if ruta:
+            with open(ruta, "w", encoding="utf-8") as f:
+                f.write(self.texto_analisis.get("1.0", tk.END))
+            self.estado.set(f"Informe guardado: {ruta}")
 
     def dialogo_optimizar(self):
         if not isinstance(self.consigna, neumatico.ConsignaNeumatico):
