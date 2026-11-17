@@ -264,3 +264,24 @@ def test_rfid_no_se_tiene_en_cuenta(consigna, tmp_path):
     assert rfd.es_rfid and rfd.tramos == [] and not rfd.movible
     x, capas, *_ = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos])
     assert "RFD" not in {k["prod"].codigo for k in capas}
+
+
+def test_bt_cubre_todo_el_aro(consigna, tmp_path):
+    """Si lo que pasa del aro alcanza para la vuelta completa, el BT cubre el aro entero (360°)."""
+    import math
+
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 10
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    # BT IN 130, ANC 45 → 130..175; el aro en 160,25 → pasan 14,75 mm (vuelta de r 2 + 0,25: 14,1 mm)
+    ws["B21"], ws["M21"], ws["P21"], ws["Y21"], ws["Z21"] = "BT", 45, 3.0, "IN", 130
+    ws["E16"], ws["A16"] = "POSITION HAUT FALAISE/C  156    ;B T U  =  26    ;", "."
+    ruta = tmp_path / "bt360.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    info = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos],
+                                     neumatico.Ajustes(base_bt=0.5))[4]
+    bt = {v["cod"]: v for v in info["vueltas"]}["BT"]
+    assert bt["bt_completo"] and bt["ang"] == 360
+    assert bt["bt_necesario"] == pytest.approx(2 * math.pi * 2.25)

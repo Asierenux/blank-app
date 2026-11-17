@@ -627,7 +627,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
 
     # --- envolvente angular alrededor del aro: ángulo 0 = hacia fuera, 90 = arriba, 180 = hacia el
     #     centro, -90 = abajo. env[θ] = radio (desde el centro del aro) de la superficie actual.
-    th = np.arange(-200.0, 230.0, 0.25)
+    th = np.arange(-200.0, 290.0, 0.25)
     env = None
     bandas = []  # (color, codigo, polígono Nx2)
 
@@ -790,10 +790,15 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             h_vuelta = silueta(h)
             vueltas = []
             for pr, largo, t0 in bt_con_nc:
-                # el BT va sobre la NC: al volverse queda entre el aro y la NC, adelgazando hasta 0
-                usado, th_fin = envolver_polar(pr, -90, +1, largo, max(t0, 0.1), 0.0, 270)
-                info["vueltas"].append({"cod": pr.codigo, "ang": th_fin + 90, "resto": 0.0, "falta_media": 0.0,
-                                        "solo_angulo": True})
+                # El BT cubre todo el aro: lo que pasa del aro le da la vuelta completa (360°), pegado a él,
+                # y la NC se vuelve por fuera. Si su largo no llega para la vuelta entera, se indica.
+                t0 = max(t0, 0.1)
+                necesario = 2 * math.pi * (r + t0 / 2)
+                completo = largo >= 0.95 * necesario
+                usado, th_fin = envolver_polar(pr, -90, +1, necesario if completo else largo, t0, t0, 270.25)
+                info["vueltas"].append({"cod": pr.codigo, "ang": 360.0 if completo else th_fin + 90, "resto": 0.0,
+                                        "falta_media": 0.0, "solo_angulo": True, "bt_completo": completo,
+                                        "bt_largo": largo, "bt_necesario": necesario})
             for c in reversed(plegar):  # la más cercana al aro primero
                 ti = c["prod"].espesor or 1.0
                 largo = c["fin"] - xb
@@ -925,7 +930,14 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     lineas = []
     for v in info.get("vueltas", []):
         sol = v.get("solape_gi")
-        if v.get("solo_angulo"):
+        if v.get("bt_completo") is not None:
+            if v["bt_completo"]:
+                lineas.append(f"{v['cod']}: cubre todo el aro (360°) — {_f(round(v['bt_largo'], 1))} mm "
+                              f"para {_f(round(v['bt_necesario'], 1))} mm de vuelta")
+            else:
+                lineas.append(f"{v['cod']}: cubre {v['ang']:.0f}° del aro, le faltan "
+                              f"{_f(round(v['bt_necesario'] - v['bt_largo'], 1))} mm para la vuelta entera")
+        elif v.get("solo_angulo"):
             modo = "vuelto con la NC" if aj.vuelta_bt == "con_nc" else "desde la HF, por encima"
             lineas.append(f"{v['cod']} ({modo}): envuelve {v['ang']:.0f}° del aro")
         elif sol is None:
@@ -1096,7 +1108,7 @@ def optimizar(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | Non
 # ---------------------------------------------------------------------------
 
 COLORES_PLANO = {
-    "GI": "#9cc9f2", "NC": "#ffffff", "BT": "#d8d8d8", "RFI": "#f7c58f", "RFD": "#9b7fd0",
+    "GI": "#9cc9f2", "NC": "#ffffff", "BT": "#6f6f6f", "RFI": "#f7c58f", "RFD": "#9b7fd0",
     "PS": "#c21f8e", "BJ": "#f08a24", "PTR": "#2f9a5c", "FE": "#1f86e0", "TT": "#f6e600",
     "NST1": "#7d7d7d", "NST2": "#9a9a9a", "NSF": "#c9b47a", "B74": "#e2a06b", "CPX4": "#3a3a3a",
     "KM1": "#5b5b5b", "KM2": "#4a4a4a", "CJK": "#c21f8e", "KMI": "#f08a24",
@@ -1189,6 +1201,22 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
         ax.annotate("", xy=(cr, yb), xytext=(cr - 70, yb),
                     arrowprops=dict(arrowstyle="-|>", color="#7a3b10", lw=0.9, mutation_scale=8), zorder=6)
         ax.text(cr - 35, yb + 0.5, f"Cote retournement = {_f(cr)} mm", ha="center", va="bottom", **estilo_cota)
+
+    # resumen de las vueltas alrededor del aro (abajo a la derecha)
+    resumen = []
+    for v in info.get("vueltas", []):
+        if v.get("bt_completo") is not None:
+            resumen.append(f"{v['cod']}: cubre todo el aro" if v["bt_completo"]
+                           else f"{v['cod']}: cubre {v['ang']:.0f}° del aro")
+        elif v.get("solape_gi") is not None:
+            sol = v["solape_gi"]
+            resumen.append(f"{v['cod']}: solapa con la GI {_f(round(sol, 1))} mm" if sol > 0
+                           else f"{v['cod']}: le faltan {_f(round(-sol, 1))} mm para la GI")
+    if info.get("retournement") and cr:
+        resumen.append(f"vuelta NC ≈ {_f(round(float(info['retournement'][1]), 1))} (consigna {_f(cr)})")
+    if resumen:
+        ax.text(0.995, 0.03, "   ·   ".join(resumen), transform=ax.transAxes, ha="right", va="bottom",
+                fontsize=7.5, color="#333333")
 
     # leyenda discreta
     from matplotlib.patches import Patch
