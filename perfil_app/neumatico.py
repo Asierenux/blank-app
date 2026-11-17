@@ -761,7 +761,10 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
                 info["pared"] = (pr.codigo, hf)
                 largo = c["fin"] - hf
                 if aj.vuelta_bt == "con_nc":
-                    bt_con_nc.append((pr, c["fin"] - xb, t_en_aro))  # lo que pasa del aro se vuelve con la NC
+                    # punta de la falaise (arriba de la pared en la HF): ahí termina el BT al volverse
+                    i_hf = max(int(np.searchsorted(x, hf)) - 1, 0)
+                    punta = (hf, float(c["abajo"][i_hf] + (pr.espesor or 0.0)))
+                    bt_con_nc.append((pr, c["fin"] - xb, t_en_aro, punta))  # lo que pasa del aro se vuelve con la NC
                     continue
                 i_hf = max(int(np.searchsorted(x, min(hf, xb - r))) - 1, 0)
                 alto_bt = float((c["abajo"] + c["t"])[i_hf])
@@ -789,16 +792,20 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             # 2) retournement (NC): sube por fuera del aro desde abajo y vuelve por encima hacia el centro
             h_vuelta = silueta(h)
             vueltas = []
-            for pr, largo, t0 in bt_con_nc:
-                # El BT cubre todo el aro: lo que pasa del aro le da la vuelta completa (360°), pegado a él,
-                # y la NC se vuelve por fuera. Si su largo no llega para la vuelta entera, se indica.
-                t0 = max(t0, 0.1)
-                necesario = 2 * math.pi * (r + t0 / 2)
-                completo = largo >= 0.95 * necesario
-                usado, th_fin = envolver_polar(pr, -90, +1, necesario if completo else largo, t0, t0, 270.25)
-                info["vueltas"].append({"cod": pr.codigo, "ang": 360.0 if completo else th_fin + 90, "resto": 0.0,
-                                        "falta_media": 0.0, "solo_angulo": True, "bt_completo": completo,
-                                        "bt_largo": largo, "bt_necesario": necesario})
+            for pr, largo, t0, punta in bt_con_nc:
+                # El BT que pasa del aro se vuelve con la NC: sube por fuera, cubre el aro por arriba y termina
+                # en la punta de la falaise (arriba de la pared de la HF). Su espesor es el que hace que su largo
+                # llene ese recorrido (limitado entre la base y el ESP).
+                th_punta = math.degrees(math.atan2(punta[1] - yc, punta[0] - xb))
+                if th_punta < 0:
+                    th_punta += 360
+                arco = math.radians(th_punta + 90)
+                t_bt = min(max(2 * (largo / arco - r), max(t0, 0.3)), pr.espesor or 4.0)
+                usado, th_fin = envolver_polar(pr, -90, +1, largo, t_bt, t_bt, th_punta)
+                llega = th_fin >= th_punta - 1.0
+                info["vueltas"].append({"cod": pr.codigo, "ang": th_fin + 90, "resto": 0.0, "falta_media": 0.0,
+                                        "solo_angulo": True, "bt_punta": llega, "bt_espesor": t_bt,
+                                        "bt_largo": largo})
             for c in reversed(plegar):  # la más cercana al aro primero
                 ti = c["prod"].espesor or 1.0
                 largo = c["fin"] - xb
@@ -930,13 +937,10 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     lineas = []
     for v in info.get("vueltas", []):
         sol = v.get("solape_gi")
-        if v.get("bt_completo") is not None:
-            if v["bt_completo"]:
-                lineas.append(f"{v['cod']}: cubre todo el aro (360°) — {_f(round(v['bt_largo'], 1))} mm "
-                              f"para {_f(round(v['bt_necesario'], 1))} mm de vuelta")
-            else:
-                lineas.append(f"{v['cod']}: cubre {v['ang']:.0f}° del aro, le faltan "
-                              f"{_f(round(v['bt_necesario'] - v['bt_largo'], 1))} mm para la vuelta entera")
+        if v.get("bt_punta") is not None:
+            lineas.append(f"{v['cod']}: se vuelve con la NC y cubre el aro por arriba "
+                          + ("hasta la punta de la falaise" if v["bt_punta"] else f"({v['ang']:.0f}°, no llega a la falaise)")
+                          + f" — {_f(round(v['bt_largo'], 1))} mm, ≈{_f(round(v['bt_espesor'], 1))} mm de espesor")
         elif v.get("solo_angulo"):
             modo = "vuelto con la NC" if aj.vuelta_bt == "con_nc" else "desde la HF, por encima"
             lineas.append(f"{v['cod']} ({modo}): envuelve {v['ang']:.0f}° del aro")
@@ -1205,8 +1209,8 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
     # resumen de las vueltas alrededor del aro (abajo a la derecha)
     resumen = []
     for v in info.get("vueltas", []):
-        if v.get("bt_completo") is not None:
-            resumen.append(f"{v['cod']}: cubre todo el aro" if v["bt_completo"]
+        if v.get("bt_punta") is not None:
+            resumen.append(f"{v['cod']}: cubre el aro por arriba hasta la falaise" if v["bt_punta"]
                            else f"{v['cod']}: cubre {v['ang']:.0f}° del aro")
         elif v.get("solape_gi") is not None:
             sol = v["solape_gi"]
