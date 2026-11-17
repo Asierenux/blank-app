@@ -69,6 +69,8 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
     («RETOURNER PRODUIT NC»), pegado al aro. Los demás que pasan del aro (BT, PTR…) lo envuelven por
     fuera con su espesor real y, si les sobra, vuelven por debajo. La app indica cuántos grados
     envuelve cada uno y si **solapa con la GI** (o cuántos mm le faltan).
+  - El **RFID** (RFD, «RF …») es un parche corto, no una banda: no se dibuja ni cuenta para el aire
+    ni para el optimizador (en la tabla sale como «no se tiene en cuenta»).
   - **Optimizar posiciones (±2 mm):** busca cuánto mover cada producto sobre su TRAZO (como
     mucho X mm, en pasos de 0,5 mm) para dejar el mínimo aire entre productos. Muestra el TRAZO
     propuesto de cada producto y el aire antes/después, y se puede ver la propuesta en el dibujo
