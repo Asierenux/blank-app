@@ -416,7 +416,7 @@ class DialogoOptimizar(tk.Toplevel):
         f = ttk.Frame(self, padding=10)
         f.pack(fill=tk.BOTH, expand=True)
         ttk.Label(f, text=f"Sección: {self.seccion}.  Busca el desplazamiento de cada producto sobre su TRAZO "
-                          "que deja menos aire entre productos\n(fuera de la zona del aro), con la rigidez y el "
+                          "que deja menos aire en total\n(entre productos y en la zona del aro), con la rigidez y el "
                           "chaflán actuales. No cambia la consigna: es una propuesta.",
                   justify=tk.LEFT).pack(anchor=tk.W)
         fila = ttk.Frame(f)

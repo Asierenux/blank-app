@@ -1122,7 +1122,8 @@ def optimizar(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | Non
         evals += 1
         aplicar_desplazamientos(trabajo, d)
         principal, aro = _aire(trabajo, seccion, aj)
-        return principal + 1e-3 * sum(abs(v) for v in d.values()), principal, aro
+        # se minimiza el aire total (entre productos + zona del aro) para no pasar aire de una zona a otra
+        return principal + aro + 1e-3 * sum(abs(v) for v in d.values()), principal, aro
 
     base, aire0, aro0 = coste(desp)
     mejor = base
