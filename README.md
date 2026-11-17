@@ -57,12 +57,13 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
     *Rigidez goma* (radio con el que la goma puentea los escalones × ESP). **Simular ruletaje**
     aprieta los productos para ver cuánto aire quedaría tras pasar los apliques. El aire junto al
     aro se muestra aparte, como aproximado, porque el pliegue del retournement es un esquema.
-  - **Aro y BT:** el aro es el alambre, con el **ESP del TT** (4,79), centrado en entre aros / 2 y
-    a la altura del burlete de la consigna (Radio interior burlete + Ø Burlete / 2). El BT va lleno
-    hasta la HF («POSITION HAUT FALAISE/C»); ahí la falaise baja hasta su borde y el aro se apoya en
-    ella, pegado a la pared. Lo que pasa del aro se vuelve con la NC (entre el aro y la NC). Luego
-    el PTR envuelve todo y vuelve por debajo hasta solapar con la GI. Cada vuelta se calcula
-    ángulo a ángulo con los espesores reales. Opción alternativa: «BT por encima del aro».
+  - **Aro y BT (según el corte del BT):** el aro es el alambre (ESP del TT, 4,79), con su cara
+    interior en el «Radio interior burlete» y centrado en entre aros / 2. El BT es una **base fina**
+    en todo su ancho (ANCH) con la **falaise**: un triángulo que sube desde dentro hasta la HF
+    («POSITION HAUT FALAISE/C»), donde una pared de altura ESP hace de tope del aro (la BTU va de la
+    HF al borde interior). El aro se apoya en la base, pegado a la pared. Lo que pasa del aro se
+    vuelve con la NC; luego el PTR envuelve todo y vuelve por debajo hasta solapar con la GI. El
+    espesor de la base y el largo de la rampa no vienen en la consigna: se ajustan en la barra.
   - **Aro y vuelta de los productos:** el aro se dibuja con el **Ø Burlete** y el **Radio interior
     burlete** de la consigna. Solo se vuelve alrededor del aro el producto que indica la consigna
     («RETOURNER PRODUIT NC»), pegado al aro. Los demás que pasan del aro (BT, PTR…) lo envuelven por

@@ -28,7 +28,9 @@ class Ajustes:
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
-    vuelta_bt: str = "con_nc"     # «con_nc»: el aro se apoya en la falaise del BT y lo que pasa del aro
+    base_bt: float = 0.5          # mm: espesor de la base fina del BT (fuera de la falaise)
+    rampa_bt: float = 6.0         # mm: largo de la rampa de la falaise (sube desde dentro hasta la HF)
+    vuelta_bt: str = "con_nc"     # «con_nc»: el aro se apoya en la base del BT, pegado a la falaise, y lo que pasa del aro
                                   # se vuelve junto con la NC (por dentro de ella);
                                   # «arriba»: el resto del BT envuelve el aro por encima desde la HF
 
@@ -537,7 +539,7 @@ def _productos_retournes(cons: ConsignaNeumatico) -> set[str] | None:
     return cods or None
 
 
-def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0, hf=None):
+def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0, hf=None, base=None, rampa=None):
     """Espesor del producto en cada x: trapecio con los bordes achaflanados."""
     import numpy as np
 
@@ -548,6 +550,17 @@ def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0, 
     bev = min(max(k_chaflan * esp, 1.0), ancho / 2.2)
     sube = (x - a) / bev if chaflan_ini else np.full_like(x, np.inf)
     baja = (b - x) / bev if chaflan_fin else np.full_like(x, np.inf)
+    if hf is not None and a < hf < b and base is not None:
+        # Perfil del BT (corte): base fina en todo el ancho y la falaise: un triángulo que sube desde
+        # dentro (rampa) hasta la HF, donde una pared vertical de altura ESP hace de tope del aro.
+        rampa = rampa or 6.0
+        bev = min(max(k_chaflan * base, 0.5), (b - a) / 2.2)
+        t = base * np.clip(np.minimum((x - a) / bev, (b - x) / bev), 0, 1)
+        sube = np.clip((x - (hf - rampa)) / rampa, 0, 1)
+        tri = base + (esp - base) * sube
+        t = np.where((x >= hf - rampa) & (x <= hf), np.maximum(t, tri), t)
+        t[(x < a) | (x > b)] = 0
+        return t
     if hf is not None and a < hf < b:
         # perfil con falaise: lleno hasta la HF y desde ahí baja en rampa hasta el borde exterior
         baja = (b - x) / (b - hf)
@@ -651,10 +664,10 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         largo = b - xb
         usado, th_fin = envolver_polar(p, 90, -1, largo, ti, ti, -90)
         resto = max(largo - usado, 0.0)
-        r_abajo = env[idx(-90)]
+        r_abajo = env[idx(-90) + 1] - ti   # cara interior de la vuelta abajo del aro (último ángulo envuelto)
         v = {"cod": p.codigo, "ang": 90 - th_fin, "resto": resto, "falta_media": 0.0}
         if resto > 0.05:
-            colas.append((color(p), xb - resto, xb, yc - r_abajo, yc - r_abajo + ti, p.codigo))
+            colas.append((color(p), xb - resto, xb, yc - r_abajo - ti, yc - r_abajo, p.codigo))
         else:
             # cuánto le falta para llegar abajo del todo (−90°)
             falta = sum(env[k] * math.radians(0.25) for k in range(idx(-90), idx(th_fin)))
@@ -699,12 +712,11 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         a, b = p.tramos[-1]
         if p.es_aro:
             xb = (a + b) / 2
-            # El aro es el alambre (ESP del TT); el burlete (Ø y radio interior) solo da su centro.
-            r_bur = cons.diam_aro / 2 if cons.diam_aro else None
-            r = (p.espesor / 2) if p.espesor else (r_bur or 2.0)
+            # El aro es el alambre (ESP del TT) y su cara interior está en el «Radio interior burlete».
+            r = (p.espesor / 2) if p.espesor else ((cons.diam_aro or 4.0) / 2)
             ib = int(np.searchsorted(x, xb))
-            if cons.radio_int_aro and cons.radio_int_aro > y0 and r_bur:
-                yc = cons.radio_int_aro + r_bur   # centro del burlete = centro del aro
+            if cons.radio_int_aro and cons.radio_int_aro > y0:
+                yc = cons.radio_int_aro + r
             else:
                 yc = h[ib] + r
             info["aro"] = (xb, yc, r)
@@ -722,7 +734,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
                 if pr.hf_efectivo is None:
                     continue
                 hf = pr.hf_efectivo
-                t_en_aro = float(c["t"][min(int(np.searchsorted(x, xb)), len(x) - 1)])
+                t_en_aro = aj.base_bt
                 if aj.vuelta_bt == "con_nc":
                     # después de la HF la falaise baja; el aro se apoya en ella y lo que pasa del aro se vuelve
                     c["t"][x > xb] = 0
@@ -796,7 +808,8 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             h = envolver(p, a, b, h)
             continue
         chaflan_ini = a > 0
-        t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan, hf=p.hf_efectivo)
+        t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan, hf=p.hf_efectivo,
+                       base=aj.base_bt if aj.vuelta_bt == "con_nc" else None, rampa=aj.rampa_bt)
         abajo = apoyar(p, t, h)
         capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
         h = np.where(t > 0, abajo + t, h)
@@ -892,7 +905,7 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
         ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
     if aros and cons.diam_aro:
         xc, yc, r = aros[0]
-        txt_aro = f"Aro Ø{_f(round(2 * r, 2))}\n(burlete Ø{_f(cons.diam_aro)}, R int. {_f(cons.radio_int_aro)})"
+        txt_aro = f"Aro Ø{_f(round(2 * r, 2))}\nR int. {_f(cons.radio_int_aro)}"
         ax.annotate(txt_aro, (xc, yc), xytext=(xc + 22, yc + 12),
                     fontsize=6.5, ha="center", arrowprops=dict(arrowstyle="-", lw=0.5, color="#555"), zorder=7)
     lineas = []

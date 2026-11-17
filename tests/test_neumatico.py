@@ -141,7 +141,7 @@ def test_aro_exacto_y_vuelta_hasta_la_gi(consigna, tmp_path):
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)
     xb, yc, r = info["aro"]
-    assert xb == pytest.approx(160.25) and r == pytest.approx(2) and yc == pytest.approx(205.5)
+    assert xb == pytest.approx(160.25) and r == pytest.approx(2) and yc == pytest.approx(202.5 + 2)
     # el PTR envuelve por fuera de la NC vuelta: radio interior 2 (aro = ESP del TT) + 1,5
     v = {v["cod"]: v for v in info["vueltas"]}["PTR"]
     rm = 2 + 1.5 + 1.0
@@ -209,9 +209,9 @@ def test_bt_vuelto_con_la_nc(consigna, tmp_path):
     prods = [p for p in c.de(neumatico.CARCASA) if p.tramos]
     arriba = neumatico._calcular_plano(c, prods, neumatico.Ajustes(vuelta_bt="arriba"))[4]
     con_nc = neumatico._calcular_plano(c, prods, neumatico.Ajustes(vuelta_bt="con_nc"))[4]
-    # con el BT dentro de la vuelta, la NC envuelve con más radio y vuelve menos hacia el centro
-    assert con_nc["retournement"][1] > arriba["retournement"][1]
-    assert {b[1] for b in con_nc["bandas"]} >= {"BT", "NC"}
+    assert arriba["retournement"] and con_nc["retournement"]
+    orden = [b[1] for b in con_nc["bandas"]]
+    assert orden.index("BT") < orden.index("NC")   # la base del BT queda entre el aro y la NC
 
 
 def test_aro_es_el_alambre_y_el_bt_bajo_el_aro_se_vuelve_con_la_nc(consigna, tmp_path):
@@ -230,9 +230,24 @@ def test_aro_es_el_alambre_y_el_bt_bajo_el_aro_se_vuelve_con_la_nc(consigna, tmp
     x, capas, cunas, aros, info, colores, h = neumatico._calcular_plano(c, prods)   # por defecto
     (xa, ya, r), = aros
     assert r == pytest.approx(2.0)                      # ESP del TT = 4
-    assert ya == pytest.approx(203.0 + 5.0)             # centro del burlete
+    assert ya == pytest.approx(203.0 + 2.0)             # cara interior del aro en el Radio interior
     assert xa == pytest.approx(320.5 / 2)
     bt = next(k for k in capas if k["prod"].codigo == "BT")
     assert bt["t"][x > xa + 0.05].max() == 0            # lo que pasa del aro ya no está plano
     orden = [b[1] for b in info["bandas"]]
     assert orden.index("BT") < orden.index("NC")       # BT pegado al aro, la NC por fuera
+
+
+def test_perfil_bt_base_fina_y_falaise():
+    """Corte del BT: base fina en todo el ancho y un triángulo que sube hasta la HF (pared de altura ESP)."""
+    import numpy as np
+
+    x = np.arange(160, 220, 0.1)
+    t = neumatico._espesor_x(x, 168, 215, 4.3, k_chaflan=1, hf=195, base=0.5, rampa=6)
+    def en(v):
+        return t[int(round((v - 160) / 0.1))]
+    assert en(180) == pytest.approx(0.5)               # base fina
+    assert en(192) == pytest.approx(0.5 + 3.8 * 3 / 6, abs=0.05)   # en la rampa
+    assert en(195) == pytest.approx(4.3, abs=0.05)     # pared en la HF
+    assert en(196) == pytest.approx(0.5)               # después de la pared, base fina
+    assert en(210) == pytest.approx(0.5)
