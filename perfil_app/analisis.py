@@ -166,7 +166,8 @@ def analizar(cons: nm.ConsignaNeumatico, seccion: str = nm.CARCASA, aj: nm.Ajust
             desde=desde, hacia=hacia, producto_encima=encima, en_aro=en_aro,
             volumen_cm3=sum(b.volumen_cm3 for b in g)))
     orden = {"ALTO": 0, "MEDIO": 1, "BAJO": 2}
-    zonas.sort(key=lambda z: (orden[z.riesgo], -z.area))
+    # primero las zonas entre productos (las ataca el rodillo del aplique); la del aro va aparte, al final
+    zonas.sort(key=lambda z: (z.en_aro, orden[z.riesgo], -z.area))
     for i, z in enumerate(zonas, 1):
         z.nombre = f"R{i}"
 

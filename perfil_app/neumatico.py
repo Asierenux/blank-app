@@ -23,12 +23,13 @@ BANDAJE = "Bandaje"
 @dataclass
 class Ajustes:
     """Parámetros del dibujo de la semisección (la consigna no da el perfil real de cada goma)."""
-    chaflan: float = 4.0          # largo del chaflán de los bordes = chaflan × espesor
+    chaflan: float = 1.5          # largo del chaflán de los bordes = chaflan × espesor
     rigidez: float = 6.0          # radio con el que un producto «puentea» escalones = rigidez × espesor
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
     base_bt: float = 0.5          # mm: espesor de la base fina del BT (fuera de la falaise)
+    cuna_bj: bool = True          # el BJ en cuña (grueso junto al aro), como en el plano de máquina
     rampa_bt: float = 6.0         # mm: largo de la rampa de la falaise (sube desde dentro hasta la HF)
     vuelta_bt: str = "con_nc"     # «con_nc»: el aro se apoya en la base del BT, pegado a la falaise, y lo que pasa del aro
                                   # se vuelve junto con la NC (por dentro de ella);
@@ -553,6 +554,26 @@ def _productos_retournes(cons: ConsignaNeumatico) -> set[str] | None:
     return cods or None
 
 
+PERFIL_CUNA = {"BJ"}   # productos en cuña: gruesos junto al aro y afinándose hacia el centro (como en el plano)
+
+
+def _perfil_cuna(x, a, b, esp, punta=0.15):
+    """Cuña: espesor ESP en el extremo exterior (junto al aro) que baja hasta casi 0 en el interior."""
+    import numpy as np
+
+    t = np.zeros_like(x)
+    if b <= a:
+        return t
+    m = (x >= a) & (x <= b)
+    frac = (x[m] - a) / (b - a)
+    t[m] = esp * (punta + (1 - punta) * frac)
+    # remate corto en el extremo grueso
+    remate = min(2.0, (b - a) / 10)
+    fin = (x > b - remate) & (x <= b)
+    t[fin] = np.minimum(t[fin], esp * (b - x[fin]) / remate + 0.3)
+    return t
+
+
 def _espesor_x(x, a, b, esp, chaflan_ini=True, chaflan_fin=True, k_chaflan=5.0, hf=None, base=None, rampa=None):
     """Espesor del producto en cada x: trapecio con los bordes achaflanados."""
     import numpy as np
@@ -873,6 +894,8 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         chaflan_ini = a > 0
         t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan, hf=p.hf_efectivo,
                        base=aj.base_bt if aj.vuelta_bt == "con_nc" else None, rampa=aj.rampa_bt)
+        if p.codigo.upper() in PERFIL_CUNA and aj.cuna_bj:
+            t = _perfil_cuna(x, max(a, 0.0), b, p.espesor or 1.0)
         abajo = apoyar(p, t, h)
         capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
         h = np.where(t > 0, abajo + t, h)
