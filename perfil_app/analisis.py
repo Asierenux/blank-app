@@ -64,15 +64,39 @@ class Analisis:
                        f"≈{_f(round(z.volumen_cm3, 1))} cm³ por lado) → tras ruletear ≈ "
                        f"{_f(round(z.area_con_ruletaje, 2))} mm²")
             if z.en_aro:
-                out.append("    Ruletaje: ruleta estrecha justo después de la vuelta de la NC, apretando la vuelta "
-                           "contra el aro y la falaise y llevando la pasada desde el aro hacia el flanco "
-                           f"(hasta ≈{_f(round(z.hacia))} mm). La cavidad bajo el tramo recto del BT (aro/pared) "
-                           "queda cerrada antes de la vuelta: hay que asentar el BT sobre el aro y la punta de la "
-                           "falaise al colocarlo, porque después el ruletaje ya no la alcanza.")
+                out.append("    Máquina: la ataca el ruletaje de la vuelta (retournement) de la NC: presión sobre el "
+                           "aro y la falaise y recorrido desde el aro hacia el flanco "
+                           f"(hasta ≈{_f(round(z.hacia))} mm). El hueco bajo el tramo recto del BT queda cerrado "
+                           "antes de la vuelta: depende de que el BT asiente bien sobre el aro y la punta de la "
+                           "falaise al ponerlo.")
             else:
-                out.append(f"    Ruletaje: ruleta de ≥{_f(round(z.ancho_ruleta))} mm; empezar en "
-                           f"{_f(round(z.desde))} mm y llevar la pasada {sentido} hasta {_f(round(z.hacia))} mm "
-                           f"(borde libre del {z.producto_encima}, por donde sale el aire).")
+                out.append(f"    Máquina: rodillo del aplique del {z.producto_encima} (al ponerlo) y ruletaje final del "
+                           f"flanco: más presión entre {_f(round(z.x0))} y {_f(round(z.x1))} mm, recorrido {sentido} "
+                           f"desde {_f(round(z.desde))} hasta {_f(round(z.hacia))} mm (borde libre del "
+                           f"{z.producto_encima}, por donde sale el aire).")
+            out.append("")
+        # resumen por máquina: qué zonas toca cada aplique y la pasada final
+        por_aplique: dict[str, list] = {}
+        for z in self.zonas:
+            if not z.en_aro:
+                por_aplique.setdefault(z.producto_encima, []).append(z)
+        if por_aplique or self.zonas:
+            out.append("AJUSTES DE RULETAJE PROPUESTOS (máquina)")
+            for prod, zs in por_aplique.items():
+                tramos = ", ".join(f"{_f(round(z.x0))}–{_f(round(z.x1))} mm ({z.nombre}, {z.riesgo})"
+                                   for z in sorted(zs, key=lambda z: z.x0))
+                out.append(f"  • Rodillo del aplique {prod}: insistir (presión/pasada lenta) en {tramos}.")
+            criticas = [z for z in self.zonas if not z.en_aro and z.riesgo != "BAJO"]
+            if criticas:
+                xs0 = min(min(z.desde, z.hacia, z.x0) for z in criticas)
+                xs1 = max(max(z.desde, z.hacia, z.x1) for z in criticas)
+                out.append(f"  • Ruletaje final del flanco: cubrir al menos de {_f(round(xs0))} a {_f(round(xs1))} mm; "
+                           "en cada zona crítica, recorrido hacia el borde libre del producto de encima:")
+                for z in sorted(criticas, key=lambda z: -z.xc):
+                    out.append(f"      {z.nombre}: {_f(round(z.desde))} → {_f(round(z.hacia))} mm")
+            if any(z.en_aro for z in self.zonas):
+                out.append("  • Ruletaje de la vuelta (retournement): presión sobre el aro y la falaise, recorrido "
+                           "del aro hacia el flanco.")
             out.append("")
         if self.bordes_coincidentes:
             out.append("BORDES CASI COINCIDENTES (escalón doble: atrapa aire y cuesta ruletear):")
@@ -180,18 +204,19 @@ def _recomendaciones(cons, prods, zonas, coinc) -> list[str]:
         rec.append("Prioridad de ruletaje: " + ", ".join(
             f"{z.nombre} ({_f(round(z.x0))}–{_f(round(z.x1))} mm, {', '.join(z.pares)})" for z in altas)
             + ". Son las zonas con más volumen de aire ocluido.")
-    rec.append("Ruletear después de colocar cada producto de flanco, no solo al final: en este orden "
-               + " → ".join(c for c in ("PS", "BJ", "PTR", "FE") if c in cods)
-               + ". Cada producto que se pone encima de aire sin ruletear lo encierra y ya no se saca.")
-    rec.append("Sentido de las pasadas: siempre desde el centro del hueco hacia el borde libre del producto de "
-               "encima (lo indica cada zona). Si se ruletea hacia el lado cerrado, la bolsa se desplaza pero no sale.")
-    rec.append("Ruleta: estrecha y estriada/dentada en los rincones de los escalones (bordes de PS, BJ, PTR y la "
-               "punta del BJ junto al aro), y lisa y ancha en las zonas planas; pasadas solapadas un 30–50 % y "
-               "presión constante. Repetir la pasada en las zonas ALTO.")
+    rec.append("Sin parar la puesta: lo que se ajusta es el ruletaje de la máquina, es decir, la presión, las cotas "
+               "de inicio y fin y el número de pasadas del rodillo de cada aplique ("
+               + ", ".join(c for c in ("PS", "BJ", "PTR", "FE") if c in cods)
+               + ") y del ruletaje final del flanco, concentrando la presión en las cotas de las zonas marcadas.")
+    rec.append("Sentido de los recorridos: hacia el borde libre del producto de encima (lo indica cada zona). Si el "
+               "rodillo empuja hacia el lado cerrado, la bolsa se desplaza pero no sale.")
+    rec.append("Rodillo: perfil estrecho o estriado donde hay rincones de escalón (bordes de PS, BJ, PTR y la punta "
+               "del BJ junto al aro) y ancho y liso en lo plano; solape entre pasadas y presión constante. En las "
+               "zonas ALTO, una segunda pasada o menos velocidad en esas cotas.")
     if any(z.en_aro for z in zonas):
         rec.append("Zona del aro: la cavidad entre el aro, la pared de la falaise (HF) y el BT, y el rincón donde "
-                   "el BJ y el PTR suben sobre la vuelta de la NC, son trampas de aire típicas. Ruletear ahí con "
-                   "ruleta estrecha justo después de la vuelta, y comprobar el asiento del aro contra la falaise.")
+                   "el BJ y el PTR suben sobre la vuelta de la NC, son trampas de aire típicas. Las ataca el "
+                   "ruletaje de la vuelta; comprobar también el asiento del aro contra la falaise.")
     if coinc:
         pares = "; ".join(f"{a}/{b} ({_f(round(abs(xa - xb), 1))} mm)" for a, xa, b, xb in coinc)
         rec.append(f"Bordes casi coincidentes: {pares}. Escalonar los bordes al menos 5–10 mm (o usar el "
