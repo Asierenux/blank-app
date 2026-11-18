@@ -1265,9 +1265,6 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
             ax.plot([z.x0 - 1, z.x1 + 1], [yk, yk], color=colr, lw=4, solid_capstyle="butt", zorder=6, alpha=0.85)
             ax.text(z.xc, yk + 0.9, z.nombre, ha="center", va="bottom", fontsize=7.5, color=colr,
                     fontweight="bold", zorder=7)
-            largo_flecha = max(-12.0, min(12.0, z.hacia - z.xc))
-            ax.annotate("", xy=(z.xc + largo_flecha, yk - 1.4), xytext=(z.xc, yk - 1.4),
-                        arrowprops=dict(arrowstyle="-|>", color=colr, lw=1.0, mutation_scale=7), zorder=7)
 
     # resumen de las vueltas alrededor del aro (abajo a la derecha)
     resumen = []

@@ -64,16 +64,15 @@ class Analisis:
                        f"≈{_f(round(z.volumen_cm3, 1))} cm³ por lado) → tras ruletear ≈ "
                        f"{_f(round(z.area_con_ruletaje, 2))} mm²")
             if z.en_aro:
-                out.append("    Máquina: la ataca el ruletaje de la vuelta (retournement) de la NC: presión sobre el "
-                           "aro y la falaise y recorrido desde el aro hacia el flanco "
-                           f"(hasta ≈{_f(round(z.hacia))} mm). El hueco bajo el tramo recto del BT queda cerrado "
-                           "antes de la vuelta: depende de que el BT asiente bien sobre el aro y la punta de la "
-                           "falaise al ponerlo.")
+                out.append("    Máquina: la ataca el ruletaje de la vuelta (retournement) de la NC, apretando sobre "
+                           "el aro y la falaise. El hueco bajo el tramo recto del BT queda cerrado antes de la "
+                           "vuelta: depende de que el BT asiente bien sobre el aro y la punta de la falaise al ponerlo.")
             else:
-                out.append(f"    Máquina: rodillo del aplique del {z.producto_encima} (al ponerlo) y ruletaje final del "
-                           f"flanco: más presión entre {_f(round(z.x0))} y {_f(round(z.x1))} mm, recorrido {sentido} "
-                           f"desde {_f(round(z.desde))} hasta {_f(round(z.hacia))} mm (borde libre del "
-                           f"{z.producto_encima}, por donde sale el aire).")
+                out.append(f"    Máquina: el rodillo del aplique del {z.producto_encima} tiene que llegar al rincón "
+                           f"entre {_f(round(z.x0))} y {_f(round(z.x1))} mm. Si no lo rellena, ese rincón es un canal "
+                           f"a lo largo de toda la vuelta: el rodillo empuja el aire (≈{_f(round(z.volumen_cm3, 1))} cm³ "
+                           f"por lado) por delante de él y lo deja atrapado en el empalme del {z.producto_encima}, "
+                           "a esa cota.")
             out.append("")
         # resumen por máquina: qué zonas toca cada aplique y la pasada final
         por_aplique: dict[str, list] = {}
@@ -85,18 +84,14 @@ class Analisis:
             for prod, zs in por_aplique.items():
                 tramos = ", ".join(f"{_f(round(z.x0))}–{_f(round(z.x1))} mm ({z.nombre}, {z.riesgo})"
                                    for z in sorted(zs, key=lambda z: z.x0))
-                out.append(f"  • Rodillo del aplique {prod}: insistir (presión/pasada lenta) en {tramos}.")
+                out.append(f"  • Rodillo del aplique {prod}: presión que llegue al fondo del rincón en {tramos}.")
             criticas = [z for z in self.zonas if not z.en_aro and z.riesgo != "BAJO"]
             if criticas:
-                xs0 = min(min(z.desde, z.hacia, z.x0) for z in criticas)
-                xs1 = max(max(z.desde, z.hacia, z.x1) for z in criticas)
-                out.append(f"  • Ruletaje final del flanco: cubrir al menos de {_f(round(xs0))} a {_f(round(xs1))} mm; "
-                           "en cada zona crítica, recorrido hacia el borde libre del producto de encima:")
-                for z in sorted(criticas, key=lambda z: -z.xc):
-                    out.append(f"      {z.nombre}: {_f(round(z.desde))} → {_f(round(z.hacia))} mm")
+                out.append("  • Empalmes a vigilar (donde acaba el aire empujado por el rodillo): "
+                           + "; ".join(f"empalme del {z.producto_encima} a {_f(round(z.x0))}–{_f(round(z.x1))} mm "
+                                       f"({z.nombre}, ≈{_f(round(z.volumen_cm3, 1))} cm³)" for z in criticas) + ".")
             if any(z.en_aro for z in self.zonas):
-                out.append("  • Ruletaje de la vuelta (retournement): presión sobre el aro y la falaise, recorrido "
-                           "del aro hacia el flanco.")
+                out.append("  • Ruletaje de la vuelta (retournement): presión sobre el aro y la falaise.")
             out.append("")
         if self.bordes_coincidentes:
             out.append("BORDES CASI COINCIDENTES (escalón doble: atrapa aire y cuesta ruletear):")
@@ -204,15 +199,17 @@ def _recomendaciones(cons, prods, zonas, coinc) -> list[str]:
         rec.append("Prioridad de ruletaje: " + ", ".join(
             f"{z.nombre} ({_f(round(z.x0))}–{_f(round(z.x1))} mm, {', '.join(z.pares)})" for z in altas)
             + ". Son las zonas con más volumen de aire ocluido.")
-    rec.append("Sin parar la puesta: lo que se ajusta es el ruletaje de la máquina, es decir, la presión, las cotas "
-               "de inicio y fin y el número de pasadas del rodillo de cada aplique ("
-               + ", ".join(c for c in ("PS", "BJ", "PTR", "FE") if c in cods)
-               + ") y del ruletaje final del flanco, concentrando la presión en las cotas de las zonas marcadas.")
-    rec.append("Sentido de los recorridos: hacia el borde libre del producto de encima (lo indica cada zona). Si el "
-               "rodillo empuja hacia el lado cerrado, la bolsa se desplaza pero no sale.")
-    rec.append("Rodillo: perfil estrecho o estriado donde hay rincones de escalón (bordes de PS, BJ, PTR y la punta "
-               "del BJ junto al aro) y ancho y liso en lo plano; solape entre pasadas y presión constante. En las "
-               "zonas ALTO, una segunda pasada o menos velocidad en esas cotas.")
+    rec.append("La puesta es circunferencial: el rodillo del aplique aprieta siempre en las mismas cotas mientras gira "
+               "el tambor. Un rincón de escalón que no se rellena es un canal a lo largo de toda la vuelta, y el aire "
+               "que hay en él se empuja por delante del rodillo hasta el empalme por superposición, donde queda "
+               "atrapado. Por eso las bolsas aparecen sobre todo en el empalme, a la cota de cada zona.")
+    rec.append("Rodillo del aplique: que copie el perfil y llegue al fondo de los rincones en las cotas marcadas "
+               "(rodillo segmentado o de discos, o más blando, mejor que uno rígido y ancho que puentea el escalón), "
+               "con presión suficiente en esas cotas.")
+    rec.append("Empalmes: desfasar angularmente los empalmes de productos consecutivos (PS, BJ, PTR, FE) para que "
+               "no se acumulen en el mismo punto. El solape lo justo, y los extremos cortados en bisel para que el "
+               "empalme no añada otro escalón. Ruletear o apretar el empalme en las cotas de las zonas marcadas y, "
+               "si persiste, picar o ventear ahí.")
     if any(z.en_aro for z in zonas):
         rec.append("Zona del aro: la cavidad entre el aro, la pared de la falaise (HF) y el BT, y el rincón donde "
                    "el BJ y el PTR suben sobre la vuelta de la NC, son trampas de aire típicas. Las ataca el "
@@ -228,6 +225,6 @@ def _recomendaciones(cons, prods, zonas, coinc) -> list[str]:
                    "(la consigna lo pide: «VERIFICACION ESTRIADO FE»). Si falta o está aplastado, sube el riesgo.")
     rec.append("Pegajosidad (tack) y temperatura: gomas frías, envejecidas o con eflorescencia no se sueldan bien al "
                "ruletear y dejan microbolsas. Respetar los tiempos de reposo/uso y evitar contaminar las caras.")
-    rec.append("Si alguna bolsa persiste, valorar picado/venteo (punzón) en la zona marcada antes de la cocción, o "
-               "revisar con el optimizador si mover 1–2 mm un producto elimina el escalón que la produce.")
+    rec.append("Si una bolsa persiste en el empalme, revisar con el optimizador si mover 1–2 mm un producto elimina "
+               "el escalón que forma el canal: sin rincón no hay canal y no llega aire al empalme.")
     return rec

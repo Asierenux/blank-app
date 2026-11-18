@@ -72,6 +72,14 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
   - El **RFID** (RFD, «RF …») es un parche corto, no una banda: no se dibuja ni cuenta para el aire
     ni para el optimizador (en la tabla sale como «no se tiene en cuenta»).
   - **Análisis y ruletaje** (pestaña y zonas R1, R2… en el plano): agrupa las bolsas de aire en
+    zonas, las clasifica por riesgo (ALTO/MEDIO/BAJO) e indica entre qué productos están y cuánto aire
+    queda si el rodillo rellena el rincón. Como la puesta es circunferencial, cada rincón que no se
+    rellena es un canal a lo largo de la vuelta y el aire acaba en el **empalme** del producto de
+    encima: el informe dice qué rodillo de aplique tiene que llegar a qué cotas y qué empalmes vigilar,
+    detecta bordes casi coincidentes y da recomendaciones. El informe se puede guardar en .txt.
+  - El **RFID** (RFD, «RF …») es un parche corto, no una banda: no se dibuja ni cuenta para el aire
+    ni para el optimizador (en la tabla sale como «no se tiene en cuenta»).
+  - **Análisis y ruletaje** (pestaña y zonas R1, R2… en el plano): agrupa las bolsas de aire en
     zonas de ruletaje, las clasifica por riesgo (ALTO/MEDIO/BAJO), indica entre qué productos están,
     cuánto aire queda tras ruletear, el ancho de ruleta y el **sentido de la pasada** (hacia el borde
     libre del producto de encima, por donde sale el aire), detecta bordes casi coincidentes y da
