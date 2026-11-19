@@ -558,7 +558,7 @@ def _productos_retournes(cons: ConsignaNeumatico) -> set[str] | None:
 PERFIL_CUNA = {"BJ"}   # productos en cuña: gruesos junto al aro y afinándose hacia el centro (como en el plano)
 
 
-def _perfil_cuna(x, a, b, esp, punta=0.15):
+def _perfil_cuna(x, a, b, esp, punta=0.15, remate=None):
     """Cuña: espesor ESP en el extremo exterior (junto al aro) que baja hasta casi 0 en el interior."""
     import numpy as np
 
@@ -569,9 +569,10 @@ def _perfil_cuna(x, a, b, esp, punta=0.15):
     frac = (x[m] - a) / (b - a)
     t[m] = esp * (punta + (1 - punta) * frac)
     # remate corto en el extremo grueso
-    remate = min(2.0, (b - a) / 10)
-    fin = (x > b - remate) & (x <= b)
-    t[fin] = np.minimum(t[fin], esp * (b - x[fin]) / remate + 0.3)
+    remate = min(2.0, (b - a) / 10) if remate is None else remate
+    if remate > 0:
+        fin = (x > b - remate) & (x <= b)
+        t[fin] = np.minimum(t[fin], esp * (b - x[fin]) / remate + 0.3)
     return t
 
 
@@ -896,7 +897,16 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         t = _espesor_x(x, max(a, 0.0), b, p.espesor, chaflan_ini, k_chaflan=aj.chaflan, hf=p.hf_efectivo,
                        base=aj.base_bt if aj.vuelta_bt == "con_nc" else None, rampa=aj.rampa_bt)
         if p.codigo.upper() in PERFIL_CUNA and aj.cuna_bj:
-            t = _perfil_cuna(x, max(a, 0.0), b, p.espesor or 1.0)
+            t = _perfil_cuna(x, max(a, 0.0), b, p.espesor or 1.0, remate=0.0 if aro_ext else None)
+            if aro_ext and b < aro_ext["xb"]:
+                # El BJ es el relleno del aro: su extremo grueso llega hasta el aro (y la vuelta), rellenando
+                # el hueco entre su EX y el aro hasta la altura de su cara.
+                ib = min(int(np.searchsorted(x, b)), len(x) - 1)
+                techo = float(h[ib] + (p.espesor or 1.0))
+                for k in range(ib + 1, len(x)):
+                    if x[k] >= aro_ext["xb"] or h[k] >= techo - 0.05:
+                        break
+                    t[k] = techo - h[k]
         abajo = apoyar(p, t, h)
         capas.append({"prod": p, "color": color(p), "abajo": abajo, "t": t, "fin": b, "vuelta": False})
         h = np.where(t > 0, abajo + t, h)

@@ -284,3 +284,19 @@ def test_bt_cubre_el_aro_por_arriba_hasta_la_falaise(consigna, tmp_path):
     cav = [b for b in info["bolsas"] if b.abajo == "aro" and b.arriba == "BT"]
     assert cav and cav[0].area > 0                  # cavidad entre aro, pared y tramo recto
     assert bt["bt_espesor"] == pytest.approx(neumatico.Ajustes().base_bt)   # igual de fino
+
+
+def test_bj_llega_hasta_el_aro(consigna, tmp_path):
+    """El BJ (relleno en cuña) prolonga su extremo grueso hasta el aro."""
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["R60"], ws["V60"] = "Ø Burlete :", 10
+    ws["Y60"], ws["AD60"] = "Radio Interior burlete :", 203.0
+    ws["B26"], ws["E26"], ws["M26"], ws["P26"], ws["Y26"], ws["Z26"] = "BJ", "XX 10", 30, 3.0, "EX", 150
+    ruta = tmp_path / "bj.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    x, capas, _c, aros, info, *_ = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos])
+    bj = [k for k in capas if k["prod"].codigo == "BJ" and not k["vuelta"]][-1]
+    xb = info["aro"][0]
+    assert bj["t"][(x > 151) & (x < xb - 3)].max() > 0      # pasa de su EX (150) hacia el aro
