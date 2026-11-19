@@ -23,7 +23,8 @@ BANDAJE = "Bandaje"
 @dataclass
 class Ajustes:
     """Parámetros del dibujo de la semisección (la consigna no da el perfil real de cada goma)."""
-    chaflan: float = 1.5          # largo del chaflán de los bordes = chaflan × espesor
+    chaflan: float = 4.0          # largo del chaflán de los bordes = chaflan × espesor
+    rigidez_por_producto: dict = field(default_factory=lambda: {"FE": 15.0})  # el FE (ancho, va el último) puentea más
     rigidez: float = 6.0          # radio con el que un producto «puentea» escalones = rigidez × espesor
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
@@ -712,7 +713,7 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
 
     def apoyar(p, t, h):
         """Coloca el producto de espesor t sobre h; devuelve su cara inferior y registra el aire."""
-        k = aj.rigidez_ruletaje if aj.ruletaje else aj.rigidez
+        k = aj.rigidez_ruletaje if aj.ruletaje else aj.rigidez_por_producto.get(p.codigo.upper(), aj.rigidez)
         radio = max(k * (p.espesor or 1.0), 0.0)
         abajo = np.where(t > 0, _asentar(h, radio), h)
         hueco = (abajo - h) * (t > 0)

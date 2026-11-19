@@ -45,6 +45,7 @@ class App(tk.Tk):
         aj = neumatico.Ajustes()
         self.var_chaflan = tk.DoubleVar(value=aj.chaflan)
         self.var_rigidez = tk.DoubleVar(value=aj.rigidez)
+        self.var_rigidez_fe = tk.DoubleVar(value=aj.rigidez_por_producto.get("FE", aj.rigidez))
         self.var_ruletaje = tk.BooleanVar(value=False)
         self.var_base_bt = tk.DoubleVar(value=neumatico.Ajustes().base_bt)
         self.var_rampa_bt = tk.DoubleVar(value=neumatico.Ajustes().rampa_bt)
@@ -82,11 +83,12 @@ class App(tk.Tk):
         cb2.bind("<<ComboboxSelected>>", lambda e: self.redibujar())
         # Segunda fila: parámetros del aire (solo neumático)
         self.barra_aire = ttk.Frame(self, padding=(6, 0, 6, 6))
-        ttk.Label(self.barra_aire, text="Chaflán bordes (× espesor):").pack(side=tk.LEFT)
-        for var, de, a in ((self.var_chaflan, 1, 12), (self.var_rigidez, 0.5, 20)):
+        ttk.Label(self.barra_aire, text="Chaflán (× esp.):").pack(side=tk.LEFT)
+        for var, de, a in ((self.var_chaflan, 1, 12), (self.var_rigidez, 0.5, 30), (self.var_rigidez_fe, 0.5, 40)):
             if var is self.var_rigidez:
-                ttk.Label(self.barra_aire, text="Rigidez goma (radio puente × espesor):").pack(side=tk.LEFT,
-                                                                                            padx=(12, 0))
+                ttk.Label(self.barra_aire, text="Rigidez (× esp.):").pack(side=tk.LEFT, padx=(12, 0))
+            elif var is self.var_rigidez_fe:
+                ttk.Label(self.barra_aire, text="Rigidez FE:").pack(side=tk.LEFT, padx=(8, 0))
             sp = ttk.Spinbox(self.barra_aire, from_=de, to=a, increment=0.5, width=5, textvariable=var,
                              command=self._actualizar_neumatico)
             sp.pack(side=tk.LEFT, padx=(4, 0))
@@ -325,6 +327,7 @@ class App(tk.Tk):
                 return defecto
         d = neumatico.Ajustes()
         return neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
+                                 rigidez_por_producto={"FE": leer(self.var_rigidez_fe, d.rigidez_por_producto["FE"])},
                                  ruletaje=self.var_ruletaje.get(),
                                  base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt))
 

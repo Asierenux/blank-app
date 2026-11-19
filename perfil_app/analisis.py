@@ -189,12 +189,47 @@ def analizar(cons: nm.ConsignaNeumatico, seccion: str = nm.CARCASA, aj: nm.Ajust
 
     total = sum(b.area for b in info["bolsas"] if not b.zona_aro)
     total_r = sum(b.area for b in bolsas_r if not b.zona_aro)
-    return Analisis(seccion, zonas, coinc, total, total_r, _recomendaciones(cons, prods, zonas, coinc))
+    # quién encierra el aire (producto de encima con más aire) y valles bajo él entre productos con cuerpo
+    por_encima: dict[str, float] = {}
+    for b in info["bolsas"]:
+        if not b.zona_aro:
+            por_encima[b.arriba] = por_encima.get(b.arriba, 0.0) + b.area
+    dominante = max(por_encima, key=por_encima.get) if por_encima else None
+    valles = []
+    if dominante and dominante in tramo:
+        a_d, b_d = tramo[dominante]
+        cuerpos = sorted((p.tramos[-1] for p in prods if p.tramos and not p.es_aro and p.codigo != dominante
+                          and (p.espesor or 0) >= 1.5 and p.tramos[-1][1] > a_d and p.tramos[-1][0] < b_d),
+                         key=lambda t: t[0])
+        cod_de = {p.tramos[-1]: p.codigo for p in prods if p.tramos}
+        fin_max, cod_fin = None, None
+        for t in cuerpos:
+            if fin_max is not None and t[0] - fin_max > 3:
+                valles.append((cod_fin, fin_max, cod_de.get(t, "?"), t[0]))
+            if fin_max is None or t[1] > fin_max:
+                fin_max, cod_fin = t[1], cod_de.get(t, "?")
+    rec = _recomendaciones(cons, prods, zonas, coinc, dominante, por_encima, valles)
+    return Analisis(seccion, zonas, coinc, total, total_r, rec)
 
 
-def _recomendaciones(cons, prods, zonas, coinc) -> list[str]:
+def _recomendaciones(cons, prods, zonas, coinc, dominante=None, por_encima=None, valles=None) -> list[str]:
     cods = {p.codigo.upper() for p in prods}
     rec = []
+    if dominante:
+        total = sum(por_encima.values()) or 1.0
+        frac = por_encima[dominante] / total * 100
+        txt = (f"Quien encierra el aire es sobre todo el {dominante} ({frac:.0f} % del aire entre productos): al "
+               "ponerlo, puentea los valles que dejan los productos de debajo y el rodillo no lo lleva hasta el "
+               "fondo. Con finales de producto progresivos no es un problema de escalones sino de valles.")
+        if valles:
+            txt += " Valles bajo el " + dominante + ": " + "; ".join(
+                f"entre el final del {a} ({_f(round(xa))} mm) y el inicio del {b} ({_f(round(xb))} mm), "
+                f"{_f(round(xb - xa))} mm" for a, xa, b, xb in valles) + "."
+        rec.append(txt)
+        rec.append(f"Medidas sobre el {dominante}: rodillo del aplique que copie el perfil (segmentado/de discos o "
+                   "más blando) con presión en las cotas de las zonas; el producto más caliente y flexible al "
+                   "aplicarlo (temperatura de llegada, tiempo de espera) para que se adapte al valle; y, si se puede, "
+                   "reducir el valle acercando los productos de debajo (probar el optimizador con más de ±2 mm).")
     altas = [z for z in zonas if z.riesgo == "ALTO" and not z.en_aro]
     if altas:
         rec.append("Prioridad de ruletaje: " + ", ".join(

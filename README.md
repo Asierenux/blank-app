@@ -71,10 +71,11 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
     envuelve cada uno y si **solapa con la GI** (o cuántos mm le faltan).
   - El **RFID** (RFD, «RF …») es un parche corto, no una banda: no se dibuja ni cuenta para el aire
     ni para el optimizador (en la tabla sale como «no se tiene en cuenta»).
-  - **Calibración con máquina:** el BJ se dibuja en cuña (grueso junto al aro, como en el plano de
-    máquina) y los bordes con chaflán corto (1,5 × ESP) y rigidez 6 × ESP. Con estos valores las
-    zonas de más aire coinciden con lo observado en la QXAX: la punta del PTR bajo el FE y sobre el
-    BJ, y el hueco entre BJ y PS.
+  - **Calibración con máquina:** finales de producto progresivos (chaflán 4 × ESP), el BJ en cuña
+    (grueso junto al aro, como en el plano) y el **FE más rígido** (15 × ESP; el resto 6 × ESP),
+    porque es el producto ancho que va el último y puentea los valles. Con estos valores el aire sale
+    donde se ve en máquina en la QXAX: la punta del PTR bajo el FE y sobre el BJ, y el hueco BJ–PS.
+    La rigidez del FE se ajusta en la barra («Rigidez FE»).
   - **Análisis y ruletaje** (pestaña y zonas R1, R2… en el plano): agrupa las bolsas de aire en
     zonas, las clasifica por riesgo (ALTO/MEDIO/BAJO) e indica entre qué productos están y cuánto aire
     queda si el rodillo rellena el rincón. Como la puesta es circunferencial, cada rincón que no se
