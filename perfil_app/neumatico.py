@@ -1337,8 +1337,18 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
             colr = colores_riesgo[z.riesgo]
             yk = yz + (k % 2) * 3.2
             ax.plot([z.x0 - 1, z.x1 + 1], [yk, yk], color=colr, lw=4, solid_capstyle="butt", zorder=6, alpha=0.85)
-            ax.text(z.xc, yk + 0.9, z.nombre, ha="center", va="bottom", fontsize=7.5, color=colr,
-                    fontweight="bold", zorder=7)
+            # punto crítico: el sitio con más hueco dentro de la zona
+            dentro = [b for b in info["bolsas"] if b.x1 >= z.x0 - 0.5 and b.x0 <= z.x1 + 0.5]
+            if dentro:
+                peor = max(dentro, key=lambda b: b.alto)
+                ax.plot([peor.xc, peor.xc], [peor.yc, yk - 0.4], color=colr, lw=0.7, ls=":", zorder=6)
+                ax.plot(peor.xc, peor.yc, "o", ms=6.5, mfc="none", mec=colr, mew=1.6, zorder=8)
+                ax.plot(peor.xc, peor.yc, "o", ms=2.2, color=colr, zorder=8)
+                etiqueta = f"{z.nombre} · {_f(round(peor.xc))} mm · hueco {_f(round(peor.alto, 1))}"
+            else:
+                etiqueta = z.nombre
+            ax.text(z.xc, yk + 0.9, etiqueta, ha="center", va="bottom", fontsize=7, color=colr,
+                    fontweight="bold", zorder=7, bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8))
 
     # ruletas de 20 mm y multiperfil del plan de ruletaje (barras verdes sobre los productos)
     if aj.ruletas or aj.multiperfil:
