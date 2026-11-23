@@ -145,6 +145,15 @@ class App(tk.Tk):
         barra_an = ttk.Frame(marco_an)
         barra_an.pack(side=tk.TOP, fill=tk.X)
         ttk.Button(barra_an, text="💾 Guardar informe…", command=self.guardar_informe).pack(side=tk.LEFT, pady=2)
+        ttk.Button(barra_an, text="⚙ Calcular plan de ruletaje (ruletas 20 mm + multiperfil FE)",
+                   command=self.calcular_plan).pack(side=tk.LEFT, padx=8, pady=2)
+        ttk.Label(barra_an, text="Ver en el dibujo:").pack(side=tk.LEFT)
+        self.var_plan = tk.StringVar(value="Sin ruletaje")
+        self.cb_plan = ttk.Combobox(barra_an, textvariable=self.var_plan, state="readonly", width=34,
+                                    values=("Sin ruletaje",))
+        self.cb_plan.pack(side=tk.LEFT, padx=4)
+        self.cb_plan.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
+        self.planes = []
         self.texto_analisis = tk.Text(marco_an, wrap=tk.WORD, height=8, font=("TkFixedFont", 9))
         sbt = ttk.Scrollbar(marco_an, orient=tk.VERTICAL, command=self.texto_analisis.yview)
         self.texto_analisis.configure(yscrollcommand=sbt.set)
@@ -289,8 +298,15 @@ class App(tk.Tk):
         sec = self.var_seccion.get()
         sec = neumatico.CARCASA if sec == "Todo" else sec
         try:
-            self.analisis = analisis.analizar(cons, sec, self.ajustes())
+            aj_sin = self.ajustes()
+            aj_sin.ruletas, aj_sin.multiperfil = (), False
+            self.analisis = analisis.analizar(cons, sec, aj_sin)
             texto = self.analisis.texto(cons)
+            if getattr(self, "planes", None):
+                texto = ("PLAN DE RULETAJE PROPUESTO (medios de máquina: ruletas de 20 mm y multiperfil del FE)\n"
+                         + "\n".join(pl.texto() for pl in self.planes)
+                         + "\n\nPara ensayar: empezar por el plan con menos aire; si no se puede montar todo, "
+                           "las ruletas van en orden de importancia (la 1 es la que más aire quita).\n\n" + texto)
         except Exception as e:  # noqa: BLE001
             self.analisis, texto = None, f"No se pudo analizar: {type(e).__name__}: {e}"
         self.texto_analisis.configure(state=tk.NORMAL)
@@ -326,10 +342,34 @@ class App(tk.Tk):
             except (tk.TclError, ValueError):
                 return defecto
         d = neumatico.Ajustes()
-        return neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
-                                 rigidez_por_producto={"FE": leer(self.var_rigidez_fe, d.rigidez_por_producto["FE"])},
-                                 ruletaje=self.var_ruletaje.get(),
-                                 base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt))
+        aj = neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
+                               rigidez_por_producto={"FE": leer(self.var_rigidez_fe, d.rigidez_por_producto["FE"])},
+                               ruletaje=self.var_ruletaje.get(),
+                               base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt))
+        if getattr(self, "planes", None) and self.var_plan.get() != "Sin ruletaje":
+            idx = list(self.cb_plan["values"]).index(self.var_plan.get()) - 1
+            if 0 <= idx < len(self.planes):
+                aj = self.planes[idx].ajustes(aj)
+        return aj
+
+    def calcular_plan(self):
+        if not isinstance(self.consigna, neumatico.ConsignaNeumatico):
+            return
+        sec = self.var_seccion.get()
+        sec = neumatico.CARCASA if sec == "Todo" else sec
+        self.estado.set("Calculando el plan de ruletaje…")
+        self.config(cursor="watch")
+        self.update()
+        try:
+            base = self.ajustes()
+            base.ruletas, base.multiperfil = (), False
+            self.planes = analisis.planes_ruletaje(self.consigna, sec, base)
+        finally:
+            self.config(cursor="")
+        nombres = ["Sin ruletaje", "Plan A: ruletas de 20 mm", "Plan B: multiperfil FE + ruletas 20 mm"]
+        self.cb_plan["values"] = nombres
+        self.var_plan.set(nombres[2] if self.planes[1].aire_final <= self.planes[0].aire_final else nombres[1])
+        self._actualizar_neumatico()
 
     def redibujar(self):
         if not self.consigna:

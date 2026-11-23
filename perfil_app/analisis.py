@@ -264,3 +264,88 @@ def _recomendaciones(cons, prods, zonas, coinc, dominante=None, por_encima=None,
     rec.append("Si una bolsa persiste en el empalme, revisar con el optimizador si mover 1–2 mm un producto elimina "
                "el escalón que forma el canal: sin rincón no hay canal y no llega aire al empalme.")
     return rec
+
+
+# ---------------------------------------------------------------------------
+# Plan de ruletaje óptimo con los medios de máquina (ruletas de 20 mm + multiperfil del FE)
+# ---------------------------------------------------------------------------
+
+_SIN_APLIQUE = {"NC", "GI", "TT", "NST1", "NST2", "NSF"}   # se ponen a todo el ancho o se vuelven
+
+
+@dataclass
+class PlanRuletaje:
+    multiperfil: bool
+    ruletas: list[tuple[str, float, float, float]]   # (producto, desde, hasta, mm² que quita)
+    aire_inicial: float
+    aire_final: float
+    ancho: float
+
+    def ajustes(self, aj: nm.Ajustes) -> nm.Ajustes:
+        nuevo = copy.deepcopy(aj)
+        nuevo.multiperfil = self.multiperfil
+        nuevo.ruletas = tuple((p, a, b) for p, a, b, _ in self.ruletas)
+        return nuevo
+
+    def texto(self) -> str:
+        cab = "con multiperfil en el FE" if self.multiperfil else "sin multiperfil"
+        out = [f"PLAN {cab}: aire entre productos {_f(round(self.aire_inicial, 1))} → "
+               f"{_f(round(self.aire_final, 1))} mm²"
+               + (f" (−{(1 - self.aire_final / self.aire_inicial) * 100:.0f} %)" if self.aire_inicial else "")]
+        if self.multiperfil:
+            out.append("    • Multiperfil apretando el FE en todo su ancho.")
+        for i, (p, a, b, g) in enumerate(self.ruletas, 1):
+            out.append(f"    • Ruleta {i} ({_f(round(self.ancho))} mm) en el aplique del {p}: de {_f(round(a))} a "
+                       f"{_f(round(b))} mm (centro {_f(round((a + b) / 2))} mm) → quita ≈{_f(round(g, 1))} mm²")
+        if not self.ruletas and not self.multiperfil:
+            out.append("    (sin ruletas: no se encuentra ninguna que reduzca el aire de forma apreciable)")
+        return "\n".join(out)
+
+
+def _aire_entre(cons, seccion, aj):
+    return sum(b.area for b in nm.bolsas_de_aire(cons, seccion, aj) if not b.zona_aro)
+
+
+def plan_ruletaje(cons: nm.ConsignaNeumatico, seccion: str = nm.CARCASA, aj: nm.Ajustes | None = None,
+                  ancho: float = 20.0, max_ruletas: int = 4, multiperfil: bool = False,
+                  ganancia_min: float = 0.2) -> PlanRuletaje:
+    """Busca dónde poner las ruletas de `ancho` mm (y en qué aplique) para dejar el mínimo aire.
+
+    Método voraz: en cada paso prueba ruletas centradas en las bolsas que quedan (en el aplique del
+    producto que las encierra) y se queda con la que más aire quita, hasta `max_ruletas` o hasta que
+    ninguna quite al menos `ganancia_min` mm².
+    """
+    base = copy.deepcopy(aj) if aj else nm.Ajustes()
+    base.ruletaje = False
+    base.multiperfil = multiperfil
+    base.ruletas = ()
+    inicial = _aire_entre(cons, seccion, nm.Ajustes(**{**base.__dict__, "multiperfil": False, "ruletas": ()}))
+    actual = _aire_entre(cons, seccion, base)
+    elegidas: list[tuple[str, float, float, float]] = []
+    for _ in range(max_ruletas):
+        bolsas = [b for b in nm.bolsas_de_aire(cons, seccion, base)
+                  if not b.zona_aro and b.area >= 0.1 and b.arriba.upper() not in _SIN_APLIQUE]
+        candidatos = set()
+        for b in bolsas:
+            for c in (b.xc, b.x0 + ancho / 2 - 2, b.x1 - ancho / 2 + 2, (b.x0 + b.x1) / 2):
+                candidatos.add((b.arriba, round(c)))
+        mejor = None
+        for prod, c in sorted(candidatos):
+            prueba = copy.deepcopy(base)
+            prueba.ruletas = base.ruletas + ((prod, c - ancho / 2, c + ancho / 2),)
+            a = _aire_entre(cons, seccion, prueba)
+            if mejor is None or a < mejor[0] - 1e-6:
+                mejor = (a, prod, c)
+        if mejor is None or actual - mejor[0] < ganancia_min:
+            break
+        a, prod, c = mejor
+        base.ruletas = base.ruletas + ((prod, c - ancho / 2, c + ancho / 2),)
+        elegidas.append((prod, c - ancho / 2, c + ancho / 2, actual - a))
+        actual = a
+    return PlanRuletaje(multiperfil, elegidas, inicial, actual, ancho)
+
+
+def planes_ruletaje(cons, seccion=nm.CARCASA, aj=None, ancho=20.0, max_ruletas=4) -> list[PlanRuletaje]:
+    """Los dos planes a comparar: solo ruletas de 20 mm, y multiperfil en el FE + ruletas de 20 mm."""
+    return [plan_ruletaje(cons, seccion, aj, ancho, max_ruletas, multiperfil=False),
+            plan_ruletaje(cons, seccion, aj, ancho, max_ruletas, multiperfil=True)]

@@ -30,6 +30,12 @@ class Ajustes:
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
     ignorar_aire_aro: bool = True  # el aire de la zona del aro (aro, falaise, vuelta) no interesa: no se cuenta
+    # Ruletaje de máquina: ruletas de 20 mm en el aplique de un producto (producto, desde, hasta en mm desde el 0)
+    # y el multiperfil, que aprieta el FE en todo su ancho.
+    ruletas: tuple = ()
+    multiperfil: bool = False
+    k_ruleta: float = 0.5         # radio de puente bajo una ruleta de 20 mm = k_ruleta × espesor
+    k_multiperfil: float = 4.0    # radio de puente bajo el multiperfil = k_multiperfil × espesor
     base_bt: float = 0.5          # mm: espesor de la base fina del BT (fuera de la falaise)
     cuna_bj: bool = True          # el BJ en cuña (grueso junto al aro), como en el plano de máquina
     rampa_bt: float = 6.0         # mm: largo de la rampa de la falaise (sube desde dentro hasta la HF)
@@ -732,8 +738,20 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
     def apoyar(p, t, h):
         """Coloca el producto de espesor t sobre h; devuelve su cara inferior y registra el aire."""
         k = aj.rigidez_ruletaje if aj.ruletaje else aj.rigidez_por_producto.get(p.codigo.upper(), aj.rigidez)
-        radio = max(k * (p.espesor or 1.0), 0.0)
-        abajo = np.where(t > 0, _asentar(h, radio), h)
+        esp = p.espesor or 1.0
+        radio = max(k * esp, 0.0)
+        cerrado = _asentar(h, radio)
+        cod = p.codigo.upper()
+        # ruletaje de máquina: donde aprieta un rodillo, el producto puentea menos (radio menor)
+        if aj.multiperfil and cod == "FE":
+            cerrado = np.where(t > 0, np.minimum(cerrado, _asentar(h, min(radio, aj.k_multiperfil * esp))), cerrado)
+        ventanas = [(x0r, x1r) for pr_r, x0r, x1r in aj.ruletas if pr_r.upper() == cod]
+        if ventanas:
+            fino = _asentar(h, min(radio, aj.k_ruleta * esp))
+            for x0r, x1r in ventanas:
+                en = (x >= x0r) & (x <= x1r)
+                cerrado = np.where(en, np.minimum(cerrado, fino), cerrado)
+        abajo = np.where(t > 0, cerrado, h)
         hueco = (abajo - h) * (t > 0)
         m = hueco > aj.aire_min
         if m.any():
@@ -1321,6 +1339,22 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
             ax.plot([z.x0 - 1, z.x1 + 1], [yk, yk], color=colr, lw=4, solid_capstyle="butt", zorder=6, alpha=0.85)
             ax.text(z.xc, yk + 0.9, z.nombre, ha="center", va="bottom", fontsize=7.5, color=colr,
                     fontweight="bold", zorder=7)
+
+    # ruletas de 20 mm y multiperfil del plan de ruletaje (barras verdes sobre los productos)
+    if aj.ruletas or aj.multiperfil:
+        yr = y0 - 6          # debajo del tambor, donde hay sitio
+        for k, (prod_r, x0r, x1r) in enumerate(aj.ruletas):
+            yk = yr - (k % 2) * 3.4
+            ax.plot([x0r, x1r], [yk, yk], color="#1a7f37", lw=5, solid_capstyle="butt", zorder=6, alpha=0.9)
+            ax.text((x0r + x1r) / 2, yk + 0.9, f"ruleta {k + 1} · {prod_r}", ha="center", va="bottom",
+                    fontsize=7, color="#1a7f37", fontweight="bold", zorder=7)
+        if aj.multiperfil:
+            fe = next((p.tramos[-1] for p in prods if p.codigo.upper() == "FE" and p.tramos), None)
+            if fe:
+                ym = yr - 7.5
+                ax.plot([fe[0], fe[1]], [ym, ym], color="#0b5d1e", lw=2, ls="--", zorder=6)
+                ax.text((fe[0] + fe[1]) / 2, ym + 0.7, "multiperfil FE", ha="center", va="bottom", fontsize=7,
+                        color="#0b5d1e", fontweight="bold", zorder=7)
 
     # resumen de las vueltas alrededor del aro (abajo a la derecha)
     resumen = []

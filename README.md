@@ -77,6 +77,11 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
     donde se ve en máquina en la QXAX: la punta del PTR bajo el FE y sobre el BJ, y el hueco BJ–PS.
     La rigidez del FE se ajusta en la barra («Rigidez FE»).
   - **El aire de la zona del aro no se tiene en cuenta** (ni se dibuja, ni suma, ni lo usa el optimizador): solo interesa el aire entre productos de flanco.
+  - **Plan de ruletaje con los medios de máquina:** en la pestaña de análisis, «Calcular plan de
+    ruletaje» busca dónde poner las **ruletas de 20 mm** (en qué aplique y a qué cota) y compara con y
+    sin el **multiperfil** del FE, con el aire que quedaría. Cada plan se puede ver en el dibujo (barras
+    verdes). La eficacia de cada rodillo es una estimación (ruleta: radio de puente 0,5 × ESP;
+    multiperfil: 4 × ESP) que hay que confirmar con el ensayo.
   - **Análisis y ruletaje** (pestaña y zonas R1, R2… en el plano): agrupa las bolsas de aire en
     zonas, las clasifica por riesgo (ALTO/MEDIO/BAJO) e indica entre qué productos están y cuánto aire
     queda si el rodillo rellena el rincón. Como la puesta es circunferencial, cada rincón que no se
