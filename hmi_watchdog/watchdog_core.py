@@ -144,11 +144,13 @@ class Config:
     launch_gap_s: int = 5           # separación entre el arranque de una app y la siguiente
     detect_hang: bool = True        # reiniciar si la ventana "No responde"
     hang_timeout_s: int = 60        # segundos seguidos colgada antes de matarla
+    hang_startup_grace_s: int = 120 # margen de arranque: no se mira "No responde" al inicio
     hang_recover_s: int = 20        # respondiendo X s seguidos = bloqueo terminado
     hang_log_min_s: int = 0         # no anotar bloqueos con menos de X s sin responder
-    loop_max_restarts: int = 5      # protección anti-bucle: N reinicios...
-    loop_window_min: int = 10       # ...en M minutos...
-    loop_cooldown_min: int = 2      # ...=> esperar X minutos antes de reintentar
+    loop_max_restarts: int = 5      # anti-bucle: tras N reinicios seguidos sin éxito...
+    loop_window_min: int = 10       # (un reinicio tiene éxito si la app va bien M minutos)
+    loop_cooldown_min: int = 2      # ...esperar X min antes de reintentar (se duplica cada vez)
+    loop_max_cooldown_min: int = 30 # ...hasta un máximo de X min
     pause_auto_resume_min: int = 30 # una pausa manual se reanuda sola tras X min
     autostart: bool = True          # arrancar el supervisor con Windows
     start_minimized: bool = False
@@ -470,6 +472,7 @@ class Status:
     RUNNING = "EN EJECUCIÓN"
     HUNG = "NO RESPONDE"
     UNSTABLE = "INESTABLE"           # responde, pero se ha bloqueado hace poco
+    STARTING = "ARRANCANDO"          # aún no responde, pero está en el margen de arranque
     RESTARTING = "REINICIANDO"
     STOPPED = "CERRADA"
     PAUSED = "VIGILANCIA PAUSADA"
@@ -477,7 +480,7 @@ class Status:
     ERROR = "ERROR AL LANZAR"
 
 
-OK_STATUSES = {Status.RUNNING, Status.WAITING, Status.PAUSED}
+OK_STATUSES = {Status.RUNNING, Status.WAITING, Status.PAUSED, Status.STARTING}
 
 
 class HangEpisode:
@@ -538,7 +541,9 @@ class Watchdog(threading.Thread):
         self._pobj: psutil.Process | None = None      # para medir CPU entre ticks
         self._last_cpu_times = None
         self.last_error = ""
-        self._restart_times: deque[float] = deque()
+        self.failures = 0                   # reinicios seguidos sin éxito (anti-bucle)
+        self._retry_allowed = False         # al acabar una espera se permite 1 intento
+        self._healthy_since: float | None = None
         self._first_check = True
         self._manual_restart = False
         self.events: deque[tuple[float, str]] = deque(maxlen=200)
@@ -568,6 +573,8 @@ class Watchdog(threading.Thread):
                 episode_cuts=self.episode.cuts if self.episode else 0,
                 paused_left=(self.paused_until - now) if self.paused_until else None,
                 loop_block_left=(self.loop_block_until - now) if self.loop_block_until else None,
+                failures=self.failures,
+                grace_left=self._grace_left(now),
                 hung_for=(now - self.hung_since) if self.hung_since else None,
                 last_error=self.last_error,
                 events=list(self.events),
@@ -597,7 +604,8 @@ class Watchdog(threading.Thread):
                 self.paused_until = None
                 self._event("Vigilancia reanudada", history=True)
             self.loop_block_until = None
-            self._restart_times.clear()
+            self.failures = 0
+            self._retry_allowed = False
         self._wake.set()
 
     def restart_now(self) -> None:
@@ -664,13 +672,16 @@ class Watchdog(threading.Thread):
                 self.paused_until = None
                 self._event("Fin de la pausa: vigilancia reanudada automáticamente", history=True)
 
-            # --- bloqueo anti-bucle
+            # --- bloqueo anti-bucle (si la app está abierta, sigue la vigilancia
+            #     normal pero no se fuerza su cierre hasta que termine la espera)
             if self.loop_block_until:
-                if now < self.loop_block_until and not proc:
+                if now >= self.loop_block_until:
+                    self.loop_block_until = None
+                    self._retry_allowed = True
+                    self._event("Fin de la espera anti-bucle: se permite un nuevo intento")
+                elif not proc:
                     self.status = Status.LOOP_BLOCK
                     return
-                self.loop_block_until = None
-                self._restart_times.clear()
 
             # --- primer chequeo (arranque del PC / supervisor)
             delay = None
@@ -716,18 +727,8 @@ class Watchdog(threading.Thread):
             self.episode = None
             self.status = Status.STOPPED
 
-            # protección anti-bucle
-            window = cfg.loop_window_min * 60
-            while self._restart_times and now - self._restart_times[0] > window:
-                self._restart_times.popleft()
-            if len(self._restart_times) >= cfg.loop_max_restarts:
-                self.loop_block_until = now + cfg.loop_cooldown_min * 60
+            if self._loop_guard(now, "Se cerró"):
                 self.status = Status.LOOP_BLOCK
-                self._event(
-                    f"{len(self._restart_times)} reinicios en {cfg.loop_window_min} min: "
-                    f"se espera {cfg.loop_cooldown_min} min antes de reintentar",
-                    history=True,
-                )
                 return
             delay = cfg.restart_delay_s
             self.status = Status.RESTARTING
@@ -748,7 +749,15 @@ class Watchdog(threading.Thread):
         hung = cfg.detect_hang and is_hung(proc.pid)
         ep = self.episode
 
+        if hung and ep is None and self._grace_left(now):
+            # muchas HMI no atienden su ventana mientras arrancan (cargan datos,
+            # conectan con el equipo...). No es un bloqueo todavía.
+            self.status = Status.STARTING
+            self._healthy_since = None
+            return
+
         if hung:
+            self._healthy_since = None
             if ep is None:
                 ep = self.episode = HangEpisode(now)
                 self._event("Bloqueo: la aplicación NO RESPONDE", pid=proc.pid)
@@ -759,6 +768,8 @@ class Watchdog(threading.Thread):
             self._sample(proc, ep)
             self.status = Status.HUNG
             if now - self.hung_since >= cfg.hang_timeout_s:
+                if self.loop_block_until or self._loop_guard(now, "No responde"):
+                    return  # anti-bucle: no se fuerza el cierre; quizá se recupere sola
                 ep.hung_total += now - self.hung_since
                 ep.longest = max(ep.longest, now - self.hung_since)
                 self._event(
@@ -781,6 +792,7 @@ class Watchdog(threading.Thread):
         self.hung_since = None
         if ep is None:
             self.status = Status.RUNNING
+            self._note_healthy(now)
             return
         if ep.responsive_since is None:
             ep.responsive_since = now
@@ -797,6 +809,39 @@ class Watchdog(threading.Thread):
         self.state.save(self.app.id)
         self._event(f"Bloqueo superado, vuelve a responder ({ep.summary(end)})",
                     history=ep.hung_total >= cfg.hang_log_min_s, pid=proc.pid)
+
+    def _grace_left(self, now: float) -> float | None:
+        if not self.proc_started or not self.cfg.hang_startup_grace_s:
+            return None
+        left = self.cfg.hang_startup_grace_s - (now - self.proc_started)
+        return left if left > 0 else None
+
+    def _note_healthy(self, now: float) -> None:
+        """Si la app lleva `loop_window_min` funcionando bien, el anti-bucle vuelve a cero."""
+        if self._healthy_since is None:
+            self._healthy_since = now
+        elif self.failures and now - self._healthy_since >= self.cfg.loop_window_min * 60:
+            self._event(f"Funciona bien desde hace {self.cfg.loop_window_min} min: "
+                        f"anti-bucle a cero (había {self.failures} reinicios seguidos)")
+            self.failures = 0
+
+    def _loop_guard(self, now: float, reason: str) -> bool:
+        """True si hay que esperar en vez de reiniciar (demasiados reinicios seguidos)."""
+        cfg = self.cfg
+        if self.failures < cfg.loop_max_restarts:
+            return False
+        if self._retry_allowed:
+            self._retry_allowed = False
+            return False
+        extra = self.failures - cfg.loop_max_restarts
+        wait_min = min(cfg.loop_cooldown_min * (2 ** min(extra, 16)), cfg.loop_max_cooldown_min)
+        self.loop_block_until = now + wait_min * 60
+        action = ("no se fuerza el cierre" if reason == "No responde"
+                  else "no se vuelve a abrir")
+        self._event(
+            f"ANTI-BUCLE: {self.failures} reinicios seguidos sin éxito ({reason}); "
+            f"{action} durante {wait_min} min", history=True, level=logging.WARNING)
+        return True
 
     def _sample(self, proc: psutil.Process, ep: HangEpisode) -> None:
         """Pico de CPU (app y equipo) y memoria durante el episodio."""
@@ -843,15 +888,16 @@ class Watchdog(threading.Thread):
             self.status = Status.ERROR
             self.last_error = str(exc)
             self._event(f"ERROR al lanzar la aplicación: {exc}", history=True, level=logging.ERROR)
-            self._restart_times.append(time.time())
+            self.failures += 1
             return
 
         self.last_error = ""
         self.pid = pid
         self.proc_started = time.time()
+        self._healthy_since = None
         self.status = Status.RUNNING
         if count:
-            self._restart_times.append(time.time())
+            self.failures += 1
             self.state.restart_count += 1
             self.state.last_restart = now_str()
             self.state.last_reason = reason

@@ -66,6 +66,7 @@ STATUS_LOOK = {
     Status.STOPPED: (RED, "alert", "Está cerrada."),
     Status.HUNG: (RED, "alert", "No responde. Se reiniciará si no se recupera."),
     Status.UNSTABLE: (ORANGE, "warn", "Vuelve a responder, pero se está bloqueando a ratos."),
+    Status.STARTING: (NAVY, "ok", "Arrancando (todavía no responde, es normal al inicio)."),
     Status.ERROR: (RED, "alert", "No se ha podido abrir. Revisa la configuración."),
     Status.LOOP_BLOCK: (PURPLE, "alert", "Demasiados cierres seguidos. Reintento en espera."),
     Status.PAUSED: (GREY, "pause", "Vigilancia en pausa por mantenimiento."),
@@ -366,8 +367,15 @@ class AppCard(tk.Frame):
         color, variant, message = STATUS_LOOK.get(s["status"], (GREY, "pause", ""))
         if s["paused_left"]:
             message += f"  Se reanuda en {fmt_duration(s['paused_left'])}."
-        elif s["loop_block_left"]:
-            message = f"Demasiados cierres seguidos. Reintento en {fmt_duration(s['loop_block_left'])}."
+        elif s["loop_block_left"] and s["hung_for"]:
+            message = (f"No responde. Anti-bucle: sin cierre forzado durante "
+                       f"{fmt_duration(s['loop_block_left'])}.")
+        elif s["loop_block_left"] and s["status"] == Status.LOOP_BLOCK:
+            message = (f"{s['failures']} reinicios seguidos sin éxito. "
+                       f"Nuevo intento en {fmt_duration(s['loop_block_left'])}.")
+        elif s["grace_left"] and s["status"] == Status.STARTING:
+            message = (f"Arrancando: todavía no responde (normal al inicio). "
+                       f"Margen restante {int(s['grace_left'])} s.")
         elif s["hung_for"]:
             message = f"No responde desde hace {int(s['hung_for'])} s"
             if s["episode_cuts"] > 1:
@@ -394,7 +402,8 @@ class AppCard(tk.Frame):
         v["count"].set(str(s["restart_count"]))
         v["since"].set(f"desde {s['counting_since'][:10]}")
         if s["last_restart"]:
-            v["last"].set(s["last_restart"])
+            lr = s["last_restart"]  # "AAAA-MM-DD HH:MM:SS" -> "DD/MM HH:MM:SS"
+            v["last"].set(f"{lr[8:10]}/{lr[5:7]} {lr[11:]}" if len(lr) >= 19 else lr)
             v["reason"].set(f"Motivo: {s['last_reason']}")
         else:
             v["last"].set("Nunca")
@@ -404,7 +413,9 @@ class AppCard(tk.Frame):
         extra = (f"Arranques al iniciar el PC: {s['boot_launches']}"
                  f"   ·   Bloqueos: {s['hang_episodes']}"
                  f"   ·   Cierres forzados: {s['hang_kills']}")
-        if s["last_hang"]:  # el resumen completo está en el historial
+        if s["failures"]:
+            extra += f"   ·   Reinicios seguidos sin éxito: {s['failures']}"
+        elif s["last_hang"]:  # el resumen completo está en el historial
             extra += f"   ·   Último bloqueo: {s['last_hang'][:16]}"
         v["extra"].set(extra)
         self.btn_pause.configure(
@@ -615,19 +626,20 @@ class ConfigDialog(tk.Toplevel):
         spin(s, 3, "Espera al encender el PC", "startup_delay_s", 0, 600, "s")
         spin(s, 4, "Entre una app y otra", "launch_gap_s", 0, 600, "s")
         check(s, 5, "Traer al frente al relanzar", "bring_to_front")
-        spin(s, 6, "Anti-bucle: máximo", "loop_max_restarts", 1, 100)
-        spin(s, 7, "   … en", "loop_window_min", 1, 600, "min")
-        spin(s, 8, "   … y luego esperar", "loop_cooldown_min", 1, 600, "min")
+        spin(s, 6, "Anti-bucle: máx. seguidos", "loop_max_restarts", 1, 100)
+        spin(s, 7, "   … luego esperar (x2)", "loop_cooldown_min", 1, 600, "min")
+        spin(s, 8, "   … a cero si va bien", "loop_window_min", 1, 600, "min")
 
         s = section(1, 1, "«No responde» (bloqueos)")
         check(s, 1, "Reiniciar si sigue colgada…", "detect_hang")
         spin(s, 2, "   … durante más de", "hang_timeout_s", 10, 3600, "s")
         spin(s, 3, "Superado si responde", "hang_recover_s", 5, 600, "s")
         spin(s, 4, "Anotar bloqueos desde", "hang_log_min_s", 0, 600, "s")
+        spin(s, 5, "Margen de arranque", "hang_startup_grace_s", 0, 1800, "s")
         tk.Label(s, text="Los cortes seguidos se agrupan en\n"
                          "un solo bloqueo (con CPU y memoria).",
                  bg=CARD, fg=MUTED, justify="left", font=(FONT, 9)).grid(
-            row=5, column=0, columnspan=3, sticky="w", pady=(6, 0))
+            row=6, column=0, columnspan=3, sticky="w", pady=(6, 0))
 
         s = section(1, 2, "Supervisor")
         check(s, 1, "Iniciar con Windows", "autostart")

@@ -44,6 +44,7 @@ def core(tmp_path, monkeypatch):
 def base_cfg(core, *apps):
     return core.Config(apps=list(apps), check_interval_s=1, restart_delay_s=0,
                        startup_delay_s=0, launch_gap_s=0, detect_hang=False,
+                       hang_startup_grace_s=0,
                        loop_max_restarts=3, loop_window_min=10, loop_cooldown_min=1)
 
 
@@ -249,5 +250,75 @@ def test_short_hangs_not_logged_below_minimum(core, tmp_path, monkeypatch):
         hung["v"] = False
         assert wait_for(lambda: wd.state.hang_episodes == 1, timeout=8)
         assert not [r for r in core.read_history() if "Bloqueo" in r[2]]
+    finally:
+        wd.stop()
+
+
+def test_hang_loop_is_stopped_and_backs_off(core, tmp_path, monkeypatch):
+    """Caso real HMI BT: la app nunca responde tras arrancar -> 5608 reinicios.
+    Ahora tras loop_max_restarts reinicios seguidos deja de forzar el cierre."""
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.detect_hang, cfg.hang_timeout_s, cfg.loop_max_restarts = True, 1, 3
+    monkeypatch.setattr(core, "is_hung", lambda pid: True)
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: wd.state.restart_count == 3, timeout=20)
+        assert wait_for(lambda: wd.snapshot()["loop_block_left"], timeout=10)
+        pid = wd.snapshot()["pid"]
+        time.sleep(4)
+        snap = wd.snapshot()
+        assert wd.state.restart_count == 3            # no hay más reinicios
+        assert snap["pid"] == pid and core.find_process(app.exe_path).pid == pid  # no se mata
+        assert snap["status"] == core.Status.HUNG
+        assert 40 < snap["loop_block_left"] <= 60      # 1ª espera = loop_cooldown_min (1 min)
+        assert any("ANTI-BUCLE" in r[2] for r in core.read_history())
+    finally:
+        wd.stop()
+
+
+def test_backoff_doubles_and_allows_one_retry(core, tmp_path):
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.loop_max_restarts, cfg.loop_cooldown_min, cfg.loop_max_cooldown_min = 2, 2, 5
+    wd = core.Watchdog(cfg, app, core.State())
+    now = time.time()
+    wd.failures = 2
+    assert wd._loop_guard(now, "Se cerró") and round((wd.loop_block_until - now) / 60) == 2
+    wd._retry_allowed = True                       # termina la espera: 1 intento
+    assert not wd._loop_guard(now, "Se cerró")
+    wd.failures = 3
+    assert wd._loop_guard(now, "Se cerró") and round((wd.loop_block_until - now) / 60) == 4
+    wd.failures = 9
+    assert wd._loop_guard(now, "Se cerró") and round((wd.loop_block_until - now) / 60) == 5  # tope
+
+
+def test_startup_grace_prevents_kill(core, tmp_path, monkeypatch):
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.detect_hang, cfg.hang_timeout_s, cfg.hang_startup_grace_s = True, 1, 30
+    monkeypatch.setattr(core, "is_hung", lambda pid: True)
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: wd.snapshot()["status"] == core.Status.STARTING)
+        time.sleep(3)
+        assert wd.state.restart_count == 0 and wd.snapshot()["status"] == core.Status.STARTING
+    finally:
+        wd.stop()
+
+
+def test_failures_reset_when_healthy(core, tmp_path, monkeypatch):
+    app = make_app(core, tmp_path)
+    cfg = base_cfg(core, app)
+    cfg.loop_window_min = 0                        # "estable" de inmediato para la prueba
+    wd = core.Watchdog(cfg, app, core.State())
+    wd.start()
+    try:
+        assert wait_for(lambda: core.find_process(app.exe_path) is not None)
+        core.find_process(app.exe_path).kill()
+        assert wait_for(lambda: wd.state.restart_count == 1)
+        assert wait_for(lambda: wd.failures == 0, timeout=8)
     finally:
         wd.stop()
