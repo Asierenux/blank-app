@@ -29,6 +29,7 @@ class Ajustes:
     ruletaje: bool = False        # simular el ruletaje (presión de los apliques)
     rigidez_ruletaje: float = 0.4  # radio de puente tras el ruletaje = rigidez_ruletaje × espesor
     aire_min: float = 0.05        # mm: huecos más finos no se cuentan
+    ignorar_aire_aro: bool = True  # el aire de la zona del aro (aro, falaise, vuelta) no interesa: no se cuenta
     base_bt: float = 0.5          # mm: espesor de la base fina del BT (fuera de la falaise)
     cuna_bj: bool = True          # el BJ en cuña (grueso junto al aro), como en el plano de máquina
     rampa_bt: float = 6.0         # mm: largo de la rampa de la falaise (sube desde dentro hasta la HF)
@@ -935,6 +936,11 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         for bo in bolsas:
             bo.zona_aro = bo.x1 >= limite
         info["limite_aro"] = limite
+        if aj.ignorar_aire_aro:
+            # fuera todo el aire de la zona del aro: ni se dibuja ni se cuenta
+            bolsas[:] = [bo for bo in bolsas if not bo.zona_aro]
+            aire[:] = [(hp, ab, m & (x < limite), cod) for hp, ab, m, cod in aire]
+            info["cavidades"] = []
     info["bolsas"] = bolsas
     info["aire"] = aire
     info["colas"] = colas
@@ -1172,7 +1178,7 @@ def optimizar(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | Non
         evals += 1
         aplicar_desplazamientos(trabajo, d)
         principal, aro = _aire(trabajo, seccion, aj)
-        # se minimiza el aire total (entre productos + zona del aro) para no pasar aire de una zona a otra
+        # se minimiza el aire que interesa (entre productos; la zona del aro solo si se tiene en cuenta)
         return principal + aro + 1e-3 * sum(abs(v) for v in d.values()), principal, aro
 
     base, aire0, aro0 = coste(desp)

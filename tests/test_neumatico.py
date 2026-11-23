@@ -281,8 +281,11 @@ def test_bt_cubre_el_aro_por_arriba_hasta_la_falaise(consigna, tmp_path):
     bt = {v["cod"]: v for v in info["vueltas"]}["BT"]
     assert bt["bt_punta"]                      # llega a la cota HF (punta de la pared)
     assert bt["ang"] == pytest.approx(180, abs=1)   # por abajo y por fuera hasta arriba; luego recto
-    cav = [b for b in info["bolsas"] if b.abajo == "aro" and b.arriba == "BT"]
+    info2 = neumatico._calcular_plano(c, [p for p in c.de(neumatico.CARCASA) if p.tramos],
+                                      neumatico.Ajustes(ignorar_aire_aro=False))[4]
+    cav = [b for b in info2["bolsas"] if b.abajo == "aro" and b.arriba == "BT"]
     assert cav and cav[0].area > 0                  # cavidad entre aro, pared y tramo recto
+    assert not [b for b in info["bolsas"] if b.zona_aro]   # por defecto el aire del aro no se cuenta
     assert bt["bt_espesor"] == pytest.approx(neumatico.Ajustes().base_bt)   # igual de fino
 
 

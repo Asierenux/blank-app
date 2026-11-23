@@ -51,7 +51,7 @@ class Analisis:
         out = [f"ANÁLISIS DE AIRE Y RULETAJES — {self.seccion}", cab, ""]
         out.append(f"Aire estimado entre productos: {_f(round(self.total, 1))} mm² en la sección "
                    f"→ con ruletaje: {_f(round(self.total_con_ruletaje, 1))} mm²")
-        out.append("(La zona del aro se marca aparte: su geometría es la más aproximada.)")
+        out.append("(No se tiene en cuenta el aire de la zona del aro.)")
         out.append("")
         if not self.zonas:
             out.append("No se detectan zonas con aire apreciable con los ajustes actuales.")
