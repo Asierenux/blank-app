@@ -263,7 +263,7 @@ def cargar(ruta: str) -> ConsignaNeumatico:
             # Fila de notas: "CLAVE valor ;CLAVE valor ;"
             for trozo in [t.strip() for t in texto.split(";") if t.strip()]:
                 pendientes.append(trozo)
-                m = re.match(r"^(.*?)[\s:=]+(-?[\d.]+(?:\s+.*)?)$", trozo)
+                m = re.match(r"^(.*?)[\s:=]+(-?\d+(?:[.,]\d+)?(?:\s+.*)?)$", trozo)
                 if m:
                     notas[m.group(1).strip(" :=")] = m.group(2).strip()
                 else:
@@ -301,7 +301,8 @@ def cargar(ruta: str) -> ConsignaNeumatico:
                 cons.diam_aro = valor
     for k, v in notas.items():
         n = _num(v.split()[0]) if v else None
-        if "ENTRE-TRINGLES" in k.upper() or "ENTRE TRINGLES" in k.upper():
+        clave = re.sub(r"[\s\-_.]", "", k.upper())
+        if "ENTRETRINGLE" in clave:
             cons.entre_tringles = n
         elif "HORS TOUT" in k.upper():
             cons.hors_tout = n
@@ -329,11 +330,26 @@ def _calcular_posiciones(cons: ConsignaNeumatico) -> None:
         w, t, v = p.anchura, p.trazo_tipo, p.trazo
         if not w:
             # Aro / tringle: sin anchura, va en la posición de entre-tringles
-            if cons.entre_tringles and (p.codigo.upper() in ("TT", "TR") or "TRING" in p.apelacion.upper()
-                                        or t):
-                p.es_aro = True
-                x = cons.entre_tringles / 2
+            es_tt = p.codigo.upper() in ("TT", "TR") or "TRING" in p.apelacion.upper() or bool(t)
+            if es_tt:
                 d = p.espesor or 4
+                if cons.entre_tringles:
+                    x = cons.entre_tringles / 2
+                elif cons.haut_falaise:
+                    # sin ENTRE-TRINGLES: el aro se apoya en la pared de la falaise del BT
+                    x = cons.haut_falaise + d / 2
+                    aviso = (f"No se encuentra ENTRE-TRINGLES: el aro ({p.codigo}) se coloca pegado a la HF del BT "
+                             f"(en {_f(round(x, 1))} mm).")
+                    if aviso not in cons.avisos:
+                        cons.avisos.append(aviso)
+                else:
+                    aviso = (f"No se encuentra ENTRE-TRINGLES ni la HF del BT: no se puede colocar el aro "
+                             f"({p.codigo}) ni dibujar la vuelta. Revisa la nota «ENTRE-TRINGLES» de la consigna.")
+                    if aviso not in cons.avisos:
+                        cons.avisos.append(aviso)
+                    p.tramos = []
+                    continue
+                p.es_aro = True
                 p.tramos = [(-x - d / 2, -x + d / 2), (x - d / 2, x + d / 2)]
             continue
         v = (v or 0.0) + (p.desplazamiento if p.movible else 0.0)

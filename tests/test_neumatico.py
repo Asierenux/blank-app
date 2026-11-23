@@ -300,3 +300,31 @@ def test_bj_llega_hasta_el_aro(consigna, tmp_path):
     bj = [k for k in capas if k["prod"].codigo == "BJ" and not k["vuelta"]][-1]
     xb = info["aro"][0]
     assert bj["t"][(x > 151) & (x < xb - 3)].max() > 0      # pasa de su EX (150) hacia el aro
+
+
+def test_entre_tringles_con_coma_decimal(consigna, tmp_path):
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    for fila in ws.iter_rows():
+        for c in fila:
+            if isinstance(c.value, str) and "ENTRE-TRINGLES" in c.value:
+                c.value = c.value.replace("320.5", "320,5").replace("ENTRE-TRINGLES", "ENTRE TRINGLES")
+    ruta = tmp_path / "coma.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    assert c.entre_tringles == pytest.approx(320.5)
+    assert next(p for p in c.productos if p.codigo == "TT").es_aro
+
+
+def test_sin_entre_tringles_avisa(consigna, tmp_path):
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    for fila in ws.iter_rows():
+        for c in fila:
+            if isinstance(c.value, str) and "ENTRE-TRINGLES" in c.value:
+                c.value = c.value.replace("ENTRE-TRINGLES  320.5    ;", "")
+    ruta = tmp_path / "sin_et.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    assert c.entre_tringles is None
+    assert any("ENTRE-TRINGLES" in a for a in c.avisos)
