@@ -432,7 +432,16 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
     desp = {p.codigo: p.desplazamiento for p in cons.productos if p.desplazamiento}
     if desp:
         titulo += "\nPROPUESTA (no es la consigna): " + ", ".join(f"{k} {v:+g} mm" for k, v in desp.items())
-    ax.set_title(titulo, fontsize=10, color="#b00000" if desp else "black")
+    try:
+        from . import tema
+        fam_titulo = tema.familias_matplotlib()[0]
+        azul = tema.COLORES["azul"]
+    except Exception:  # noqa: BLE001
+        fam_titulo, azul = None, "black"
+    ax.set_title(titulo, fontsize=10.5, color="#b00000" if desp else azul, fontweight="bold",
+                 fontfamily=fam_titulo, loc="left")
+    for lado in ax.spines.values():
+        lado.set_edgecolor(azul)
     fig.tight_layout()
     return ax
 

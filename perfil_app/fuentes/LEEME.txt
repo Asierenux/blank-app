@@ -1,0 +1,13 @@
+Tipografías de la app
+=====================
+
+Noto Sans (NotoSans-*.ttf)
+  Copyright 2022 The Noto Project Authors (https://github.com/notofonts/latin-greek-cyrillic)
+  Licencia SIL Open Font License 1.1 (https://openfontlicense.org): se puede incluir y
+  redistribuir libremente con la app.
+
+BIB (tipografía corporativa)
+  NO se incluye aquí porque el repositorio es público. Para usarla en los títulos:
+  - instálala en el PC (doble clic en BIB-Bold.ttf > Instalar), o
+  - crea una carpeta "fuentes" junto a DibujadorPerfiles.exe y copia dentro BIB-Bold.ttf.
+  Si no está, la app usa Noto Sans.

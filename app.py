@@ -18,7 +18,8 @@ matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk  # noqa: E402
 from matplotlib.figure import Figure  # noqa: E402
 
-from perfil_app import analisis, core, neumatico  # noqa: E402
+from perfil_app import analisis, core, neumatico, tema  # noqa: E402
+from perfil_app.tema import COLORES as C  # noqa: E402
 
 APP_NOMBRE = "Dibujador de Perfiles"
 
@@ -35,6 +36,9 @@ class App(tk.Tk):
         self.title(APP_NOMBRE)
         self.geometry("1280x800")
         self.minsize(900, 600)
+        tema.registrar_fuentes()
+        tema.configurar_matplotlib()
+        self.fuentes = tema.aplicar(self)
 
         self.ruta: str | None = None
         self.consigna: core.Consigna | None = None
@@ -61,9 +65,19 @@ class App(tk.Tk):
 
     # ------------------------------------------------------------------ UI
     def _construir_ui(self):
+        F = self.fuentes
+        cab = tk.Frame(self, bg=C["azul"])
+        cab.pack(side=tk.TOP, fill=tk.X)
+        tk.Label(cab, text=APP_NOMBRE.upper(), bg=C["azul"], fg="#FFFFFF", font=F["titulo"]
+                 ).pack(side=tk.LEFT, padx=(14, 10), pady=(8, 6))
+        tk.Label(cab, text="Consignas · aire entre productos · RFID", bg=C["azul"], fg="#D6E2F5",
+                 font=F["cuerpo"]).pack(side=tk.LEFT, pady=(10, 6))
+        tk.Label(cab, text="🔒 100 % local, sin conexión", bg=C["azul"], fg=C["amarillo"],
+                 font=F["cuerpo_b"]).pack(side=tk.RIGHT, padx=14)
+        tk.Frame(self, bg=C["amarillo"], height=4).pack(side=tk.TOP, fill=tk.X)
         barra = self.barra = ttk.Frame(self, padding=(6, 6))
         barra.pack(side=tk.TOP, fill=tk.X)
-        ttk.Button(barra, text="📂 Abrir consigna…", command=self.abrir).pack(side=tk.LEFT)
+        ttk.Button(barra, text="📂 Abrir consigna…", command=self.abrir, style="Accion.TButton").pack(side=tk.LEFT)
         ttk.Button(barra, text="⟳ Recargar (F5)", command=self.recargar).pack(side=tk.LEFT, padx=4)
         ttk.Button(barra, text="💾 Exportar…", command=self.exportar).pack(side=tk.LEFT, padx=4)
         ttk.Separator(barra, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=8)
@@ -108,8 +122,8 @@ class App(tk.Tk):
         ttk.Button(self.barra_aire, text="⚙ Optimizar posiciones (±2 mm)…",
                    command=self.dialogo_optimizar).pack(side=tk.LEFT, padx=(16, 0))
         self.var_total_aire = tk.StringVar()
-        ttk.Label(self.barra_aire, textvariable=self.var_total_aire, foreground="#b00000",
-                  font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT, padx=(16, 0))
+        ttk.Label(self.barra_aire, textvariable=self.var_total_aire, foreground=C["mal"],
+                  font=F["seccion"]).pack(side=tk.LEFT, padx=(16, 0))
         ttk.Button(barra, text="Guardar plantilla de ejemplo…",
                    command=self.guardar_plantilla).pack(side=tk.RIGHT)
         self.boton_tecnico = ttk.Button(barra, text="🔧 Modo técnico", command=self._alternar_tecnico)
@@ -117,20 +131,22 @@ class App(tk.Tk):
 
         self.estado = tk.StringVar(value="Abre una consigna (.xlsx o .csv) para empezar.  "
                                          "Todo se procesa en este equipo, sin conexión.")
-        ttk.Label(self, textvariable=self.estado, anchor=tk.W, padding=(6, 3),
-                  relief=tk.SUNKEN).pack(side=tk.BOTTOM, fill=tk.X)
+        ttk.Label(self, textvariable=self.estado, anchor=tk.W, padding=(8, 4), background=C["fondo0"],
+                  foreground=C["tinta_suave"]).pack(side=tk.BOTTOM, fill=tk.X)
 
         panel = self.paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
         panel.pack(fill=tk.BOTH, expand=True)
 
         # Zona principal: dibujo + panel de resumen (vista simple)
         principal = ttk.Frame(panel)
-        self.panel_simple = ttk.Frame(principal, padding=(8, 4), width=360)
+        self.panel_simple = ttk.Frame(principal, padding=(14, 10), width=370, style="Panel.TFrame")
         marco_dibujo = ttk.Frame(principal)
         marco_dibujo.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.fig = Figure(figsize=(8, 6), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.fig, master=marco_dibujo)
-        NavigationToolbar2Tk(self.canvas, marco_dibujo).update()
+        barra_mpl = NavigationToolbar2Tk(self.canvas, marco_dibujo)
+        barra_mpl.update()
+        self._colorear_toolbar(barra_mpl)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
         panel.add(principal, weight=4)
         self._construir_panel_simple()
@@ -146,8 +162,8 @@ class App(tk.Tk):
         for c, t, a in TABLA_AIRE:
             self.tabla_aire.heading(c, text=t)
             self.tabla_aire.column(c, width=a, anchor=tk.CENTER)
-        self.tabla_aire.tag_configure("GRANDE", foreground="#b00000")
-        self.tabla_aire.tag_configure("ARO", foreground="#888888")
+        self.tabla_aire.tag_configure("GRANDE", foreground=C["mal"])
+        self.tabla_aire.tag_configure("ARO", foreground=C["tinta_tenue"])
         sba = ttk.Scrollbar(marco_aire, orient=tk.VERTICAL, command=self.tabla_aire.yview)
         self.tabla_aire.configure(yscrollcommand=sba.set)
         self.tabla_aire.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -166,16 +182,18 @@ class App(tk.Tk):
         self.cb_plan.pack(side=tk.LEFT, padx=4)
         self.cb_plan.bind("<<ComboboxSelected>>", lambda e: self._actualizar_neumatico())
         self.planes = []
-        self.texto_analisis = tk.Text(marco_an, wrap=tk.WORD, height=8, font=("TkFixedFont", 9))
+        self.texto_analisis = tk.Text(marco_an, wrap=tk.WORD, height=8, font=("TkFixedFont", 9),
+                                      bg=C["panel"], fg=C["tinta"], insertbackground=C["tinta"],
+                                      relief=tk.FLAT, highlightthickness=0, padx=8, pady=6)
         sbt = ttk.Scrollbar(marco_an, orient=tk.VERTICAL, command=self.texto_analisis.yview)
         self.texto_analisis.configure(yscrollcommand=sbt.set)
         self.texto_analisis.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         sbt.pack(side=tk.RIGHT, fill=tk.Y)
         self.tabla = ttk.Treeview(marco_tabla, show="headings", height=7)
         self._columnas_tabla(TABLA_COTAS)
-        self.tabla.tag_configure("OK", foreground=core.COLOR_OK)
-        self.tabla.tag_configure("NOK", foreground=core.COLOR_NOK)
-        self.tabla.tag_configure("AVISO", foreground=core.COLOR_AVISO)
+        self.tabla.tag_configure("OK", foreground=C["bien"])
+        self.tabla.tag_configure("NOK", foreground=C["mal"])
+        self.tabla.tag_configure("AVISO", foreground=C["aviso"])
         sb = ttk.Scrollbar(marco_tabla, orient=tk.VERTICAL, command=self.tabla.yview)
         self.tabla.configure(yscrollcommand=sb.set)
         self.tabla.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -188,42 +206,46 @@ class App(tk.Tk):
     def _construir_panel_simple(self):
         p = self.panel_simple
         p.pack_propagate(False)
-        titulo = ("TkDefaultFont", 10, "bold")
-        ttk.Label(p, text="RIESGO DE AIRE ENTRE PRODUCTOS", font=titulo).pack(anchor=tk.W)
-        ttk.Label(p, text="PS · BJ · PTR · FE  (sin la zona del aro)", foreground="#666").pack(anchor=tk.W)
-        self.lbl_aire = tk.Label(p, text="—", font=("TkDefaultFont", 26, "bold"), fg="#b00000", anchor=tk.W)
+        F = self.fuentes
+        T, S = "PanelTitulo.TLabel", "PanelSuave.TLabel"
+        ttk.Label(p, text="RIESGO DE AIRE ENTRE PRODUCTOS", style=T).pack(anchor=tk.W)
+        ttk.Label(p, text="PS · BJ · PTR · FE  (sin la zona del aro)", style=S).pack(anchor=tk.W)
+        self.lbl_aire = tk.Label(p, text="—", font=F["grande"], fg=C["tinta_suave"], bg=C["panel"], anchor=tk.W)
         self.lbl_aire.pack(anchor=tk.W, fill=tk.X)
-        self.lbl_aire_sub = ttk.Label(p, text="", foreground="#444")
+        self.lbl_aire_sub = tk.Label(p, text="", bg=C["panel"], fg=C["tinta_suave"], font=F["suave"],
+                                     justify=tk.LEFT, anchor=tk.W, wraplength=330)
         self.lbl_aire_sub.pack(anchor=tk.W)
 
-        ttk.Separator(p).pack(fill=tk.X, pady=6)
-        ttk.Label(p, text="ZONAS CON AIRE", font=titulo).pack(anchor=tk.W)
-        self.marco_zonas = ttk.Frame(p)
+        ttk.Separator(p).pack(fill=tk.X, pady=8)
+        ttk.Label(p, text="ZONAS CON AIRE", style=T).pack(anchor=tk.W)
+        self.marco_zonas = ttk.Frame(p, style="Panel.TFrame")
         self.marco_zonas.pack(anchor=tk.W, fill=tk.X)
 
-        ttk.Separator(p).pack(fill=tk.X, pady=6)
-        ttk.Label(p, text="RFID", font=titulo).pack(anchor=tk.W)
-        fila = ttk.Frame(p)
+        ttk.Separator(p).pack(fill=tk.X, pady=8)
+        ttk.Label(p, text="RFID", style=T).pack(anchor=tk.W)
+        fila = ttk.Frame(p, style="Panel.TFrame")
         fila.pack(anchor=tk.W, fill=tk.X)
         self.var_rfid = tk.BooleanVar(value=False)
         self.var_rfid_pos = tk.DoubleVar(value=0.0)
-        ttk.Checkbutton(fila, text="Ver RFID, en (mm):", variable=self.var_rfid,
+        ttk.Checkbutton(fila, text="Ver RFID, en (mm):", variable=self.var_rfid, style="Panel.TCheckbutton",
                         command=self._actualizar_neumatico).pack(side=tk.LEFT)
         sp = ttk.Spinbox(fila, from_=0, to=300, increment=1, width=6, textvariable=self.var_rfid_pos,
                          command=self._mover_rfid)
         sp.pack(side=tk.LEFT, padx=4)
         sp.bind("<Return>", lambda e: self._mover_rfid())
-        self.lbl_rfid = tk.Label(p, text="", justify=tk.LEFT, anchor=tk.W, wraplength=330)
+        self.lbl_rfid = tk.Label(p, text="", justify=tk.LEFT, anchor=tk.W, wraplength=330, bg=C["panel"],
+                                 fg=C["tinta"], font=F["cuerpo"])
         self.lbl_rfid.pack(anchor=tk.W, fill=tk.X)
 
-        ttk.Separator(p).pack(fill=tk.X, pady=6)
-        ttk.Label(p, text="POSICIÓN DE LOS PRODUCTOS", font=titulo).pack(anchor=tk.W)
-        ttk.Label(p, text="Mover (mm, + hacia fuera) y ver cómo cambia el aire", foreground="#666").pack(anchor=tk.W)
-        self.marco_prods = ttk.Frame(p)
+        ttk.Separator(p).pack(fill=tk.X, pady=8)
+        ttk.Label(p, text="POSICIÓN DE LOS PRODUCTOS", style=T).pack(anchor=tk.W)
+        ttk.Label(p, text="Mover (mm, + hacia fuera) y ver cómo cambia el aire", style=S).pack(anchor=tk.W)
+        self.marco_prods = ttk.Frame(p, style="Panel.TFrame")
         self.marco_prods.pack(anchor=tk.W, fill=tk.X, pady=(2, 4))
-        botones = ttk.Frame(p)
+        botones = ttk.Frame(p, style="Panel.TFrame")
         botones.pack(anchor=tk.W, fill=tk.X)
-        ttk.Button(botones, text="🔍 Buscar mejor posición (±2 mm)", command=self._buscar_mejor).pack(side=tk.LEFT)
+        ttk.Button(botones, text="🔍 Buscar mejor posición (±2 mm)", command=self._buscar_mejor,
+                   style="Primario.TButton").pack(side=tk.LEFT)
         ttk.Button(botones, text="↺ Consigna", command=self._volver_consigna).pack(side=tk.LEFT, padx=4)
 
     def _rellenar_productos_simple(self):
@@ -232,25 +254,26 @@ class App(tk.Tk):
         self.vars_desp = {}
         cons = self.consigna
         f = neumatico._f
-        ttk.Label(self.marco_prods, text="Prod.", foreground="#666").grid(row=0, column=0, sticky=tk.W)
-        ttk.Label(self.marco_prods, text="Consigna", foreground="#666").grid(row=0, column=1, sticky=tk.W, padx=4)
-        ttk.Label(self.marco_prods, text="Mover", foreground="#666").grid(row=0, column=2, sticky=tk.W)
-        ttk.Label(self.marco_prods, text="Queda", foreground="#666").grid(row=0, column=3, sticky=tk.W, padx=4)
+        S = "PanelSuave.TLabel"
+        ttk.Label(self.marco_prods, text="Prod.", style=S).grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(self.marco_prods, text="Consigna", style=S).grid(row=0, column=1, sticky=tk.W, padx=4)
+        ttk.Label(self.marco_prods, text="Mover", style=S).grid(row=0, column=2, sticky=tk.W)
+        ttk.Label(self.marco_prods, text="Queda", style=S).grid(row=0, column=3, sticky=tk.W, padx=4)
         fila = 1
         for p in cons.de(neumatico.CARCASA):
             if not p.movible:
                 continue
             var = tk.DoubleVar(value=p.desplazamiento)
             self.vars_desp[p.codigo] = var
-            ttk.Label(self.marco_prods, text=p.codigo, font=("TkDefaultFont", 9, "bold")).grid(row=fila, column=0,
-                                                                                               sticky=tk.W)
-            ttk.Label(self.marco_prods, text=f"{p.trazo_tipo} {f(p.trazo)}").grid(row=fila, column=1, sticky=tk.W,
+            ttk.Label(self.marco_prods, text=p.codigo, style="Panel.TLabel", font=self.fuentes["cuerpo_b"],
+                      foreground=C["amarillo"]).grid(row=fila, column=0, sticky=tk.W, pady=1)
+            ttk.Label(self.marco_prods, text=f"{p.trazo_tipo} {f(p.trazo)}", style="Panel.TLabel").grid(row=fila, column=1, sticky=tk.W,
                                                                                padx=4)
             sp = ttk.Spinbox(self.marco_prods, from_=-10, to=10, increment=0.5, width=5, textvariable=var,
                              command=self._aplicar_movimientos)
             sp.grid(row=fila, column=2, sticky=tk.W)
             sp.bind("<Return>", lambda e: self._aplicar_movimientos())
-            lbl = ttk.Label(self.marco_prods, text="")
+            lbl = ttk.Label(self.marco_prods, text="", style="Panel.TLabel")
             lbl.grid(row=fila, column=3, sticky=tk.W, padx=4)
             var._etiqueta = lbl  # noqa: SLF001 - etiqueta con la posición resultante
             fila += 1
@@ -297,25 +320,26 @@ class App(tk.Tk):
 
     def _refrescar_panel(self, total, zonas, rfid_info):
         f = neumatico._f
-        color = "#1a7f37" if total < 3 else ("#d97706" if total < 8 else "#b00000")
+        color = C["bien"] if total < 3 else (C["aviso"] if total < 8 else C["mal"])
         self.lbl_aire.configure(text=f"{f(round(total, 1))} mm²", fg=color)
         estado = "BIEN" if total < 3 else ("ATENCIÓN" if total < 8 else "ALTO")
-        self.lbl_aire_sub.configure(text=f"{estado} · estimación del modelo para comparar y anticipar,\n"
+        self.lbl_aire_sub.configure(text=f"{estado} · estimación del modelo para comparar y anticipar, "
                                          "no es una medida")
         for w in self.marco_zonas.winfo_children():
             w.destroy()
-        colores = {"ALTO": "#b00000", "MEDIO": "#d97706", "BAJO": "#9a7d00"}
+        colores = {"ALTO": C["mal"], "MEDIO": C["aviso"], "BAJO": C["amarillo"]}
         if not zonas:
-            ttk.Label(self.marco_zonas, text="Sin zonas de aire apreciable.").pack(anchor=tk.W)
+            ttk.Label(self.marco_zonas, text="Sin zonas de aire apreciable.", style="Panel.TLabel").pack(anchor=tk.W)
         for z in zonas[:6]:
             pares = ", ".join(z.pares)
             tk.Label(self.marco_zonas, text=f"● {z.nombre}  {f(round(z.xc))} mm  ({f(round(z.x0))}–{f(round(z.x1))})",
-                     fg=colores[z.riesgo], font=("TkDefaultFont", 9, "bold"), anchor=tk.W).pack(anchor=tk.W)
-            ttk.Label(self.marco_zonas, text=f"     {pares} · {f(round(z.area, 1))} mm²", foreground="#444"
+                     fg=colores[z.riesgo], bg=C["panel"], font=self.fuentes["cuerpo_b"], anchor=tk.W
+                     ).pack(anchor=tk.W, pady=(3, 0))
+            ttk.Label(self.marco_zonas, text=f"     {pares} · {f(round(z.area, 1))} mm²", style="PanelSuave.TLabel"
                       ).pack(anchor=tk.W)
         # RFID
         if rfid_info is None:
-            self.lbl_rfid.configure(text="La consigna no tiene RFID.", fg="#666")
+            self.lbl_rfid.configure(text="La consigna no tiene RFID.", fg=C["tinta_suave"])
         else:
             bj = rfid_info.get("bj")
             rango = f"{f(round(rfid_info['x0']))}–{f(round(rfid_info['x1']))} mm"
@@ -323,11 +347,11 @@ class App(tk.Tk):
                 txt = (f"✔ PROTEGIDO por el BJ ({rango})\nMargen a los bordes del BJ: {f(round(bj['margen_int']))} y "
                        f"{f(round(bj['margen_ext']))} mm · BJ encima {f(round(bj['espesor_min'], 1))}–"
                        f"{f(round(bj['espesor_max'], 1))} mm")
-                col = "#1a7f37" if min(bj["margen_int"], bj["margen_ext"]) >= 5 else "#d97706"
+                col = C["bien"] if min(bj["margen_int"], bj["margen_ext"]) >= 5 else C["aviso"]
             else:
                 pct = f" (cubre el {bj['cubierto_pct']:.0f} %)" if bj else ""
                 txt = f"✖ NO protegido del todo por el BJ{pct} ({rango})"
-                col = "#b00000"
+                col = C["mal"]
             self.lbl_rfid.configure(text=txt, fg=col)
         # posición resultante de cada producto
         cons = self.consigna
@@ -337,7 +361,7 @@ class App(tk.Tk):
                 var.set(p.desplazamiento)   # p. ej. si se aplicó una propuesta desde el modo técnico
             if var is not None and hasattr(var, "_etiqueta"):
                 txt = f"{p.trazo_tipo} {f(round((p.trazo or 0) + p.desplazamiento, 1))}"
-                var._etiqueta.configure(text=txt, foreground="#b00000" if p.desplazamiento else "#444")
+                var._etiqueta.configure(text=txt, foreground=C["amarillo"] if p.desplazamiento else C["tinta_suave"])
 
     def _alternar_tecnico(self):
         self.var_tecnico.set(not self.var_tecnico.get())
@@ -365,6 +389,19 @@ class App(tk.Tk):
         elif not tecnico and str(self.pestanas) in [str(x) for x in presentes]:
             self.paned.forget(self.pestanas)
 
+    @staticmethod
+    def _colorear_toolbar(barra):
+        """Barra de zoom de matplotlib en tonos claros de marca (sus iconos son oscuros)."""
+        claro = "#E4EBF6"
+        widgets = [barra] + list(barra.winfo_children())
+        for w in widgets:
+            for opcion, valor in (("background", claro), ("activebackground", "#C9D6EC"),
+                                  ("highlightbackground", claro), ("foreground", C["azul"])):
+                try:
+                    w.configure(**{opcion: valor})
+                except tk.TclError:
+                    pass
+
     def _columnas_tabla(self, defin):
         cols = [c for c, _, _ in defin]
         self.tabla.configure(columns=cols)
@@ -376,8 +413,14 @@ class App(tk.Tk):
         self.fig.clear()
         ax = self.fig.add_subplot(111)
         ax.axis("off")
-        ax.text(0.5, 0.55, APP_NOMBRE, ha="center", fontsize=20, color=core.COLOR_PERFIL)
-        ax.text(0.5, 0.45, "Pulsa «Abrir consigna…» (Ctrl+O): Excel de perfil o consigna de neumático", ha="center", fontsize=11, color="#666")
+        fam = tema.familias_matplotlib()[0]
+        ax.text(0.5, 0.56, APP_NOMBRE.upper(), ha="center", fontsize=24, color=C["azul"], fontweight="bold",
+                fontfamily=fam)
+        ax.plot([0.38, 0.62], [0.51, 0.51], color=C["amarillo"], lw=4, transform=ax.transAxes)
+        ax.text(0.5, 0.44, "Pulsa «Abrir consigna…» (Ctrl+O): Excel de perfil o consigna de neumático",
+                ha="center", fontsize=11, color="#5A6B85")
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
         self.canvas.draw()
 
     # ------------------------------------------------------------ acciones
@@ -679,6 +722,7 @@ class DialogoOptimizar(tk.Toplevel):
         self.title("Optimizar posiciones de los productos")
         self.transient(app)
         self.resizable(True, True)
+        self.configure(background=C["fondo1"])
         cons = app.consigna
         seccion = app.var_seccion.get()
         self.seccion = neumatico.CARCASA if seccion == "Todo" else seccion
@@ -710,13 +754,13 @@ class DialogoOptimizar(tk.Toplevel):
                 ttk.Checkbutton(cajas, text=f"{p.codigo} ({p.trazo_tipo} {neumatico._f(p.trazo)})",
                                 variable=v).pack(side=tk.LEFT, padx=(0, 8))
 
-        self.boton = ttk.Button(f, text="Calcular", command=self.calcular)
+        self.boton = ttk.Button(f, text="Calcular", command=self.calcular, style="Primario.TButton")
         self.boton.pack(anchor=tk.W, pady=6)
         self.barra = ttk.Progressbar(f, mode="determinate", maximum=1.0)
         self.barra.pack(fill=tk.X)
         self.var_res = tk.StringVar()
-        ttk.Label(f, textvariable=self.var_res, foreground="#b00000",
-                  font=("TkDefaultFont", 10, "bold")).pack(anchor=tk.W, pady=(8, 4))
+        ttk.Label(f, textvariable=self.var_res, foreground=C["amarillo"],
+                  font=app.fuentes["seccion"]).pack(anchor=tk.W, pady=(8, 4))
         cols = (("prod", "Producto", 90), ("orig", "TRAZO consigna", 120), ("nuevo", "TRAZO propuesto", 130),
                 ("delta", "Mover (mm)", 90), ("sentido", "Sentido", 140))
         self.tabla = ttk.Treeview(f, columns=[c for c, _, _ in cols], show="headings", height=8)

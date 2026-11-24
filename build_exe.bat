@@ -5,7 +5,7 @@ call .venv\Scripts\activate
 python -m pip install --upgrade pip
 pip install -r requirements-build.txt
 pyinstaller --noconfirm --onefile --windowed --name DibujadorPerfiles ^
-  --add-data "ejemplos;ejemplos" ^
+  --add-data "ejemplos;ejemplos" --add-data "perfil_app/fuentes;fuentes" ^
   --exclude-module streamlit ^
   app.py
 echo.

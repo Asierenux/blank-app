@@ -20,7 +20,7 @@ jobs:
       - name: Compilar ejecutable
         run: >
           pyinstaller --noconfirm --onefile --windowed --name DibujadorPerfiles
-          --add-data "ejemplos;ejemplos" app.py
+          --add-data "ejemplos;ejemplos" --add-data "perfil_app/fuentes;fuentes" app.py
       - name: Preparar paquete
         shell: pwsh
         run: |
