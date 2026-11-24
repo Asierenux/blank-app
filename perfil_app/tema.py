@@ -1,10 +1,10 @@
-"""Estética de la app: tonos grises, logo y tipografías BIB / Noto Sans.
+"""Estética de la app: gris claro de las plantillas, fondo con la «M», logo y tipografías BIB / Noto Sans.
 
 El logo y las fuentes se buscan en una carpeta
 «fuentes» (junto al .exe, dentro del paquete o en la carpeta actual) o instaladas en el sistema:
 
 * Noto Sans (licencia libre OFL) va incluida con la app.
-* El logo (logo*.png, blanco sobre transparente) y la tipografía BIB son de la marca: NO se incluyen en el
+* El logo (logo*.png), el fondo con la «M» (fondo*.jpg / .png) y la tipografía BIB son de la marca: NO se incluyen en el
   repositorio (es público). Si se copian en la carpeta «fuentes» (o BIB está instalada en el PC) se
   usan; si no, la cabecera muestra solo el nombre de la app y los títulos usan Noto Sans.
 """
@@ -15,24 +15,26 @@ import os
 import sys
 
 COLORES = {
-    # Tonos grises (neutros); el color solo se usa para avisos (verde / ámbar / rojo)
-    "primario": "#4A4D52",      # cabecera y botón principal
+    # Gris claro como las plantillas de marca (fondo F5F3F1); el color solo se usa para avisos
+    "primario": "#5F6368",      # botón principal y pestaña activa
     "primario_ink": "#FFFFFF",
-    "destaque": "#E3E4E6",      # títulos de sección y valores destacados
-    "destaque_ink": "#1E1F22",
-    "fondo0": "#1C1D20",
-    "fondo1": "#26282B",
-    "fondo2": "#34363A",
-    "panel": "#2E3034",
-    "borde": "#4C4F54",
-    "tinta": "#ECEDEE",
-    "tinta_suave": "#AEB1B6",
-    "tinta_tenue": "#878A8F",
-    "acento": "#62666C",
-    "texto_plano": "#3C3F44",   # títulos y marco del plano (fondo blanco)
-    "bien": "#33D489",
-    "aviso": "#FFB545",
-    "mal": "#FF6B5E",
+    "destaque": "#3A3B3D",      # títulos de sección y botón «Abrir»
+    "destaque_ink": "#FFFFFF",
+    "cabecera": "#ECEAE7",
+    "fondo0": "#E4E2DF",        # barra de estado
+    "fondo1": "#F5F3F1",        # fondo general
+    "fondo2": "#FFFFFF",        # campos
+    "panel": "#FBFAF9",
+    "borde": "#D2D0CC",
+    "tinta": "#2E2F31",
+    "tinta_suave": "#6E7073",
+    "tinta_tenue": "#9C9EA1",
+    "acento": "#8A8D91",
+    "logo": "#3A3B3D",
+    "texto_plano": "#3C3F44",   # títulos y marco del plano
+    "bien": "#1E8E3E",
+    "aviso": "#C77700",
+    "mal": "#D93025",
 }
 
 _registradas: list[str] = []
@@ -94,19 +96,56 @@ def buscar_logo() -> str | None:
     return None
 
 
-def cargar_logo(root, alto: int = 30):
+def cargar_logo(root, alto: int = 30, color: str | None = None):
     """PhotoImage del logo reducido a unos «alto» píxeles, o None si no hay logo."""
     ruta = buscar_logo()
     if not ruta:
         return None
-    import tkinter as tk
-
     try:
-        img = tk.PhotoImage(master=root, file=ruta)
-    except tk.TclError:
+        from PIL import Image, ImageTk
+
+        im = Image.open(ruta).convert("RGBA")
+        alfa = im.getchannel("A")
+        im = Image.new("RGBA", im.size, color or COLORES["logo"])  # mismo dibujo, en gris oscuro
+        im.putalpha(alfa)
+        ancho = max(1, round(im.width * alto / im.height))
+        return ImageTk.PhotoImage(im.resize((ancho, alto), Image.LANCZOS), master=root)
+    except Exception:  # noqa: BLE001
         return None
-    factor = max(1, round(img.height() / alto))
-    return img.subsample(factor, factor) if factor > 1 else img
+
+
+def buscar_fondo() -> str | None:
+    """Ruta a la imagen de fondo con la «M» (fondo*.jpg/.png) en las carpetas «fuentes», o None."""
+    for carpeta in carpetas_fuentes():
+        for ext in ("jpg", "jpeg", "png"):
+            for ruta in sorted(glob.glob(os.path.join(carpeta, "**", f"fondo*.{ext}"), recursive=True)):
+                if "__MACOSX" not in ruta:
+                    return ruta
+    return None
+
+
+_fondo_cache: dict = {}
+
+
+def fondo_recortado(ancho: int, alto: int):
+    """Imagen de fondo (PIL) recortada sin deformar para cubrir ancho×alto píxeles, o None."""
+    ruta = buscar_fondo()
+    if not ruta or ancho < 2 or alto < 2:
+        return None
+    try:
+        from PIL import Image
+
+        if ruta not in _fondo_cache:
+            _fondo_cache[ruta] = Image.open(ruta).convert("RGB")
+        im = _fondo_cache[ruta]
+        escala = max(ancho / im.width, alto / im.height)
+        im2 = im.resize((max(ancho, round(im.width * escala)), max(alto, round(im.height * escala))),
+                        Image.LANCZOS)
+        x0 = (im2.width - ancho) // 2
+        y0 = (im2.height - alto) // 2
+        return im2.crop((x0, y0, x0 + ancho, y0 + alto))
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def familias_matplotlib() -> tuple[str, str]:
@@ -179,7 +218,7 @@ def aplicar(root) -> dict:
     s.map("Primario.TButton", background=[("active", c["acento"]), ("pressed", c["acento"])])
     s.configure("Accion.TButton", background=c["destaque"], foreground=c["destaque_ink"],
                 bordercolor=c["destaque"], font=f["cuerpo_b"])
-    s.map("Accion.TButton", background=[("active", "#FFFFFF"), ("pressed", "#C8CACD")])
+    s.map("Accion.TButton", background=[("active", "#55575A"), ("pressed", "#202123")])
     for w in ("TCheckbutton", "TRadiobutton"):
         s.configure(w, background=c["fondo1"], foreground=c["tinta"], indicatorbackground=c["fondo2"],
                     indicatorforeground=c["destaque"])

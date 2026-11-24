@@ -66,19 +66,27 @@ class App(tk.Tk):
     # ------------------------------------------------------------------ UI
     def _construir_ui(self):
         F = self.fuentes
-        cab = tk.Frame(self, bg=C["primario"])
+        # Cabecera: fondo con la «M» de las plantillas (si está en «fuentes»), logo y nombre en gris oscuro
+        cab = self.cabecera = tk.Canvas(self, height=58, bg=C["cabecera"], highlightthickness=0, bd=0)
         cab.pack(side=tk.TOP, fill=tk.X)
         self._logo = tema.cargar_logo(self, 30)
+        self._img_cab = None
+        x = 18
         if self._logo is not None:
-            tk.Label(cab, image=self._logo, bg=C["primario"]).pack(side=tk.LEFT, padx=(14, 4), pady=8)
-            tk.Frame(cab, bg="#7A7D82", width=1).pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
-        tk.Label(cab, text=APP_NOMBRE.upper(), bg=C["primario"], fg="#FFFFFF", font=F["titulo"]
-                 ).pack(side=tk.LEFT, padx=(14 if self._logo is None else 0, 10), pady=(8, 6))
-        tk.Label(cab, text="Consignas · aire entre productos · RFID", bg=C["primario"], fg="#C9CBCF",
-                 font=F["cuerpo"]).pack(side=tk.LEFT, pady=(10, 6))
-        tk.Label(cab, text="🔒 100 % local, sin conexión", bg=C["primario"], fg="#D5D7DA",
-                 font=F["cuerpo_b"]).pack(side=tk.RIGHT, padx=14)
-        tk.Frame(self, bg="#6E7176", height=3).pack(side=tk.TOP, fill=tk.X)
+            cab.create_image(x, 29, image=self._logo, anchor=tk.W, tags="frente")
+            x += self._logo.width() + 14
+            cab.create_line(x, 14, x, 44, fill=C["borde"], tags="frente")
+            x += 14
+        cab.create_text(x, 29, text=APP_NOMBRE.upper(), anchor=tk.W, fill=C["destaque"], font=F["titulo"],
+                        tags=("frente", "titulo"))
+        self.update_idletasks()
+        x2 = cab.bbox("titulo")[2] + 12 if cab.bbox("titulo") else x + 260
+        cab.create_text(x2, 31, text="Consignas · aire entre productos · RFID", anchor=tk.W,
+                        fill=C["tinta_suave"], font=F["cuerpo"], tags="frente")
+        cab.create_text(0, 29, text="🔒 100 % local, sin conexión", anchor=tk.E, fill=C["tinta_suave"],
+                        font=F["cuerpo_b"], tags=("frente", "local"))
+        cab.bind("<Configure>", self._pintar_cabecera)
+        tk.Frame(self, bg=C["borde"], height=1).pack(side=tk.TOP, fill=tk.X)
         barra = self.barra = ttk.Frame(self, padding=(6, 6))
         barra.pack(side=tk.TOP, fill=tk.X)
         ttk.Button(barra, text="📂 Abrir consigna…", command=self.abrir, style="Accion.TButton").pack(side=tk.LEFT)
@@ -152,6 +160,7 @@ class App(tk.Tk):
         barra_mpl.update()
         self._colorear_toolbar(barra_mpl)
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self.canvas.mpl_connect("resize_event", self._fondo_figura)
         panel.add(principal, weight=4)
         self._construir_panel_simple()
 
@@ -331,7 +340,7 @@ class App(tk.Tk):
                                          "no es una medida")
         for w in self.marco_zonas.winfo_children():
             w.destroy()
-        colores = {"ALTO": C["mal"], "MEDIO": C["aviso"], "BAJO": C["destaque"]}
+        colores = {"ALTO": C["mal"], "MEDIO": C["aviso"], "BAJO": "#A68B00"}
         if not zonas:
             ttk.Label(self.marco_zonas, text="Sin zonas de aire apreciable.", style="Panel.TLabel").pack(anchor=tk.W)
         for z in zonas[:6]:
@@ -393,13 +402,49 @@ class App(tk.Tk):
         elif not tecnico and str(self.pestanas) in [str(x) for x in presentes]:
             self.paned.forget(self.pestanas)
 
+    def _pintar_cabecera(self, evento=None):
+        cab = self.cabecera
+        ancho, alto = cab.winfo_width(), cab.winfo_height()
+        cab.coords("local", ancho - 16, alto / 2)
+        img = tema.fondo_recortado(ancho, alto)
+        cab.delete("fondo")
+        if img is not None:
+            from PIL import ImageTk
+
+            self._img_cab = ImageTk.PhotoImage(img, master=self)
+            cab.create_image(0, 0, image=self._img_cab, anchor=tk.NW, tags="fondo")
+            cab.tag_lower("fondo")
+
+    def _fondo_figura(self, evento=None):
+        """Fondo de la figura en gris claro, con la «M» de las plantillas si está disponible."""
+        fig = self.fig
+        fig.patch.set_facecolor(C["fondo1"])
+        for ax in [a for a in fig.axes if getattr(a, "_es_fondo", False)]:
+            ax.remove()
+        ancho, alto = (int(v) for v in fig.get_size_inches() * fig.dpi)
+        img = tema.fondo_recortado(ancho, alto)
+        if img is not None:
+            import numpy as np
+
+            ax = fig.add_axes((0, 0, 1, 1), zorder=-10)
+            ax._es_fondo = True  # noqa: SLF001
+            ax.imshow(np.asarray(img), aspect="auto", interpolation="bilinear")
+            ax.set_axis_off()
+            ax.set_navigate(False)
+        if evento is not None:
+            self.canvas.draw_idle()
+
+    def _dibujar_canvas(self):
+        self._fondo_figura()
+        self.canvas.draw()
+
     @staticmethod
     def _colorear_toolbar(barra):
         """Barra de zoom de matplotlib en tonos claros de marca (sus iconos son oscuros)."""
-        claro = "#E6E7E9"
+        claro = C["fondo1"]
         widgets = [barra] + list(barra.winfo_children())
         for w in widgets:
-            for opcion, valor in (("background", claro), ("activebackground", "#D2D4D7"),
+            for opcion, valor in (("background", claro), ("activebackground", C["borde"]),
                                   ("highlightbackground", claro), ("foreground", C["primario"])):
                 try:
                     w.configure(**{opcion: valor})
@@ -418,14 +463,14 @@ class App(tk.Tk):
         ax = self.fig.add_subplot(111)
         ax.axis("off")
         fam = tema.familias_matplotlib()[0]
-        ax.text(0.5, 0.56, APP_NOMBRE.upper(), ha="center", fontsize=24, color=C["primario"], fontweight="bold",
+        ax.text(0.5, 0.56, APP_NOMBRE.upper(), ha="center", fontsize=24, color=C["destaque"], fontweight="bold",
                 fontfamily=fam)
-        ax.plot([0.38, 0.62], [0.51, 0.51], color=C["destaque"], lw=4, transform=ax.transAxes)
+        ax.plot([0.38, 0.62], [0.51, 0.51], color=C["acento"], lw=2, transform=ax.transAxes)
         ax.text(0.5, 0.44, "Pulsa «Abrir consigna…» (Ctrl+O): Excel de perfil o consigna de neumático",
-                ha="center", fontsize=11, color="#6B6E73")
+                ha="center", fontsize=11, color=C["tinta_suave"])
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
-        self.canvas.draw()
+        self._dibujar_canvas()
 
     # ------------------------------------------------------------ acciones
     def abrir(self):
@@ -655,10 +700,10 @@ class App(tk.Tk):
                      else "seccion" if v.startswith("Secc") else "posiciones")
             neumatico.dibujar(self.fig, self.consigna, self.var_seccion.get(), vista, self.var_cotas.get(),
                               self.ajustes())
-            self.canvas.draw()
+            self._dibujar_canvas()
             return
         core.dibujar(self.fig, self.consigna, self.var_puntos.get(), self.var_cotas.get())
-        self.canvas.draw()
+        self._dibujar_canvas()
 
     def _rellenar_tabla(self):
         self.tabla.delete(*self.tabla.get_children())
@@ -694,7 +739,14 @@ class App(tk.Tk):
             if ruta.lower().endswith(".dxf"):
                 core.exportar_dxf(self.consigna, ruta, con_cotas=self.var_cotas.get())
             else:
-                self.fig.savefig(ruta, dpi=300)
+                fondos = [a for a in self.fig.axes if getattr(a, "_es_fondo", False)]
+                for a in fondos:
+                    a.set_visible(False)
+                try:
+                    self.fig.savefig(ruta, dpi=300, facecolor="white")   # el plano exportado, en blanco
+                finally:
+                    for a in fondos:
+                        a.set_visible(True)
         except Exception as e:  # noqa: BLE001
             messagebox.showerror("Error al exportar", f"{type(e).__name__}: {e}")
             return

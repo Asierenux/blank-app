@@ -10,5 +10,5 @@ LOGO y BIB (material de marca)
   NO se incluyen aquí porque el repositorio es público. Para usarla en los títulos:
   - instálala en el PC (doble clic en BIB-Bold.ttf > Instalar), o
   - crea una carpeta "fuentes" junto a DibujadorPerfiles.exe y copia dentro BIB-Bold.ttf
-    y logo.png (logo blanco sobre fondo transparente; sale en la cabecera).
+    , logo.png (cabecera) y fondo.jpg (fondo con la «M» de las plantillas).
   Si no están, la app usa Noto Sans y la cabecera muestra solo el nombre.
