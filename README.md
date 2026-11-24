@@ -82,6 +82,10 @@ desde el 0 hasta su trazo. Se marcan también las líneas de *entre aros* (ENTRE
     sin el **multiperfil** del FE, con el aire que quedaría. Cada plan se puede ver en el dibujo (barras
     verdes). La eficacia de cada rodillo es una estimación (ruleta: radio de puente 0,5 × ESP;
     multiperfil: 4 × ESP) que hay que confirmar con el ensayo.
+  - **RFID:** no cuenta para el aire, pero con «Ver RFID» se dibuja en su sitio (TRAZO de la consigna, en
+    el momento de la puesta en que se coloca) y el informe dice si el **BJ lo protege**: si lo cubre
+    entero, el margen a cada borde del BJ, el espesor de BJ encima y la goma total por encima. Se
+    puede mover la cota del RFID para probar otras posiciones.
   - **Análisis y ruletaje** (pestaña y zonas R1, R2… en el plano): agrupa las bolsas de aire en
     zonas, las clasifica por riesgo (ALTO/MEDIO/BAJO) e indica entre qué productos están y cuánto aire
     queda si el rodillo rellena el rincón. Como la puesta es circunferencial, cada rincón que no se

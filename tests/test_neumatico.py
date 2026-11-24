@@ -331,3 +331,20 @@ def test_sin_entre_tringles_avisa(consigna, tmp_path):
     c = neumatico.cargar(str(ruta))
     assert c.entre_tringles is None
     assert any("ENTRE-TRINGLES" in a for a in c.avisos)
+
+
+def test_rfid_se_puede_ver_y_se_comprueba_el_bj(consigna, tmp_path):
+    wb = openpyxl.load_workbook(consigna)
+    ws = wb.active
+    ws["B19"], ws["E19"], ws["M19"], ws["P19"], ws["Y19"], ws["Z19"] = "RFD", "RF 85040", 10, 2.0, "IN", 120
+    ws["B26"], ws["E26"], ws["M26"], ws["P26"], ws["Y26"], ws["Z26"] = "BJ", "XX 10", 40, 3.0, "EX", 150
+    ruta = tmp_path / "rfid2.xlsx"
+    wb.save(ruta)
+    c = neumatico.cargar(str(ruta))
+    rfd = next(p for p in c.productos if p.codigo == "RFD")
+    assert rfd.tramo_rfid == (120, 130) and rfd.tramos == []
+    txt = "\n".join(neumatico.proteccion_rfid(c, neumatico.CARCASA))
+    assert "120" in txt and "130" in txt and "SÍ" in txt         # el BJ (110–150) lo cubre
+    rfd.tramo_rfid = (100, 110)                                  # fuera del BJ
+    txt = "\n".join(neumatico.proteccion_rfid(c, neumatico.CARCASA))
+    assert "NO" in txt

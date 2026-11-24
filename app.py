@@ -96,6 +96,14 @@ class App(tk.Tk):
             sp.bind("<FocusOut>", lambda e: self._actualizar_neumatico())
         ttk.Checkbutton(self.barra_aire, text="Simular ruletaje (apliques)", variable=self.var_ruletaje,
                         command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(16, 0))
+        self.var_rfid = tk.BooleanVar(value=False)
+        ttk.Checkbutton(self.barra_aire, text="Ver RFID en (mm):", variable=self.var_rfid,
+                        command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(10, 0))
+        self.var_rfid_pos = tk.DoubleVar(value=0.0)
+        sp_r = ttk.Spinbox(self.barra_aire, from_=0, to=300, increment=1, width=6, textvariable=self.var_rfid_pos,
+                           command=self._mover_rfid)
+        sp_r.pack(side=tk.LEFT, padx=(2, 0))
+        sp_r.bind("<Return>", lambda e: self._mover_rfid())
         for texto, var, de, a, inc in (("BT base (mm):", self.var_base_bt, 0.1, 4, 0.1),
                                        ("rampa falaise (mm):", self.var_rampa_bt, 1, 27, 0.5)):
             ttk.Label(self.barra_aire, text=texto).pack(side=tk.LEFT, padx=(12, 0))
@@ -251,6 +259,12 @@ class App(tk.Tk):
             messagebox.showerror("Error al abrir", f"{type(e).__name__}: {e}")
             return
         self.ruta, self.consigna = ruta, cons
+        self.planes = []
+        self.var_plan.set("Sin ruletaje")
+        self.cb_plan["values"] = ("Sin ruletaje",)
+        rf = [p for p in cons.productos if p.es_rfid and p.tramo_rfid]
+        if rf:
+            self.var_rfid_pos.set(round(rf[0].tramo_rfid[0], 1))
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
         self.barra_neum.pack(side=tk.LEFT)
         self.barra_aire.pack(side=tk.TOP, fill=tk.X, after=self.barra)
@@ -302,6 +316,9 @@ class App(tk.Tk):
             aj_sin.ruletas, aj_sin.multiperfil = (), False
             self.analisis = analisis.analizar(cons, sec, aj_sin)
             texto = self.analisis.texto(cons)
+            rfid = neumatico.proteccion_rfid(cons, sec, aj_sin)
+            if rfid:
+                texto = "RFID (no cuenta para el aire)\n" + "\n".join(rfid) + "\n\n" + texto
             if getattr(self, "planes", None):
                 texto = ("PLAN DE RULETAJE PROPUESTO (medios de máquina: ruletas de 20 mm y multiperfil del FE)\n"
                          + "\n".join(pl.texto() for pl in self.planes)
@@ -345,12 +362,31 @@ class App(tk.Tk):
         aj = neumatico.Ajustes(chaflan=leer(self.var_chaflan, d.chaflan), rigidez=leer(self.var_rigidez, d.rigidez),
                                rigidez_por_producto={"FE": leer(self.var_rigidez_fe, d.rigidez_por_producto["FE"])},
                                ruletaje=self.var_ruletaje.get(),
-                               base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt))
+                               base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt),
+                               mostrar_rfid=self.var_rfid.get())
         if getattr(self, "planes", None) and self.var_plan.get() != "Sin ruletaje":
             idx = list(self.cb_plan["values"]).index(self.var_plan.get()) - 1
             if 0 <= idx < len(self.planes):
                 aj = self.planes[idx].ajustes(aj)
         return aj
+
+    def _rfids(self):
+        cons = self.consigna
+        if not isinstance(cons, neumatico.ConsignaNeumatico):
+            return []
+        return [p for p in cons.productos if p.es_rfid and p.tramo_rfid]
+
+    def _mover_rfid(self):
+        """Coloca el borde interior del RFID en la cota indicada (para ver dónde queda y si lo protege el BJ)."""
+        try:
+            pos = float(self.var_rfid_pos.get())
+        except (tk.TclError, ValueError):
+            return
+        for p in self._rfids():
+            w = p.tramo_rfid[1] - p.tramo_rfid[0]
+            p.tramo_rfid = (pos, pos + w)
+        self.var_rfid.set(True)
+        self._actualizar_neumatico()
 
     def calcular_plan(self):
         if not isinstance(self.consigna, neumatico.ConsignaNeumatico):

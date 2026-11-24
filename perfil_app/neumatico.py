@@ -36,6 +36,7 @@ class Ajustes:
     multiperfil: bool = False
     k_ruleta: float = 0.5         # radio de puente bajo una ruleta de 20 mm = k_ruleta × espesor
     k_multiperfil: float = 4.0    # radio de puente bajo el multiperfil = k_multiperfil × espesor
+    mostrar_rfid: bool = False    # dibujar el RFID (no cuenta para el aire) y ver si lo protege el BJ
     base_bt: float = 0.5          # mm: espesor de la base fina del BT (fuera de la falaise)
     cuna_bj: bool = True          # el BJ en cuña (grueso junto al aro), como en el plano de máquina
     rampa_bt: float = 6.0         # mm: largo de la rampa de la falaise (sube desde dentro hasta la HF)
@@ -85,6 +86,7 @@ class Producto:
     tramos: list[tuple[float, float]] = field(default_factory=list)  # (x0, x1) en mm
     es_aro: bool = False
     desplazamiento: float = 0.0  # mm sobre el TRAZO de la consigna (+ = hacia fuera)
+    tramo_rfid: tuple | None = None  # (x0, x1) del RFID en el lado R; no se dibuja salvo que se pida
     hf: float | None = None      # «haut falaise»: mm desde el 0 donde empieza la pared (falaise) del perfil
 
     @property
@@ -332,7 +334,15 @@ def cargar(ruta: str) -> ConsignaNeumatico:
 def _calcular_posiciones(cons: ConsignaNeumatico) -> None:
     for p in cons.productos:
         if p.es_rfid:
-            p.tramos = []  # el RFID no se dibuja ni cuenta para el aire
+            p.tramos = []  # el RFID no cuenta para el aire; su posición se guarda aparte por si se quiere ver
+            w, t, v = p.anchura or 0.0, p.trazo_tipo, (p.trazo or 0.0)
+            if w:
+                if t.startswith("IN"):
+                    p.tramo_rfid = (v, v + w)
+                elif t.startswith("EX"):
+                    p.tramo_rfid = (v - w, v)
+                else:
+                    p.tramo_rfid = (v - w / 2, v + w / 2) if v else (0.0, w / 2)
             continue
         w, t, v = p.anchura, p.trazo_tipo, p.trazo
         if not w:
@@ -778,9 +788,11 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             colores[p.codigo] = PALETA[len(colores) % len(PALETA)]
         return colores[p.codigo]
 
+    antes: dict[str, object] = {}   # superficie justo antes de poner cada producto (para colocar el RFID)
     for p in prods:
         if not p.tramos:
             continue
+        antes[p.codigo] = h.copy()
         a, b = p.tramos[-1]
         if p.es_aro:
             xb = (a + b) / 2
@@ -959,6 +971,8 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             bolsas[:] = [bo for bo in bolsas if not bo.zona_aro]
             aire[:] = [(hp, ab, m & (x < limite), cod) for hp, ab, m, cod in aire]
             info["cavidades"] = []
+    if aj.mostrar_rfid:
+        info["rfid"] = _colocar_rfid(cons, prods, x, capas, antes, h)
     info["bolsas"] = bolsas
     info["aire"] = aire
     info["colas"] = colas
@@ -979,6 +993,88 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
     return x, capas, cuñas, aros, info, colores, h
 
 
+def _colocar_rfid(cons, prods, x, capas, antes, h_final):
+    """Coloca el RFID sobre la superficie que había cuando se pone (orden de la consigna) y mira si el BJ lo
+    protege: si lo cubre entero, con qué margen a sus bordes y cuánto BJ tiene encima."""
+    import numpy as np
+
+    if not prods:
+        return []
+    seccion = prods[0].seccion
+    orden = [p for p in cons.productos if p.seccion == seccion]
+    res = []
+    for r in orden:
+        if not (r.es_rfid and r.tramo_rfid):
+            continue
+        i = orden.index(r)
+        siguiente = next((q for q in orden[i + 1:] if q.codigo in antes), None)
+        suelo = antes[siguiente.codigo] if siguiente is not None else h_final
+        x0, x1 = r.tramo_rfid
+        m = (x >= x0) & (x <= x1)
+        esp = r.espesor or 1.0
+        abajo = np.where(m, suelo, np.nan)
+        arriba = abajo + esp
+        dato = {"prod": r, "x0": x0, "x1": x1, "esp": esp, "abajo": abajo, "arriba": arriba,
+                "encima": None, "bj": None}
+        # qué queda justo encima (primer producto puesto después que lo cubre) y protección del BJ
+        posteriores = {q.codigo for q in orden[i + 1:]}
+        for c in capas:
+            if c.get("vuelta") or c["prod"].codigo not in posteriores:
+                continue
+            cubre = (c["t"][m] > 0.05)
+            if cubre.any() and dato["encima"] is None:
+                dato["encima"] = c["prod"].codigo
+            if c["prod"].codigo.upper() == "BJ":
+                xs_bj = x[c["t"] > 0.05]
+                dato["bj"] = {
+                    "cubre_todo": bool(cubre.all()),
+                    "cubierto_pct": float(cubre.mean() * 100),
+                    "margen_int": float(x0 - xs_bj.min()) if xs_bj.size else None,
+                    "margen_ext": float(xs_bj.max() - x1) if xs_bj.size else None,
+                    "espesor_min": float(c["t"][m].min()),
+                    "espesor_max": float(c["t"][m].max()),
+                    "bj_desde": float(xs_bj.min()) if xs_bj.size else None,
+                    "bj_hasta": float(xs_bj.max()) if xs_bj.size else None,
+                }
+        dato["goma_encima"] = float(np.nanmin(h_final[m] - arriba[m])) if m.any() else 0.0
+        res.append(dato)
+    return res
+
+
+def proteccion_rfid(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | None = None) -> list[str]:
+    """Texto con dónde queda el RFID y si lo protege el BJ."""
+    import copy
+
+    aj = copy.deepcopy(aj) if aj else Ajustes()
+    aj.mostrar_rfid = True
+    prods = [p for p in cons.de(seccion) if p.tramos]
+    if not prods:
+        return []
+    out = []
+    for d in _calcular_plano(cons, prods, aj)[4].get("rfid", []):
+        r = d["prod"]
+        movido = r.trazo is not None and abs(d["x0"] - r.trazo) > 0.05 and r.trazo_tipo.startswith("IN")
+        lin = (f"{r.codigo} ({r.apelacion}, {_f(r.anchura)} × {_f(r.espesor)} mm, TRAZO consigna {r.trazo_texto})"
+               + (" — MOVIDO para probar" if movido else "")
+               + f": queda de {_f(round(d['x0'], 1))} a {_f(round(d['x1'], 1))} mm desde el 0; "
+               f"justo encima: {d['encima'] or '—'}.")
+        out.append(lin)
+        bj = d["bj"]
+        if bj is None:
+            out.append("    No hay BJ encima del RFID: NO está protegido por el BJ.")
+        else:
+            estado = "SÍ, lo cubre entero" if bj["cubre_todo"] else f"NO del todo (cubre el {bj['cubierto_pct']:.0f} %)"
+            out.append(f"    Protegido por el BJ: {estado}. BJ de {_f(round(bj['bj_desde'], 1))} a "
+                       f"{_f(round(bj['bj_hasta'], 1))} mm; margen hasta su borde interior "
+                       f"{_f(round(bj['margen_int'], 1))} mm y hasta el exterior {_f(round(bj['margen_ext'], 1))} mm; "
+                       f"espesor del BJ sobre el RFID {_f(round(bj['espesor_min'], 1))}–{_f(round(bj['espesor_max'], 1))} mm; "
+                       f"goma total por encima del RFID ≥ {_f(round(d['goma_encima'], 1))} mm.")
+            if bj["cubre_todo"] and min(bj["margen_int"], bj["margen_ext"]) < 5:
+                out.append("    Ojo: margen de menos de 5 mm a un borde del BJ; con la dispersión de colocación "
+                           "podría quedar fuera.")
+    return out
+
+
 def bolsas_de_aire(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes | None = None) -> list[Bolsa]:
     """Bolsas de aire de una sección (o de las dos con «Todo»), de mayor a menor."""
     secciones = (CARCASA, BANDAJE) if seccion in (None, "Todo") else (seccion,)
@@ -991,6 +1087,33 @@ def bolsas_de_aire(cons: ConsignaNeumatico, seccion: str = CARCASA, aj: Ajustes 
 
 
 COLOR_AIRE = "#ff2d2d"
+COLOR_RFID = "#00b4d8"
+
+
+def _dibujar_rfid(ax, x, info):
+    """RFID (si se pide): en su sitio, por encima de todo para que se vea dentro del BJ."""
+    import numpy as np
+    from matplotlib.patches import Polygon
+
+    for d in info.get("rfid", []):
+        m = ~np.isnan(d["abajo"])
+        if not m.any():
+            continue
+        xs = x[m]
+        poli = list(zip(xs, d["abajo"][m])) + list(zip(xs[::-1], d["arriba"][m][::-1]))
+        ax.add_patch(Polygon(poli, closed=True, facecolor=COLOR_RFID, edgecolor="#003049", hatch="xxx",
+                             linewidth=1.0, zorder=9))
+        bj = d["bj"]
+        ok = bj is not None and bj["cubre_todo"]
+        txt = (f"RFID {_f(round(d['x0']))}–{_f(round(d['x1']))} mm\n"
+               + (f"cubierto por BJ ({_f(round(bj['espesor_min'], 1))}–{_f(round(bj['espesor_max'], 1))} mm)"
+                  if ok else "NO cubierto del todo por el BJ"))
+        xc = (d["x0"] + d["x1"]) / 2
+        yc = float(np.nanmean(d["arriba"][m]))
+        ax.annotate(txt, (xc, yc), xytext=(xc, yc - 14), fontsize=7.5, ha="center", va="top",
+                    color="#1a7f37" if ok else "#b00000", fontweight="bold", zorder=10,
+                    arrowprops=dict(arrowstyle="-", color="#003049", lw=0.8),
+                    bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#003049", lw=0.6))
 
 
 def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
@@ -1029,6 +1152,7 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
         ax.fill_between(x, c["abajo"], c["abajo"] + c["t"], where=m, facecolor=c["color"],
                         edgecolor="#1b1b1b", linewidth=0.5, zorder=3)
     from matplotlib.patches import Polygon
+    _dibujar_rfid(ax, x, info)
     for col, _cod, poli in info.get("bandas", []):
         ax.add_patch(Polygon(poli, closed=True, facecolor=col, edgecolor="#1b1b1b", linewidth=0.5, zorder=3))
     for poli in info.get("cavidades", []):
@@ -1350,6 +1474,8 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
             ax.text(z.xc, yk + 0.9, etiqueta, ha="center", va="bottom", fontsize=7, color=colr,
                     fontweight="bold", zorder=7, bbox=dict(boxstyle="round,pad=0.1", fc="white", ec="none", alpha=0.8))
 
+    _dibujar_rfid(ax, x, info)
+
     # ruletas de 20 mm y multiperfil del plan de ruletaje (barras verdes sobre los productos)
     if aj.ruletas or aj.multiperfil:
         yr = y0 - 6          # debajo del tambor, donde hay sitio
@@ -1389,6 +1515,8 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
         if p.codigo not in vistos:
             vistos.append(p.codigo)
     asas = [Patch(facecolor=col(cod, colores.get(cod, "#999")), edgecolor="#111111", label=cod) for cod in vistos]
+    if info.get("rfid"):
+        asas.append(Patch(facecolor=COLOR_RFID, edgecolor="#003049", hatch="xxx", label="RFID"))
     if mostrar_aire:
         total = sum(b.area for b in info["bolsas"])
         asas.append(Patch(facecolor="none", edgecolor="#ff3b3b", hatch="////",
