@@ -26,6 +26,21 @@ Para usarlo sin compilar: `pip install -r requirements.txt` y `python app.py`.
 
 ## Consigna de calidad de neumático (CONSIGNA / QXAX)
 
+**Vista simple (al abrir la consigna):** el plano del flanco con las zonas de aire y sus puntos
+críticos, y un panel a la derecha con:
+
+- **Aire entre productos** (PS · BJ · PTR · FE, sin la zona del aro), con semáforo.
+- **Zonas con aire:** cota en mm y productos de cada una.
+- **RFID:** se puede ver en el dibujo y mover; dice si queda **protegido por el BJ** y con qué margen.
+  El BJ se adapta por encima del RFID; el aire se calcula sin el RFID (parche local).
+- **Posición de los productos:** mover cada producto en mm y ver al momento cómo cambia el aire;
+  «Buscar mejor posición (±2 mm)» rellena los movimientos que más aire quitan; «Consigna» vuelve a
+  la original.
+
+**Modo técnico** (botón arriba a la derecha): todos los ajustes del modelo, el plan de ruletaje, las
+tablas, el informe completo y las demás vistas.
+
+
 Abre directamente el Excel de la consigna (`.xlsx` / `.xlsm`): la app encuentra sola la tabla
 `PROD. · APELACIÓN · ANC. · ESP. · ANG. · TRAZO · LONG. · PESO` y dibuja cada producto
 **desde el 0 (centro del tambor)** según su **TRAZO**:

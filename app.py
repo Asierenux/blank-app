@@ -49,6 +49,8 @@ class App(tk.Tk):
         self.var_ruletaje = tk.BooleanVar(value=False)
         self.var_base_bt = tk.DoubleVar(value=neumatico.Ajustes().base_bt)
         self.var_rampa_bt = tk.DoubleVar(value=neumatico.Ajustes().rampa_bt)
+        self.var_tecnico = tk.BooleanVar(value=False)
+        self.vars_desp: dict[str, tk.DoubleVar] = {}
 
         self._construir_ui()
         self.bind("<Control-o>", lambda e: self.abrir())
@@ -96,14 +98,6 @@ class App(tk.Tk):
             sp.bind("<FocusOut>", lambda e: self._actualizar_neumatico())
         ttk.Checkbutton(self.barra_aire, text="Simular ruletaje (apliques)", variable=self.var_ruletaje,
                         command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(16, 0))
-        self.var_rfid = tk.BooleanVar(value=False)
-        ttk.Checkbutton(self.barra_aire, text="Ver RFID en (mm):", variable=self.var_rfid,
-                        command=self._actualizar_neumatico).pack(side=tk.LEFT, padx=(10, 0))
-        self.var_rfid_pos = tk.DoubleVar(value=0.0)
-        sp_r = ttk.Spinbox(self.barra_aire, from_=0, to=300, increment=1, width=6, textvariable=self.var_rfid_pos,
-                           command=self._mover_rfid)
-        sp_r.pack(side=tk.LEFT, padx=(2, 0))
-        sp_r.bind("<Return>", lambda e: self._mover_rfid())
         for texto, var, de, a, inc in (("BT base (mm):", self.var_base_bt, 0.1, 4, 0.1),
                                        ("rampa falaise (mm):", self.var_rampa_bt, 1, 27, 0.5)):
             ttk.Label(self.barra_aire, text=texto).pack(side=tk.LEFT, padx=(12, 0))
@@ -118,18 +112,28 @@ class App(tk.Tk):
                   font=("TkDefaultFont", 10, "bold")).pack(side=tk.LEFT, padx=(16, 0))
         ttk.Button(barra, text="Guardar plantilla de ejemplo…",
                    command=self.guardar_plantilla).pack(side=tk.RIGHT)
+        self.boton_tecnico = ttk.Button(barra, text="🔧 Modo técnico", command=self._alternar_tecnico)
         ttk.Button(barra, text="? Ayuda", command=self.ayuda).pack(side=tk.RIGHT, padx=4)
 
-        panel = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        self.estado = tk.StringVar(value="Abre una consigna (.xlsx o .csv) para empezar.  "
+                                         "Todo se procesa en este equipo, sin conexión.")
+        ttk.Label(self, textvariable=self.estado, anchor=tk.W, padding=(6, 3),
+                  relief=tk.SUNKEN).pack(side=tk.BOTTOM, fill=tk.X)
+
+        panel = self.paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
         panel.pack(fill=tk.BOTH, expand=True)
 
-        # Dibujo
-        marco_dibujo = ttk.Frame(panel)
+        # Zona principal: dibujo + panel de resumen (vista simple)
+        principal = ttk.Frame(panel)
+        self.panel_simple = ttk.Frame(principal, padding=(8, 4), width=360)
+        marco_dibujo = ttk.Frame(principal)
+        marco_dibujo.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         self.fig = Figure(figsize=(8, 6), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.fig, master=marco_dibujo)
         NavigationToolbar2Tk(self.canvas, marco_dibujo).update()
         self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        panel.add(marco_dibujo, weight=4)
+        panel.add(principal, weight=4)
+        self._construir_panel_simple()
 
         # Tablas: cotas/productos y bolsas de aire
         self.pestanas = ttk.Notebook(panel)
@@ -178,12 +182,187 @@ class App(tk.Tk):
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         panel.add(self.pestanas, weight=1)
 
-        self.estado = tk.StringVar(value="Abre una consigna (.xlsx o .csv) para empezar.  "
-                                         "Todo se procesa en este equipo, sin conexión.")
-        ttk.Label(self, textvariable=self.estado, anchor=tk.W, padding=(6, 3),
-                  relief=tk.SUNKEN).pack(side=tk.BOTTOM, fill=tk.X)
-
         self._pantalla_inicio()
+
+    # ------------------------------------------------------ vista simple
+    def _construir_panel_simple(self):
+        p = self.panel_simple
+        p.pack_propagate(False)
+        titulo = ("TkDefaultFont", 10, "bold")
+        ttk.Label(p, text="AIRE ENTRE PRODUCTOS", font=titulo).pack(anchor=tk.W)
+        ttk.Label(p, text="PS · BJ · PTR · FE  (sin la zona del aro)", foreground="#666").pack(anchor=tk.W)
+        self.lbl_aire = tk.Label(p, text="—", font=("TkDefaultFont", 26, "bold"), fg="#b00000", anchor=tk.W)
+        self.lbl_aire.pack(anchor=tk.W, fill=tk.X)
+        self.lbl_aire_sub = ttk.Label(p, text="", foreground="#444")
+        self.lbl_aire_sub.pack(anchor=tk.W)
+
+        ttk.Separator(p).pack(fill=tk.X, pady=6)
+        ttk.Label(p, text="ZONAS CON AIRE", font=titulo).pack(anchor=tk.W)
+        self.marco_zonas = ttk.Frame(p)
+        self.marco_zonas.pack(anchor=tk.W, fill=tk.X)
+
+        ttk.Separator(p).pack(fill=tk.X, pady=6)
+        ttk.Label(p, text="RFID", font=titulo).pack(anchor=tk.W)
+        fila = ttk.Frame(p)
+        fila.pack(anchor=tk.W, fill=tk.X)
+        self.var_rfid = tk.BooleanVar(value=False)
+        self.var_rfid_pos = tk.DoubleVar(value=0.0)
+        ttk.Checkbutton(fila, text="Ver RFID, en (mm):", variable=self.var_rfid,
+                        command=self._actualizar_neumatico).pack(side=tk.LEFT)
+        sp = ttk.Spinbox(fila, from_=0, to=300, increment=1, width=6, textvariable=self.var_rfid_pos,
+                         command=self._mover_rfid)
+        sp.pack(side=tk.LEFT, padx=4)
+        sp.bind("<Return>", lambda e: self._mover_rfid())
+        self.lbl_rfid = tk.Label(p, text="", justify=tk.LEFT, anchor=tk.W, wraplength=330)
+        self.lbl_rfid.pack(anchor=tk.W, fill=tk.X)
+
+        ttk.Separator(p).pack(fill=tk.X, pady=6)
+        ttk.Label(p, text="POSICIÓN DE LOS PRODUCTOS", font=titulo).pack(anchor=tk.W)
+        ttk.Label(p, text="Mover (mm, + hacia fuera) y ver cómo cambia el aire", foreground="#666").pack(anchor=tk.W)
+        self.marco_prods = ttk.Frame(p)
+        self.marco_prods.pack(anchor=tk.W, fill=tk.X, pady=(2, 4))
+        botones = ttk.Frame(p)
+        botones.pack(anchor=tk.W, fill=tk.X)
+        ttk.Button(botones, text="🔍 Buscar mejor posición (±2 mm)", command=self._buscar_mejor).pack(side=tk.LEFT)
+        ttk.Button(botones, text="↺ Consigna", command=self._volver_consigna).pack(side=tk.LEFT, padx=4)
+
+    def _rellenar_productos_simple(self):
+        for w in self.marco_prods.winfo_children():
+            w.destroy()
+        self.vars_desp = {}
+        cons = self.consigna
+        f = neumatico._f
+        ttk.Label(self.marco_prods, text="Prod.", foreground="#666").grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(self.marco_prods, text="Consigna", foreground="#666").grid(row=0, column=1, sticky=tk.W, padx=4)
+        ttk.Label(self.marco_prods, text="Mover", foreground="#666").grid(row=0, column=2, sticky=tk.W)
+        ttk.Label(self.marco_prods, text="Queda", foreground="#666").grid(row=0, column=3, sticky=tk.W, padx=4)
+        fila = 1
+        for p in cons.de(neumatico.CARCASA):
+            if not p.movible:
+                continue
+            var = tk.DoubleVar(value=p.desplazamiento)
+            self.vars_desp[p.codigo] = var
+            ttk.Label(self.marco_prods, text=p.codigo, font=("TkDefaultFont", 9, "bold")).grid(row=fila, column=0,
+                                                                                               sticky=tk.W)
+            ttk.Label(self.marco_prods, text=f"{p.trazo_tipo} {f(p.trazo)}").grid(row=fila, column=1, sticky=tk.W,
+                                                                               padx=4)
+            sp = ttk.Spinbox(self.marco_prods, from_=-10, to=10, increment=0.5, width=5, textvariable=var,
+                             command=self._aplicar_movimientos)
+            sp.grid(row=fila, column=2, sticky=tk.W)
+            sp.bind("<Return>", lambda e: self._aplicar_movimientos())
+            lbl = ttk.Label(self.marco_prods, text="")
+            lbl.grid(row=fila, column=3, sticky=tk.W, padx=4)
+            var._etiqueta = lbl  # noqa: SLF001 - etiqueta con la posición resultante
+            fila += 1
+
+    def _aplicar_movimientos(self):
+        cons = self.consigna
+        desp = {}
+        for cod, var in self.vars_desp.items():
+            try:
+                v = float(var.get())
+            except (tk.TclError, ValueError):
+                v = 0.0
+            if v:
+                desp[cod] = v
+        neumatico.aplicar_desplazamientos(cons, desp)
+        self._actualizar_neumatico()
+
+    def _buscar_mejor(self):
+        if not isinstance(self.consigna, neumatico.ConsignaNeumatico):
+            return
+        self.estado.set("Buscando la mejor posición de los productos (±2 mm)…")
+        self.config(cursor="watch")
+        self.update()
+        try:
+            aj = self.ajustes()
+            aj.mostrar_rfid, aj.ruletas, aj.multiperfil = False, (), False
+            r = neumatico.optimizar(self.consigna, neumatico.CARCASA, aj, 2.0, 0.5,
+                                    [c for c in self.vars_desp])
+        finally:
+            self.config(cursor="")
+        for cod, var in self.vars_desp.items():
+            var.set(r.desplazamientos.get(cod, 0.0))
+        self._aplicar_movimientos()
+        messagebox.showinfo("Mejor posición",
+                            f"Aire entre productos: {neumatico._f(round(r.aire_antes, 1))} → "
+                            f"{neumatico._f(round(r.aire_despues, 1))} mm²\n\n"
+                            + ("\n".join(f"{k}: {v:+g} mm" for k, v in r.desplazamientos.items())
+                               or "La consigna ya es la mejor posición (±2 mm)."))
+
+    def _volver_consigna(self):
+        for var in self.vars_desp.values():
+            var.set(0.0)
+        self._aplicar_movimientos()
+
+    def _refrescar_panel(self, total, zonas, rfid_info):
+        f = neumatico._f
+        color = "#1a7f37" if total < 3 else ("#d97706" if total < 8 else "#b00000")
+        self.lbl_aire.configure(text=f"{f(round(total, 1))} mm²", fg=color)
+        estado = "BIEN" if total < 3 else ("ATENCIÓN" if total < 8 else "ALTO")
+        self.lbl_aire_sub.configure(text=f"{estado} · en la sección, por lado")
+        for w in self.marco_zonas.winfo_children():
+            w.destroy()
+        colores = {"ALTO": "#b00000", "MEDIO": "#d97706", "BAJO": "#9a7d00"}
+        if not zonas:
+            ttk.Label(self.marco_zonas, text="Sin zonas de aire apreciable.").pack(anchor=tk.W)
+        for z in zonas[:6]:
+            pares = ", ".join(z.pares)
+            tk.Label(self.marco_zonas, text=f"● {z.nombre}  {f(round(z.xc))} mm  ({f(round(z.x0))}–{f(round(z.x1))})",
+                     fg=colores[z.riesgo], font=("TkDefaultFont", 9, "bold"), anchor=tk.W).pack(anchor=tk.W)
+            ttk.Label(self.marco_zonas, text=f"     {pares} · {f(round(z.area, 1))} mm²", foreground="#444"
+                      ).pack(anchor=tk.W)
+        # RFID
+        if rfid_info is None:
+            self.lbl_rfid.configure(text="La consigna no tiene RFID.", fg="#666")
+        else:
+            bj = rfid_info.get("bj")
+            rango = f"{f(round(rfid_info['x0']))}–{f(round(rfid_info['x1']))} mm"
+            if bj and bj["cubre_todo"]:
+                txt = (f"✔ PROTEGIDO por el BJ ({rango})\nMargen a los bordes del BJ: {f(round(bj['margen_int']))} y "
+                       f"{f(round(bj['margen_ext']))} mm · BJ encima {f(round(bj['espesor_min'], 1))}–"
+                       f"{f(round(bj['espesor_max'], 1))} mm")
+                col = "#1a7f37" if min(bj["margen_int"], bj["margen_ext"]) >= 5 else "#d97706"
+            else:
+                pct = f" (cubre el {bj['cubierto_pct']:.0f} %)" if bj else ""
+                txt = f"✖ NO protegido del todo por el BJ{pct} ({rango})"
+                col = "#b00000"
+            self.lbl_rfid.configure(text=txt, fg=col)
+        # posición resultante de cada producto
+        cons = self.consigna
+        for p in cons.productos:
+            var = self.vars_desp.get(p.codigo)
+            if var is not None and abs(float(var.get() or 0) - p.desplazamiento) > 1e-9:
+                var.set(p.desplazamiento)   # p. ej. si se aplicó una propuesta desde el modo técnico
+            if var is not None and hasattr(var, "_etiqueta"):
+                txt = f"{p.trazo_tipo} {f(round((p.trazo or 0) + p.desplazamiento, 1))}"
+                var._etiqueta.configure(text=txt, foreground="#b00000" if p.desplazamiento else "#444")
+
+    def _alternar_tecnico(self):
+        self.var_tecnico.set(not self.var_tecnico.get())
+        self._aplicar_modo()
+
+    def _aplicar_modo(self):
+        es_neum = isinstance(self.consigna, neumatico.ConsignaNeumatico)
+        tecnico = self.var_tecnico.get() or not es_neum
+        self.boton_tecnico.configure(text="◀ Vista simple" if self.var_tecnico.get() else "🔧 Modo técnico")
+        if es_neum:
+            self.boton_tecnico.pack(side=tk.RIGHT, padx=4)
+            self.panel_simple.pack(side=tk.RIGHT, fill=tk.Y, before=self.canvas.get_tk_widget().master)
+        else:
+            self.boton_tecnico.pack_forget()
+            self.panel_simple.pack_forget()
+        if es_neum and tecnico:
+            self.barra_neum.pack(side=tk.LEFT)
+            self.barra_aire.pack(side=tk.TOP, fill=tk.X, after=self.barra)
+        else:
+            self.barra_neum.pack_forget()
+            self.barra_aire.pack_forget()
+        presentes = self.paned.panes()
+        if tecnico and str(self.pestanas) not in [str(x) for x in presentes]:
+            self.paned.add(self.pestanas, weight=1)
+        elif not tecnico and str(self.pestanas) in [str(x) for x in presentes]:
+            self.paned.forget(self.pestanas)
 
     def _columnas_tabla(self, defin):
         cols = [c for c, _, _ in defin]
@@ -230,8 +409,7 @@ class App(tk.Tk):
             messagebox.showerror("Error al abrir", f"{type(e).__name__}: {e}")
             return
         self.ruta, self.consigna = ruta, consigna
-        self.barra_neum.pack_forget()
-        self.barra_aire.pack_forget()
+        self._aplicar_modo()
         self.pestanas.hide(1)
         self.pestanas.hide(2)
         self._columnas_tabla(TABLA_COTAS)
@@ -266,8 +444,9 @@ class App(tk.Tk):
         if rf:
             self.var_rfid_pos.set(round(rf[0].tramo_rfid[0], 1))
         self.title(f"{APP_NOMBRE} — {os.path.basename(ruta)}")
-        self.barra_neum.pack(side=tk.LEFT)
-        self.barra_aire.pack(side=tk.TOP, fill=tk.X, after=self.barra)
+        self.var_seccion.set(neumatico.CARCASA)
+        self._aplicar_modo()
+        self._rellenar_productos_simple()
         self.pestanas.add(self.marco_aire)
         self.pestanas.add(self.marco_analisis)
         self._columnas_tabla(TABLA_NEUMATICO)
@@ -293,7 +472,9 @@ class App(tk.Tk):
             info.append(f"Entre aros {f(cons.entre_tringles)}")
         # bolsas de aire
         self.tabla_aire.delete(*self.tabla_aire.get_children())
-        bolsas = neumatico.bolsas_de_aire(cons, self.var_seccion.get(), self.ajustes())
+        aj_b = self.ajustes()
+        aj_b.mostrar_rfid = False
+        bolsas = neumatico.bolsas_de_aire(cons, self.var_seccion.get(), aj_b)
         esp = {p.codigo: p.espesor for p in cons.productos}
         for b in sorted(bolsas, key=lambda b: (b.zona_aro, -b.area)):
             tag = ("ARO",) if b.zona_aro else (("GRANDE",) if b.area >= 1 else ())
@@ -313,7 +494,7 @@ class App(tk.Tk):
         sec = neumatico.CARCASA if sec == "Todo" else sec
         try:
             aj_sin = self.ajustes()
-            aj_sin.ruletas, aj_sin.multiperfil = (), False
+            aj_sin.ruletas, aj_sin.multiperfil, aj_sin.mostrar_rfid = (), False, False
             self.analisis = analisis.analizar(cons, sec, aj_sin)
             texto = self.analisis.texto(cons)
             rfid = neumatico.proteccion_rfid(cons, sec, aj_sin)
@@ -330,6 +511,16 @@ class App(tk.Tk):
         self.texto_analisis.delete("1.0", tk.END)
         self.texto_analisis.insert("1.0", texto)
         self.texto_analisis.configure(state=tk.DISABLED)
+        try:
+            aj_r = self.ajustes()
+            aj_r.mostrar_rfid = True
+            prods_c = [p for p in cons.de(neumatico.CARCASA) if p.tramos]
+            datos_rfid = neumatico._calcular_plano(cons, prods_c, aj_r)[4].get("rfid", [])
+        except Exception:  # noqa: BLE001
+            datos_rfid = []
+        zonas = self.analisis.zonas if self.analisis else []
+        self._refrescar_panel(self.analisis.total if self.analisis else total, zonas,
+                              datos_rfid[0] if datos_rfid else None)
         desp = {p.codigo: p.desplazamiento for p in cons.productos if p.desplazamiento}
         if desp:
             info.insert(0, "PROPUESTA: " + ", ".join(f"{k} {v:+g} mm" for k, v in desp.items()))
@@ -363,7 +554,7 @@ class App(tk.Tk):
                                rigidez_por_producto={"FE": leer(self.var_rigidez_fe, d.rigidez_por_producto["FE"])},
                                ruletaje=self.var_ruletaje.get(),
                                base_bt=leer(self.var_base_bt, d.base_bt), rampa_bt=leer(self.var_rampa_bt, d.rampa_bt),
-                               mostrar_rfid=self.var_rfid.get())
+                               mostrar_rfid=self.var_rfid.get(), zoom_flanco=not self.var_tecnico.get())
         if getattr(self, "planes", None) and self.var_plan.get() != "Sin ruletaje":
             idx = list(self.cb_plan["values"]).index(self.var_plan.get()) - 1
             if 0 <= idx < len(self.planes):
