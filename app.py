@@ -189,7 +189,7 @@ class App(tk.Tk):
         p = self.panel_simple
         p.pack_propagate(False)
         titulo = ("TkDefaultFont", 10, "bold")
-        ttk.Label(p, text="AIRE ENTRE PRODUCTOS", font=titulo).pack(anchor=tk.W)
+        ttk.Label(p, text="RIESGO DE AIRE ENTRE PRODUCTOS", font=titulo).pack(anchor=tk.W)
         ttk.Label(p, text="PS · BJ · PTR · FE  (sin la zona del aro)", foreground="#666").pack(anchor=tk.W)
         self.lbl_aire = tk.Label(p, text="—", font=("TkDefaultFont", 26, "bold"), fg="#b00000", anchor=tk.W)
         self.lbl_aire.pack(anchor=tk.W, fill=tk.X)
@@ -300,7 +300,8 @@ class App(tk.Tk):
         color = "#1a7f37" if total < 3 else ("#d97706" if total < 8 else "#b00000")
         self.lbl_aire.configure(text=f"{f(round(total, 1))} mm²", fg=color)
         estado = "BIEN" if total < 3 else ("ATENCIÓN" if total < 8 else "ALTO")
-        self.lbl_aire_sub.configure(text=f"{estado} · en la sección, por lado")
+        self.lbl_aire_sub.configure(text=f"{estado} · estimación del modelo para comparar y anticipar,\n"
+                                         "no es una medida")
         for w in self.marco_zonas.winfo_children():
             w.destroy()
         colores = {"ALTO": "#b00000", "MEDIO": "#d97706", "BAJO": "#9a7d00"}
