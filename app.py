@@ -66,15 +66,19 @@ class App(tk.Tk):
     # ------------------------------------------------------------------ UI
     def _construir_ui(self):
         F = self.fuentes
-        cab = tk.Frame(self, bg=C["azul"])
+        cab = tk.Frame(self, bg=C["primario"])
         cab.pack(side=tk.TOP, fill=tk.X)
-        tk.Label(cab, text=APP_NOMBRE.upper(), bg=C["azul"], fg="#FFFFFF", font=F["titulo"]
-                 ).pack(side=tk.LEFT, padx=(14, 10), pady=(8, 6))
-        tk.Label(cab, text="Consignas · aire entre productos · RFID", bg=C["azul"], fg="#D6E2F5",
+        self._logo = tema.cargar_logo(self, 30)
+        if self._logo is not None:
+            tk.Label(cab, image=self._logo, bg=C["primario"]).pack(side=tk.LEFT, padx=(14, 4), pady=8)
+            tk.Frame(cab, bg="#7A7D82", width=1).pack(side=tk.LEFT, fill=tk.Y, padx=10, pady=10)
+        tk.Label(cab, text=APP_NOMBRE.upper(), bg=C["primario"], fg="#FFFFFF", font=F["titulo"]
+                 ).pack(side=tk.LEFT, padx=(14 if self._logo is None else 0, 10), pady=(8, 6))
+        tk.Label(cab, text="Consignas · aire entre productos · RFID", bg=C["primario"], fg="#C9CBCF",
                  font=F["cuerpo"]).pack(side=tk.LEFT, pady=(10, 6))
-        tk.Label(cab, text="🔒 100 % local, sin conexión", bg=C["azul"], fg=C["amarillo"],
+        tk.Label(cab, text="🔒 100 % local, sin conexión", bg=C["primario"], fg="#D5D7DA",
                  font=F["cuerpo_b"]).pack(side=tk.RIGHT, padx=14)
-        tk.Frame(self, bg=C["amarillo"], height=4).pack(side=tk.TOP, fill=tk.X)
+        tk.Frame(self, bg="#6E7176", height=3).pack(side=tk.TOP, fill=tk.X)
         barra = self.barra = ttk.Frame(self, padding=(6, 6))
         barra.pack(side=tk.TOP, fill=tk.X)
         ttk.Button(barra, text="📂 Abrir consigna…", command=self.abrir, style="Accion.TButton").pack(side=tk.LEFT)
@@ -266,7 +270,7 @@ class App(tk.Tk):
             var = tk.DoubleVar(value=p.desplazamiento)
             self.vars_desp[p.codigo] = var
             ttk.Label(self.marco_prods, text=p.codigo, style="Panel.TLabel", font=self.fuentes["cuerpo_b"],
-                      foreground=C["amarillo"]).grid(row=fila, column=0, sticky=tk.W, pady=1)
+                      foreground=C["destaque"]).grid(row=fila, column=0, sticky=tk.W, pady=1)
             ttk.Label(self.marco_prods, text=f"{p.trazo_tipo} {f(p.trazo)}", style="Panel.TLabel").grid(row=fila, column=1, sticky=tk.W,
                                                                                padx=4)
             sp = ttk.Spinbox(self.marco_prods, from_=-10, to=10, increment=0.5, width=5, textvariable=var,
@@ -327,7 +331,7 @@ class App(tk.Tk):
                                          "no es una medida")
         for w in self.marco_zonas.winfo_children():
             w.destroy()
-        colores = {"ALTO": C["mal"], "MEDIO": C["aviso"], "BAJO": C["amarillo"]}
+        colores = {"ALTO": C["mal"], "MEDIO": C["aviso"], "BAJO": C["destaque"]}
         if not zonas:
             ttk.Label(self.marco_zonas, text="Sin zonas de aire apreciable.", style="Panel.TLabel").pack(anchor=tk.W)
         for z in zonas[:6]:
@@ -361,7 +365,7 @@ class App(tk.Tk):
                 var.set(p.desplazamiento)   # p. ej. si se aplicó una propuesta desde el modo técnico
             if var is not None and hasattr(var, "_etiqueta"):
                 txt = f"{p.trazo_tipo} {f(round((p.trazo or 0) + p.desplazamiento, 1))}"
-                var._etiqueta.configure(text=txt, foreground=C["amarillo"] if p.desplazamiento else C["tinta_suave"])
+                var._etiqueta.configure(text=txt, foreground=C["destaque"] if p.desplazamiento else C["tinta_suave"])
 
     def _alternar_tecnico(self):
         self.var_tecnico.set(not self.var_tecnico.get())
@@ -392,11 +396,11 @@ class App(tk.Tk):
     @staticmethod
     def _colorear_toolbar(barra):
         """Barra de zoom de matplotlib en tonos claros de marca (sus iconos son oscuros)."""
-        claro = "#E4EBF6"
+        claro = "#E6E7E9"
         widgets = [barra] + list(barra.winfo_children())
         for w in widgets:
-            for opcion, valor in (("background", claro), ("activebackground", "#C9D6EC"),
-                                  ("highlightbackground", claro), ("foreground", C["azul"])):
+            for opcion, valor in (("background", claro), ("activebackground", "#D2D4D7"),
+                                  ("highlightbackground", claro), ("foreground", C["primario"])):
                 try:
                     w.configure(**{opcion: valor})
                 except tk.TclError:
@@ -414,11 +418,11 @@ class App(tk.Tk):
         ax = self.fig.add_subplot(111)
         ax.axis("off")
         fam = tema.familias_matplotlib()[0]
-        ax.text(0.5, 0.56, APP_NOMBRE.upper(), ha="center", fontsize=24, color=C["azul"], fontweight="bold",
+        ax.text(0.5, 0.56, APP_NOMBRE.upper(), ha="center", fontsize=24, color=C["primario"], fontweight="bold",
                 fontfamily=fam)
-        ax.plot([0.38, 0.62], [0.51, 0.51], color=C["amarillo"], lw=4, transform=ax.transAxes)
+        ax.plot([0.38, 0.62], [0.51, 0.51], color=C["destaque"], lw=4, transform=ax.transAxes)
         ax.text(0.5, 0.44, "Pulsa «Abrir consigna…» (Ctrl+O): Excel de perfil o consigna de neumático",
-                ha="center", fontsize=11, color="#5A6B85")
+                ha="center", fontsize=11, color="#6B6E73")
         ax.set_xlim(0, 1)
         ax.set_ylim(0, 1)
         self.canvas.draw()
@@ -759,7 +763,7 @@ class DialogoOptimizar(tk.Toplevel):
         self.barra = ttk.Progressbar(f, mode="determinate", maximum=1.0)
         self.barra.pack(fill=tk.X)
         self.var_res = tk.StringVar()
-        ttk.Label(f, textvariable=self.var_res, foreground=C["amarillo"],
+        ttk.Label(f, textvariable=self.var_res, foreground=C["destaque"],
                   font=app.fuentes["seccion"]).pack(anchor=tk.W, pady=(8, 4))
         cols = (("prod", "Producto", 90), ("orig", "TRAZO consigna", 120), ("nuevo", "TRAZO propuesto", 130),
                 ("delta", "Mover (mm)", 90), ("sentido", "Sentido", 140))

@@ -1,11 +1,12 @@
-"""Estética de marca (colores Michelin y tipografías BIB / Noto Sans) para la app.
+"""Estética de la app: tonos grises, logo y tipografías BIB / Noto Sans.
 
-Los colores son los de las herramientas internas ya desplegadas. Las fuentes se buscan en una carpeta
+El logo y las fuentes se buscan en una carpeta
 «fuentes» (junto al .exe, dentro del paquete o en la carpeta actual) o instaladas en el sistema:
 
 * Noto Sans (licencia libre OFL) va incluida con la app.
-* BIB es la tipografía corporativa: NO se incluye en el repositorio (es público). Si está instalada en
-  el PC o se copia en la carpeta «fuentes», se usa para los títulos; si no, se usa otra sans.
+* El logo (logo*.png, blanco sobre transparente) y la tipografía BIB son de la marca: NO se incluyen en el
+  repositorio (es público). Si se copian en la carpeta «fuentes» (o BIB está instalada en el PC) se
+  usan; si no, la cabecera muestra solo el nombre de la app y los títulos usan Noto Sans.
 """
 from __future__ import annotations
 
@@ -14,19 +15,21 @@ import os
 import sys
 
 COLORES = {
-    "azul": "#27509B",          # azul Michelin
-    "azul_ink": "#FFFFFF",
-    "amarillo": "#FCE500",      # amarillo Michelin
-    "amarillo_ink": "#241A00",
-    "fondo0": "#050914",
-    "fondo1": "#0A1730",
-    "fondo2": "#0F2148",
-    "panel": "#101D38",
-    "borde": "#25406E",
-    "tinta": "#EEF3FC",
-    "tinta_suave": "#9DB3D4",
-    "tinta_tenue": "#6F84A8",
-    "acento": "#3D7BDC",
+    # Tonos grises (neutros); el color solo se usa para avisos (verde / ámbar / rojo)
+    "primario": "#4A4D52",      # cabecera y botón principal
+    "primario_ink": "#FFFFFF",
+    "destaque": "#E3E4E6",      # títulos de sección y valores destacados
+    "destaque_ink": "#1E1F22",
+    "fondo0": "#1C1D20",
+    "fondo1": "#26282B",
+    "fondo2": "#34363A",
+    "panel": "#2E3034",
+    "borde": "#4C4F54",
+    "tinta": "#ECEDEE",
+    "tinta_suave": "#AEB1B6",
+    "tinta_tenue": "#878A8F",
+    "acento": "#62666C",
+    "texto_plano": "#3C3F44",   # títulos y marco del plano (fondo blanco)
     "bien": "#33D489",
     "aviso": "#FFB545",
     "mal": "#FF6B5E",
@@ -82,6 +85,30 @@ def registrar_fuentes() -> list[str]:
     return _registradas
 
 
+def buscar_logo() -> str | None:
+    """Ruta a logo*.png en las carpetas «fuentes», o None."""
+    for carpeta in carpetas_fuentes():
+        for ruta in sorted(glob.glob(os.path.join(carpeta, "**", "logo*.png"), recursive=True)):
+            if "__MACOSX" not in ruta:
+                return ruta
+    return None
+
+
+def cargar_logo(root, alto: int = 30):
+    """PhotoImage del logo reducido a unos «alto» píxeles, o None si no hay logo."""
+    ruta = buscar_logo()
+    if not ruta:
+        return None
+    import tkinter as tk
+
+    try:
+        img = tk.PhotoImage(master=root, file=ruta)
+    except tk.TclError:
+        return None
+    factor = max(1, round(img.height() / alto))
+    return img.subsample(factor, factor) if factor > 1 else img
+
+
 def familias_matplotlib() -> tuple[str, str]:
     """(títulos, texto) disponibles en matplotlib."""
     from matplotlib import font_manager
@@ -132,31 +159,31 @@ def aplicar(root) -> dict:
     root.option_add("*Font", f["cuerpo"])
     root.option_add("*TCombobox*Listbox.background", c["fondo2"])
     root.option_add("*TCombobox*Listbox.foreground", c["tinta"])
-    root.option_add("*TCombobox*Listbox.selectBackground", c["azul"])
+    root.option_add("*TCombobox*Listbox.selectBackground", c["primario"])
     s = ttk.Style(root)
     s.theme_use("clam")
     s.configure(".", background=c["fondo1"], foreground=c["tinta"], fieldbackground=c["fondo2"],
                 bordercolor=c["borde"], lightcolor=c["fondo2"], darkcolor=c["fondo2"], font=f["cuerpo"],
-                troughcolor=c["fondo0"], selectbackground=c["azul"], selectforeground="#FFFFFF",
+                troughcolor=c["fondo0"], selectbackground=c["primario"], selectforeground="#FFFFFF",
                 insertcolor=c["tinta"])
     s.configure("TFrame", background=c["fondo1"])
     s.configure("Panel.TFrame", background=c["panel"])
     s.configure("TLabel", background=c["fondo1"], foreground=c["tinta"])
     s.configure("Panel.TLabel", background=c["panel"], foreground=c["tinta"])
     s.configure("PanelSuave.TLabel", background=c["panel"], foreground=c["tinta_suave"], font=f["suave"])
-    s.configure("PanelTitulo.TLabel", background=c["panel"], foreground=c["amarillo"], font=f["seccion"])
+    s.configure("PanelTitulo.TLabel", background=c["panel"], foreground=c["destaque"], font=f["seccion"])
     s.configure("TButton", background=c["fondo2"], foreground=c["tinta"], bordercolor=c["borde"],
                 focuscolor=c["acento"], padding=(10, 4))
-    s.map("TButton", background=[("active", c["borde"]), ("pressed", c["azul"])])
-    s.configure("Primario.TButton", background=c["azul"], foreground="#FFFFFF", bordercolor=c["azul"])
+    s.map("TButton", background=[("active", c["borde"]), ("pressed", c["primario"])])
+    s.configure("Primario.TButton", background=c["primario"], foreground="#FFFFFF", bordercolor=c["primario"])
     s.map("Primario.TButton", background=[("active", c["acento"]), ("pressed", c["acento"])])
-    s.configure("Accion.TButton", background=c["amarillo"], foreground=c["amarillo_ink"],
-                bordercolor=c["amarillo"], font=f["cuerpo_b"])
-    s.map("Accion.TButton", background=[("active", "#FFF066"), ("pressed", "#E6D000")])
+    s.configure("Accion.TButton", background=c["destaque"], foreground=c["destaque_ink"],
+                bordercolor=c["destaque"], font=f["cuerpo_b"])
+    s.map("Accion.TButton", background=[("active", "#FFFFFF"), ("pressed", "#C8CACD")])
     for w in ("TCheckbutton", "TRadiobutton"):
         s.configure(w, background=c["fondo1"], foreground=c["tinta"], indicatorbackground=c["fondo2"],
-                    indicatorforeground=c["amarillo"])
-        s.map(w, background=[("active", c["fondo1"])], indicatorbackground=[("selected", c["azul"])])
+                    indicatorforeground=c["destaque"])
+        s.map(w, background=[("active", c["fondo1"])], indicatorbackground=[("selected", c["primario"])])
     s.configure("Panel.TCheckbutton", background=c["panel"], foreground=c["tinta"])
     s.map("Panel.TCheckbutton", background=[("active", c["panel"])])
     s.configure("TSpinbox", fieldbackground=c["fondo2"], foreground=c["tinta"], background=c["fondo2"],
@@ -167,10 +194,10 @@ def aplicar(root) -> dict:
     s.configure("TSeparator", background=c["borde"])
     s.configure("TNotebook", background=c["fondo1"], bordercolor=c["borde"])
     s.configure("TNotebook.Tab", background=c["fondo2"], foreground=c["tinta_suave"], padding=(12, 4))
-    s.map("TNotebook.Tab", background=[("selected", c["azul"])], foreground=[("selected", "#FFFFFF")])
+    s.map("TNotebook.Tab", background=[("selected", c["primario"])], foreground=[("selected", "#FFFFFF")])
     s.configure("Treeview", background=c["panel"], fieldbackground=c["panel"], foreground=c["tinta"],
                 bordercolor=c["borde"], rowheight=20)
-    s.map("Treeview", background=[("selected", c["azul"])])
+    s.map("Treeview", background=[("selected", c["primario"])])
     s.configure("Treeview.Heading", background=c["fondo2"], foreground=c["tinta"], font=f["cuerpo_b"])
     s.configure("Vertical.TScrollbar", background=c["fondo2"], arrowcolor=c["tinta"])
     s.configure("Horizontal.TPanedwindow", background=c["fondo1"])

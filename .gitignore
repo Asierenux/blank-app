@@ -169,3 +169,5 @@ Bib_ttf/
 *.ai
 *.potx
 *.pptx
+logo*.png
+/fuentes/

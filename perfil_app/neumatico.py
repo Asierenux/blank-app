@@ -435,13 +435,13 @@ def dibujar(fig, cons: ConsignaNeumatico, seccion: str = CARCASA, vista: str = "
     try:
         from . import tema
         fam_titulo = tema.familias_matplotlib()[0]
-        azul = tema.COLORES["azul"]
+        col_marco = tema.COLORES["texto_plano"]
     except Exception:  # noqa: BLE001
-        fam_titulo, azul = None, "black"
-    ax.set_title(titulo, fontsize=10.5, color="#b00000" if desp else azul, fontweight="bold",
+        fam_titulo, col_marco = None, "black"
+    ax.set_title(titulo, fontsize=10.5, color="#b00000" if desp else col_marco, fontweight="bold",
                  fontfamily=fam_titulo, loc="left")
     for lado in ax.spines.values():
-        lado.set_edgecolor(azul)
+        lado.set_edgecolor(col_marco)
     fig.tight_layout()
     return ax
 
