@@ -1003,6 +1003,8 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
         for x0r, x1r in rangos_rfid:
             bolsas[:] = [bo for bo in bolsas if bo.x1 < x0r - 3 or bo.x0 > x1r + 3]
         info["rfid"] = _colocar_rfid(x, capas, h)
+    if aro_ext is not None:
+        colas, bandas = _sobre_la_gi(x, capas, aro_ext, colas, bandas, info, y0)
     info["bolsas"] = bolsas
     info["aire"] = aire
     info["colas"] = colas
@@ -1021,6 +1023,47 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
             else:
                 v["solape_gi"] = -(v["falta_media"] + max(0.0, xb - fin_gi))
     return x, capas, cuñas, aros, info, colores, h
+
+
+def _sobre_la_gi(x, capas, aro_ext, colas, bandas, info, y0):
+    """Lo que da la vuelta por debajo del aro (bandas y colas) no puede quedar por debajo de la GI:
+    se apoya sobre ella. Si no cabe entre la GI y el aro, se aplasta en ese hueco conservando el
+    orden de los productos (la GI siempre queda debajo de todo)."""
+    import numpy as np
+
+    xb, yc, r = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
+    piso = y0
+    for c in capas:
+        if c["prod"].codigo.upper() == "GI":
+            m = (c["t"] > 0) & (x <= xb + r)
+            if m.any():
+                piso = float(np.max((c["abajo"] + c["t"])[m]))
+    y_aro = yc - r                       # cara inferior del aro
+    cerca = xb - 80                      # solo la zona del aro
+    ys = [poli[:, 1][(poli[:, 0] > cerca) & (poli[:, 1] < y_aro)] for _c, _k, poli in bandas]
+    ys += [np.array([ylo]) for _c, x0c, _x1, ylo, _yhi, _k in colas]
+    ys += [np.asarray(poli)[:, 1][np.asarray(poli)[:, 1] < y_aro] for poli in info.get("cavidades", [])]
+    ys = np.concatenate([v for v in ys if len(v)]) if any(len(v) for v in ys) else np.array([])
+    if not len(ys) or float(ys.min()) >= piso - 1e-6:
+        return colas, bandas
+    y_min = float(ys.min())
+    techo = max(y_aro, piso + 0.3)       # hueco disponible: de la GI al aro
+    f = (techo - piso) / max(y_aro - y_min, 1e-6)
+
+    def mapa(y, xs=None):
+        y = np.asarray(y, dtype=float)
+        m = y < y_aro
+        if xs is not None:
+            m &= np.asarray(xs) > cerca
+        return np.where(m, piso + (y - y_min) * f, y)
+
+    bandas = [(c, k, np.column_stack([poli[:, 0], mapa(poli[:, 1], poli[:, 0])])) for c, k, poli in bandas]
+    colas = [(c, x0c, x1c, float(mapa(ylo)), float(mapa(yhi)), k) for c, x0c, x1c, ylo, yhi, k in colas]
+    if info.get("cavidades"):
+        info["cavidades"] = [np.column_stack([np.asarray(p)[:, 0], mapa(np.asarray(p)[:, 1])])
+                             for p in info["cavidades"]]
+    info["sobre_gi"] = {"piso": piso, "aplastado": round(1 - f, 3)}
+    return colas, bandas
 
 
 def _colocar_rfid(x, capas, h_final):
