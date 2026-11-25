@@ -1025,43 +1025,69 @@ def _calcular_plano(cons: ConsignaNeumatico, prods: list[Producto], aj: Ajustes 
     return x, capas, cuñas, aros, info, colores, h
 
 
+def _techo_cola(xs, x0c, x1c, ylo, yhi):
+    """Cara superior de la cola: apoyada en el tambor, espesor constante y punta achaflanada."""
+    import numpy as np
+
+    rampa = min(max(3 * (yhi - ylo), 1.0), max(x1c - x0c, 1e-6))
+    return ylo + (yhi - ylo) * np.clip((np.asarray(xs, dtype=float) - x0c) / rampa, 0.08, 1)
+
+
+def _poligono_cola(x0c, x1c, ylo, yhi):
+    import numpy as np
+
+    xs = np.linspace(x0c, x1c, 40)
+    techo = _techo_cola(xs, x0c, x1c, ylo, yhi)
+    return [(x1c, ylo), *zip(xs[::-1], techo[::-1]), (x0c, ylo)]
+
+
 def _sobre_la_gi(x, capas, aro_ext, colas, bandas, info, y0):
-    """Lo que da la vuelta por debajo del aro (bandas y colas) no puede quedar por debajo de la GI:
-    se apoya sobre ella. Si no cabe entre la GI y el aro, se aplasta en ese hueco conservando el
-    orden de los productos (la GI siempre queda debajo de todo)."""
+    """Zona bajo el aro. El producto que da la vuelta (PTR) vuelve por debajo del aro y su cola
+    solapa la GI por debajo: de abajo arriba queda PTR → GI → NC → aro.
+
+    * Nada baja del tambor: si las vueltas no caben entre el tambor y el aro se aplastan en ese
+      hueco, conservando el orden.
+    * Donde está la cola, la GI y lo que va encima (NC…) se levantan su espesor: la GI monta
+      sobre la cola del PTR."""
     import numpy as np
 
     xb, yc, r = aro_ext["xb"], aro_ext["yc"], aro_ext["r"]
-    piso = y0
-    for c in capas:
-        if c["prod"].codigo.upper() == "GI":
-            m = (c["t"] > 0) & (x <= xb + r)
-            if m.any():
-                piso = float(np.max((c["abajo"] + c["t"])[m]))
+    piso = y0                            # el tambor
     y_aro = yc - r                       # cara inferior del aro
     cerca = xb - 80                      # solo la zona del aro
     ys = [poli[:, 1][(poli[:, 0] > cerca) & (poli[:, 1] < y_aro)] for _c, _k, poli in bandas]
-    ys += [np.array([ylo]) for _c, x0c, _x1, ylo, _yhi, _k in colas]
+    ys += [np.array([ylo]) for _c, _x0, _x1, ylo, _yhi, _k in colas]
     ys += [np.asarray(poli)[:, 1][np.asarray(poli)[:, 1] < y_aro] for poli in info.get("cavidades", [])]
-    ys = np.concatenate([v for v in ys if len(v)]) if any(len(v) for v in ys) else np.array([])
-    if not len(ys) or float(ys.min()) >= piso - 1e-6:
-        return colas, bandas
-    y_min = float(ys.min())
-    techo = max(y_aro, piso + 0.3)       # hueco disponible: de la GI al aro
-    f = (techo - piso) / max(y_aro - y_min, 1e-6)
+    ys = [v for v in ys if len(v)]
+    y_min = float(np.concatenate(ys).min()) if ys else piso
+    f = 1.0
+    if y_min < piso - 1e-6:
+        techo = max(y_aro, piso + 0.3)   # hueco disponible: del tambor al aro
+        f = (techo - piso) / max(y_aro - y_min, 1e-6)
 
-    def mapa(y, xs=None):
-        y = np.asarray(y, dtype=float)
-        m = y < y_aro
-        if xs is not None:
-            m &= np.asarray(xs) > cerca
-        return np.where(m, piso + (y - y_min) * f, y)
+        def mapa(y, xs=None):
+            y = np.asarray(y, dtype=float)
+            m = y < y_aro
+            if xs is not None:
+                m &= np.asarray(xs) > cerca
+            return np.where(m, piso + (y - y_min) * f, y)
 
-    bandas = [(c, k, np.column_stack([poli[:, 0], mapa(poli[:, 1], poli[:, 0])])) for c, k, poli in bandas]
-    colas = [(c, x0c, x1c, float(mapa(ylo)), float(mapa(yhi)), k) for c, x0c, x1c, ylo, yhi, k in colas]
-    if info.get("cavidades"):
-        info["cavidades"] = [np.column_stack([np.asarray(p)[:, 0], mapa(np.asarray(p)[:, 1])])
-                             for p in info["cavidades"]]
+        bandas = [(c, k, np.column_stack([poli[:, 0], mapa(poli[:, 1], poli[:, 0])])) for c, k, poli in bandas]
+        colas = [(c, x0c, x1c, float(mapa(ylo)), float(mapa(yhi)), k) for c, x0c, x1c, ylo, yhi, k in colas]
+        if info.get("cavidades"):
+            info["cavidades"] = [np.column_stack([np.asarray(p)[:, 0], mapa(np.asarray(p)[:, 1])])
+                                 for p in info["cavidades"]]
+    # la GI (y lo que tiene encima) monta sobre la cola: se levanta lo que mide la cola en cada x
+    for _c, x0c, x1c, ylo, yhi, cod in colas:
+        if yhi - ylo <= 0:
+            continue
+        sube = (_techo_cola(x, x0c, x1c, ylo, yhi) - ylo) * ((x >= x0c) & (x <= x1c))
+        for c in capas:
+            if c["prod"].codigo == cod:
+                continue
+            m = (c["t"] > 0) & (sube > 0) & (c["abajo"] < y_aro)
+            if m.any():
+                c["abajo"] = np.where(m, c["abajo"] + sube, c["abajo"])
     info["sobre_gi"] = {"piso": piso, "aplastado": round(1 - f, 3)}
     return colas, bandas
 
@@ -1228,7 +1254,7 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
                            linewidth=0.5, zorder=3))
     from matplotlib.patches import Rectangle
     for col, x0c, x1c, ylo, yhi, cod in info.get("colas", []):
-        ax.add_patch(Polygon([(x1c, ylo), (x1c, yhi), (x0c, yhi), (x0c, yhi - 0.15)], closed=True,
+        ax.add_patch(Polygon(_poligono_cola(x0c, x1c, ylo, yhi), closed=True,
                              facecolor=col, edgecolor="#1b1b1b", linewidth=0.5, zorder=3))
     for xc, yc, r in aros:
         ax.add_patch(Circle((xc, yc), r, facecolor="#f2d600", edgecolor="#1b1b1b", linewidth=0.8, zorder=4))
@@ -1458,7 +1484,7 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
             ax.plot(medio[:, 0], medio[:, 1], color="#d42a2a", lw=0.8, zorder=3.5)
     for color, x0c, x1c, ylo, yhi, cod in info.get("colas", []):
         # la punta del producto que vuelve bajo el aro se afina hasta su borde
-        ax.add_patch(Polygon([(x1c, ylo), (x1c, yhi), (x0c, yhi), (x0c, yhi - 0.15)], closed=True,
+        ax.add_patch(Polygon(_poligono_cola(x0c, x1c, ylo, yhi), closed=True,
                              facecolor=col(cod, color), edgecolor="#111111", linewidth=0.6, zorder=3))
     for xc, yc, r in aros:
         ax.add_patch(Circle((xc, yc), r, facecolor=COLORES_PLANO["TT"], edgecolor="#111111", linewidth=0.9, zorder=5))

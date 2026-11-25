@@ -149,13 +149,21 @@ def test_aro_exacto_y_vuelta_hasta_la_gi(consigna, tmp_path):
     assert v["ang"] == pytest.approx(180, abs=0.5) and v["resto"] == pytest.approx(resto, abs=0.05)
     assert v["solape_gi"] == pytest.approx(150 - (160.25 - resto), abs=0.05)  # la GI acaba en 150
     assert v["solape_gi"] > 0
-    # la GI queda por debajo de todo: ni la cola ni las vueltas bajan de la cara superior de la GI
+    # bajo el aro, de abajo arriba: cola del PTR → GI → NC (la GI monta sobre la cola del PTR)
+    import numpy as np
+
+    y0 = info["y0"]
+    cola = next(cl for cl in info["colas"] if cl[5] == "PTR")
+    _col, x0c, x1c, ylo, yhi, _cod = cola
+    assert ylo >= y0 - 1e-6 and yhi <= yc - r + 1e-6
     gi = next(c_ for c_ in capas if c_["prod"].codigo == "GI")
-    techo_gi = float((gi["abajo"] + gi["t"])[gi["t"] > 0].max())
-    for _col, x0c, x1c, ylo, yhi, cod in info["colas"]:
-        assert ylo >= techo_gi - 1e-6 and yhi <= yc - r + 1e-6
-    for _col, cod, poli in info["bandas"]:
-        assert poli[:, 1].min() >= techo_gi - 1e-6
+    nc = next(c_ for c_ in capas if c_["prod"].codigo == "NC" and not c_.get("vuelta"))
+    xm = (max(x0c, 140) + min(x1c, 150)) / 2 + 2      # donde se solapan la cola y la GI
+    k = int(np.argmin(abs(x - xm)))
+    assert gi["t"][k] > 0 and gi["abajo"][k] >= yhi - 1e-6
+    assert nc["abajo"][k] >= gi["abajo"][k] + gi["t"][k] - 1e-6
+    for _c2, _k2, poli in info["bandas"]:
+        assert poli[:, 1].min() >= y0 - 1e-6
 
 
 def test_perfil_con_falaise():
