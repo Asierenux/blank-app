@@ -1077,11 +1077,27 @@ def _sobre_la_gi(x, capas, aro_ext, colas, bandas, info, y0):
         if info.get("cavidades"):
             info["cavidades"] = [np.column_stack([np.asarray(p)[:, 0], mapa(np.asarray(p)[:, 1])])
                                  for p in info["cavidades"]]
-    # la GI (y lo que tiene encima) monta sobre la cola: se levanta lo que mide la cola en cada x
+    # la GI (y lo que tiene encima) monta sobre la cola: escalón PTR → GI. La GI no entra en el
+    # rincón de la punta de la cola: lo puentea en línea recta y ahí queda un hueco (aire).
     for _c, x0c, x1c, ylo, yhi, cod in colas:
-        if yhi - ylo <= 0:
+        esp = yhi - ylo
+        if esp <= 0:
             continue
-        sube = (_techo_cola(x, x0c, x1c, ylo, yhi) - ylo) * ((x >= x0c) & (x <= x1c))
+        techo = np.where((x >= x0c) & (x <= x1c), _techo_cola(x, x0c, x1c, ylo, yhi), ylo)
+        rampa = min(max(3 * esp, 1.0), max(x1c - x0c, 1e-6))
+        largo = max(2.5 * esp, 1.5)                 # cuánto antes de la punta empieza a subir la GI
+        xa, xc_ = x0c - largo, x0c + rampa
+        puente = np.where((x >= xa) & (x <= xc_), ylo + esp * (x - xa) / max(xc_ - xa, 1e-6), ylo)
+        apoyo = np.maximum(techo, puente)
+        sube = (apoyo - ylo) * ((x >= xa) & (x <= x1c))
+        hueco = (puente > techo + 1e-4) & (x >= xa) & (x <= xc_)
+        if hueco.any():
+            xs = x[hueco]
+            poli = np.column_stack([np.concatenate([xs, xs[::-1]]),
+                                    np.concatenate([puente[hueco], techo[hueco][::-1]])])
+            area = float(np.trapezoid(puente[hueco] - techo[hueco], xs)) if hasattr(np, "trapezoid") \
+                else float(np.trapz(puente[hueco] - techo[hueco], xs))
+            info["escalon"] = {"cod": cod, "x": float(x0c), "area": area, "alto": esp, "poli": poli}
         for c in capas:
             if c["prod"].codigo == cod:
                 continue
@@ -1249,6 +1265,9 @@ def _dibujar_plano(ax, cons, prods, cotas, aj: Ajustes | None = None):
     for poli in info.get("cavidades", []):
         ax.add_patch(Polygon(poli, closed=True, facecolor="#ffd6d6", edgecolor=COLOR_AIRE, hatch="////",
                              linewidth=0.4, zorder=4))
+    if info.get("escalon"):
+        ax.add_patch(Polygon(info["escalon"]["poli"], closed=True, facecolor="#ffd6d6", edgecolor=COLOR_AIRE,
+                             hatch="////", linewidth=0.4, zorder=4))
     for col, xc, yc, rin, ro, a0, a1 in cuñas:
         ax.add_patch(Wedge((xc, yc), ro, a0, a1, width=ro - rin, facecolor=col, edgecolor="#1b1b1b",
                            linewidth=0.5, zorder=3))
@@ -1495,6 +1514,10 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
         for poli in info.get("cavidades", []):
             ax.add_patch(Polygon(poli, closed=True, facecolor="none", edgecolor="#ff3b3b", hatch="////",
                                  linewidth=0.0, zorder=4))
+    if info.get("escalon"):
+        # escalón PTR → GI bajo el aro: siempre visible (aunque el aire del aro no se cuente)
+        ax.add_patch(Polygon(info["escalon"]["poli"], closed=True, facecolor="#ffe3e3", edgecolor="#ff3b3b",
+                             hatch="////", linewidth=0.6, zorder=4))
 
     # marco, escalas y líneas de referencia como en el plano
     xmax = float(x[-1])
@@ -1607,6 +1630,9 @@ def _dibujar_plano_maquina(ax, cons, prods, aj: Ajustes | None = None, mostrar_a
                            else f"{v['cod']}: le faltan {_f(round(-sol, 1))} mm para la GI")
     if info.get("retournement") and cr:
         resumen.append(f"vuelta NC ≈ {_f(round(float(info['retournement'][1]), 1))} (consigna {_f(cr)})")
+    if info.get("escalon"):
+        e = info["escalon"]
+        resumen.append(f"escalón {e['cod']}→GI {_f(round(e['alto'], 1))} mm (hueco ≈ {_f(round(e['area'], 2))} mm²)")
     if resumen:
         ax.text(0.995, 0.03, "   ·   ".join(resumen), transform=ax.transAxes, ha="right", va="bottom",
                 fontsize=7.5, color="#333333")
