@@ -135,13 +135,12 @@ Select(btnCargar)   // carga del periodo visible (ver abajo)
 
 // App.Formulas (named formulas)
 ColorTaller(t: Text): Color = Coalesce(LookUp(colTalleres, StartsWith(t, T)).C, ColorValue("#7B8798"));
-// Sin sábados ni domingos: lo previsto en fin de semana se muestra el lunes siguiente
-FechaLab(f: Date): Date = Switch(Weekday(f, StartOfWeek.Monday), 6, DateAdd(f, 2, TimeUnit.Days),
-                                 7, DateAdd(f, 1, TimeUnit.Days), f);
+
 ```
 (Si vuestra versión no admite funciones con nombre, poner la expresión directamente en cada sitio.)
-Día de inicio: si hoy es sábado o domingo, `varDia` y `varLunes` deben apuntar al lunes siguiente.
-Flechas de la vista Día: saltar sábado y domingo (`If(Weekday(d, StartOfWeek.Monday) > 5, …)`).
+Fines de semana: solo se muestran si hay OQ ese día, en ámbar y con el aviso «⚠ Sábado/Domingo · ¿se puede hacer?»
+en la tarjeta (`Visible = Weekday(ThisItem.FECHA_PREVISTA, StartOfWeek.Monday) > 5`), para decidir si se reprograma
+(cambiando la fecha en el panel de seguimiento). Flechas de la vista Día: saltar sábados/domingos sin OQ.
 
 ### Carga del periodo (delegable)
 Botón oculto `btnCargar.OnSelect` — se llama al cambiar de mes/semana/día:
@@ -157,27 +156,33 @@ With({ini: DateAdd(varIniMes, -7, TimeUnit.Days), fin: DateAdd(varIniMes, 42, Ti
 Day(Today())            Upper(Text(Today(), "mmm", "es-ES"))
 // Contadores
 CountRows(Filter(colPeriodo, FECHA_PREVISTA = Today()))                                   // Hoy
-CountRows(Filter(colPeriodo, FECHA_PREVISTA >= varLunes, FECHA_PREVISTA <= DateAdd(varLunes, 6, TimeUnit.Days)))  // Semana (L–V + lo de fin de semana)
+CountRows(Filter(colPeriodo, FECHA_PREVISTA >= varLunes, FECHA_PREVISTA <= DateAdd(varLunes, 6, TimeUnit.Days)))  // Semana
 CountRows(Filter(OQ_Agenda, ES_ULTIMA_VERSION = true, SEGUIDO = false, FECHA_PREVISTA < Today()))  // Vencidas (rojo si > 0)
 ```
 
-### Vista Mes (calendario de lunes a viernes, 5 × 6)
-- `galMes`: galería vertical, **WrapCount = 5**, plantilla ~ 130 px alto. Cabecera: Lunes … Viernes.
+### Vista Mes (L–V; sábado y domingo solo si ese mes hay OQ en fin de semana)
 ```powerfx
-// galMes.Items  (empieza en el lunes de la semana del día 1; sin sábados ni domingos)
+// varHayFinde (al final de btnCargar.OnSelect)
+Set(varHayFinde, CountRows(Filter(colPeriodo, Weekday(FECHA_PREVISTA, StartOfWeek.Monday) > 5)) > 0)
+```
+- `galMes`: galería vertical, **WrapCount = `If(varHayFinde, 7, 5)`**, plantilla ~ 130 px alto.
+  Cabecera: Lunes … Viernes (+ Sábado y Domingo en ámbar si `varHayFinde`).
+```powerfx
+// galMes.Items  (empieza en el lunes de la semana del día 1)
 With({l: DateAdd(varIniMes, -(Weekday(varIniMes, StartOfWeek.Monday) - 1), TimeUnit.Days)},
   Filter(ForAll(Sequence(42, 0), {Dia: DateAdd(l, Value, TimeUnit.Days)}),
-         Weekday(Dia, StartOfWeek.Monday) <= 5))
-// Fondo de la celda (días de otro mes en gris)
-If(Month(ThisItem.Dia) <> Month(varIniMes), ColorValue("#F6F8FB"), White)
+         varHayFinde || Weekday(Dia, StartOfWeek.Monday) <= 5))
+// Fondo de la celda: ámbar si es fin de semana con OQ (¿se puede hacer?), gris si es de otro mes
+If(Weekday(ThisItem.Dia, StartOfWeek.Monday) > 5 && lblCnt.Text <> "", ColorValue("#FBEFD5"),
+   Month(ThisItem.Dia) <> Month(varIniMes), ColorValue("#F6F8FB"), White)
 // Número del día: círculo azul si es hoy
 lblNum.Text = Day(ThisItem.Dia);  circHoy.Visible = ThisItem.Dia = Today()
 // Contador
-lblCnt.Text = With({n: CountRows(Filter(colPeriodo, FechaLab(FECHA_PREVISTA) = ThisItem.Dia))}, If(n > 0, n & " OQ", ""))
+lblCnt.Text = With({n: CountRows(Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia))}, If(n > 0, n & " OQ", ""))
 ```
 - Dentro de la celda, `galChips` (galería anidada, alto ~ 4 filas de 22 px):
 ```powerfx
-galChips.Items = FirstN(SortByColumns(Filter(colPeriodo, FechaLab(FECHA_PREVISTA) = ThisItem.Dia,
+galChips.Items = FirstN(SortByColumns(Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia,
                    varFiltroTaller = "Todos" || StartsWith(DONDE, varFiltroTaller)), "DONDE"), 4)
 // rectángulo del chip
 Fill = ColorTaller(ThisItem.DONDE)
@@ -190,12 +195,15 @@ OnSelect = Set(varSel, ThisItem)
 - Flechas ◀ ▶: `Set(varIniMes, Date(Year(varIniMes), Month(varIniMes) ± 1, 1)); Select(btnCargar)`.
 - Título: `Proper(Text(varIniMes, "mmmm yyyy", "es-ES"))`.
 
-### Vista Semana (tablero lunes–viernes)
-`galSemana` horizontal con 5 columnas:
+### Vista Semana (tablero L–V; sábado/domingo solo si tienen OQ)
+`galSemana` horizontal:
 ```powerfx
-galSemana.Items = ForAll(Sequence(5, 0), {Dia: DateAdd(varLunes, Value, TimeUnit.Days)})
+galSemana.Items = Filter(ForAll(Sequence(7, 0), {Dia: DateAdd(varLunes, Value, TimeUnit.Days)}),
+                         Value < 5 || !IsEmpty(Filter(colPeriodo, FECHA_PREVISTA = DateAdd(varLunes, Value, TimeUnit.Days))))
+// Columna de fin de semana en ámbar
+Fill = If(Weekday(ThisItem.Dia, StartOfWeek.Monday) > 5, ColorValue("#FBEFD5"), White)
 // galTarjetas anidada
-Filter(colPeriodo, FechaLab(FECHA_PREVISTA) = ThisItem.Dia,
+Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia,
        varFiltroTaller = "Todos" || StartsWith(DONDE, varFiltroTaller))
 ```
 Tarjeta: barra lateral `ColorTaller(ThisItem.DONDE)`, `OQ_ID`, `MOTIVO`, etiqueta del taller, códigos, y una
