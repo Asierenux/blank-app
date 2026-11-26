@@ -1,22 +1,25 @@
 # Seguimiento de Órdenes de Calidad (OQ) — Power Apps + SharePoint (sin Dataverse, sin Power BI Pro)
 
 Objetivo: una **agenda muy visual** (mes / semana / día) de las OQ por taller, donde cualquier persona del
-entorno de fábrica pueda marcar **seguida**, **resultado** y **comentarios**. El Excel de OQ es **solo lectura**.
+entorno de fábrica pueda marcar **seguida**, **resultado** y **comentarios**.
+
+**El Excel original `OQ_BBDD.xlsm` no se toca en absoluto**: ni macros, ni copias, ni columnas nuevas.
+Solo hace falta **permiso de lectura** sobre él para la cuenta que crea el flujo.
 
 ## Arquitectura
 
 ```
-OQ_BBDD.xlsm (SharePoint)                         ← se rellena igual que hoy, no se modifica
-   │  al guardar: la macro deja una copia OQ_Export.xlsx (solo valores) en la misma carpeta
+OQ_BBDD.xlsm (SharePoint)                ← se rellena igual que hoy; NO se modifica
+   │  Power Automate solo LEE el archivo (como quien lo descarga), cada hora
    ▼
-Power Automate (cada hora)
-   │  Excel Online → "Ejecutar script" ExtraerAgendaOQ  (lee, interpreta fechas, 1 fila por ejecución)
-   │  SharePoint  → crea / actualiza elementos en la lista OQ_Agenda (sin tocar el seguimiento)
+Power Automate «Sincronizar agenda OQ»
+   │  1. SharePoint → Obtener contenido de archivo (OQ_BBDD.xlsm)
+   │  2. Excel Online → Ejecutar script «LeerOQ_xlsm» (en un libro auxiliar vacío, Puente_OQ.xlsx):
+   │     descomprime el .xlsm en memoria, lee la hoja OQ, interpreta fechas → 1 fila por ejecución
+   │  3. SharePoint → crea / actualiza elementos en la lista OQ_Agenda (sin tocar el seguimiento)
    ▼
 Lista SharePoint "OQ_Agenda"  ◄────────►  App de lienzo Power Apps "Agenda OQ" (entorno de fábrica)
  (datos OQ + seguimiento)                     calendario mes/semana/día · seguido · resultado · comentarios
-   │
-   └──► (opcional) Power BI para quien tenga Pro: indicadores
 ```
 
 Todo con conectores **estándar** (SharePoint, Excel Online Business): vale la licencia normal de M365.
@@ -26,39 +29,19 @@ La lista es **independiente** del Excel: aunque el Excel cambie o se archive, la
 
 | Fichero | Para qué |
 |---|---|
-| `agenda_visual_OQ.html` | **Diseño de referencia** de la app con vuestros datos 2026: calendario mensual por colores de taller, semana tipo tablero, día, pendientes, panel de seguimiento. Abrir en el navegador. (No se sube a git: datos internos.) |
-| `officescript/ExtraerAgendaOQ.ts` | Office Script que ejecuta el flujo. Probado con vuestro Excel: 1.444 ejecuciones, 1.212 fechas exactas, 189 aproximadas; la OQ26270‑1 sale con 11/12 OCT1 y 14/12 OCT2. |
+| `agenda_visual_OQ.html` | **Diseño de referencia** de la app con vuestros datos 2026. Abrir en el navegador. (No se sube a git: datos internos.) |
+| `officescript/LeerOQ_xlsm.ts` | Office Script que usa el flujo. Probado con vuestro `OQ_BBDD.xlsm` real: lee las 4.312 filas en ~0,2 s y da las mismas 1.444 ejecuciones que la lectura con Python (0 diferencias). |
 | `powerquery/*.pq` | Solo si algún día se usa Power BI (lee el `.xlsm` directamente). |
-| `preparar_datos.py` | La misma limpieza en Python (análisis puntual / carga inicial alternativa). |
+| `preparar_datos.py` | La misma limpieza en Python (análisis puntual). |
 
 ---
 
-## Paso 1 — Macro: copia `.xlsx` al guardar (el `.xlsm` no cambia)
+## Paso 1 — Permisos (nada que hacer en el Excel)
 
-Power Automate no puede leer `.xlsm`. En el editor VBA del `OQ_BBDD.xlsm`, en **ThisWorkbook**, pegar:
-
-```vba
-Private Sub Workbook_AfterSave(ByVal Success As Boolean)
-    If Success Then ExportarOQ
-End Sub
-
-Private Sub ExportarOQ()
-    Dim wb As Workbook, sep As String
-    On Error GoTo fin
-    Application.ScreenUpdating = False: Application.DisplayAlerts = False: Application.EnableEvents = False
-    ThisWorkbook.Sheets("OQ").Copy                       ' libro nuevo con la hoja OQ
-    Set wb = ActiveWorkbook
-    wb.Sheets(1).UsedRange.Value = wb.Sheets(1).UsedRange.Value   ' solo valores
-    sep = IIf(Left(ThisWorkbook.Path, 4) = "http", "/", Application.PathSeparator)
-    wb.SaveAs ThisWorkbook.Path & sep & "OQ_Export.xlsx", xlOpenXMLWorkbook
-fin:
-    If Not wb Is Nothing Then wb.Close False
-    Application.EnableEvents = True: Application.DisplayAlerts = True: Application.ScreenUpdating = True
-End Sub
-```
-
-Cada vez que alguien guarda el Excel se actualiza `OQ_Export.xlsx` en la misma carpeta de SharePoint.
-Nadie debe editar `OQ_Export.xlsx` (se puede dejar con permisos de solo lectura para todos salvo quien guarda).
+- La cuenta que crea el flujo (mejor una cuenta de equipo/servicio) necesita **leer** `OQ_BBDD.xlsm`.
+  Si ya podéis abrirlo, ya está.
+- Crear un libro vacío **`Puente_OQ.xlsx`** en vuestro SharePoint/OneDrive: solo sirve para "alojar"
+  el script; tampoco se modifica.
 
 ## Paso 2 — Lista SharePoint `OQ_Agenda`
 
@@ -88,17 +71,19 @@ Activar **historial de versiones** (auditoría de quién cambió qué). Permisos
 
 ## Paso 3 — Office Script
 
-1. Abrir `OQ_Export.xlsx` en Excel para la web → **Automatizar → Nuevo script**.
-2. Borrar el contenido, pegar `officescript/ExtraerAgendaOQ.ts`, nombrarlo **ExtraerAgendaOQ** y guardar.
-   (Se guarda en el OneDrive de quien lo crea, que debe ser el mismo propietario del flujo.)
-3. *Ejecutar* una vez para comprobar que no da error (no modifica el libro; devuelve las filas al flujo).
+1. Abrir `Puente_OQ.xlsx` en Excel para la web → **Automatizar → Nuevo script**.
+2. Borrar el contenido, pegar `officescript/LeerOQ_xlsm.ts`, nombrarlo **LeerOQ_xlsm** y guardar
+   (se guarda en el OneDrive de quien lo crea: debe ser el mismo propietario del flujo).
 
 ## Paso 4 — Flujo de Power Automate «Sincronizar agenda OQ»
 
-1. **Desencadenador**: *Periodicidad* cada 1 hora (o «Cuando se modifica un archivo (solo propiedades)» sobre `OQ_Export.xlsx`).
-2. **Excel Online (Business) → Ejecutar script**: Ubicación = sitio SharePoint, Biblioteca, Archivo = `OQ_Export.xlsx`,
-   Script = `ExtraerAgendaOQ`, `diasAtras` = `60`.
-3. **Aplicar a cada** → `@{outputs('Ejecutar_script')?['body/result']}` (Configuración → simultaneidad 5):
+1. **Desencadenador**: *Periodicidad* cada 1 hora (p. ej. L‑V de 6:00 a 20:00).
+2. **SharePoint → Obtener contenido de archivo**: sitio y ruta de `OQ_BBDD.xlsm` (solo lectura).
+3. **Excel Online (Business) → Ejecutar script**: Ubicación/Biblioteca/Archivo = `Puente_OQ.xlsx`,
+   Script = `LeerOQ_xlsm`,
+   - `contenidoBase64` = `body('Obtener_contenido_de_archivo')?['$content']`
+   - `diasAtras` = `60`
+4. **Aplicar a cada** → `@{outputs('Ejecutar_script')?['body/result']}` (Configuración → simultaneidad 5):
    1. **SharePoint → Obtener elementos** (`OQ_Agenda`), Consulta de filtro:
       `Title eq '@{items('Aplicar_a_cada')?['AGENDA_ID']}'`, Recuento superior `1`.
    2. **Condición**: `length(body('Obtener_elementos')?['value'])` es igual a `0`
@@ -109,7 +94,11 @@ Activar **historial de versiones** (auditoría de quién cambió qué). Permisos
         solo columnas de la OQ (motivo, tareas, donde, versión, `ES_ULTIMA_VERSION`…). **No** rellenar
         SEGUIDO / RESULTADO / COMENTARIOS. Para la fecha:
         `if(first(body('Obtener_elementos')?['value'])?['FECHA_MANUAL'], first(body('Obtener_elementos')?['value'])?['FECHA_PREVISTA'], if(empty(items('Aplicar_a_cada')?['FECHA_PREVISTA']), null, items('Aplicar_a_cada')?['FECHA_PREVISTA']))`
-4. **Carga inicial**: ejecutar el flujo una vez a mano con `diasAtras` = `330` (todo 2026) y volver a dejar `60`.
+5. **Carga inicial**: ejecutar el flujo una vez con `diasAtras` = `330` (todo 2026) y volver a dejar `60`.
+
+Qué lee: la última versión **guardada** del Excel (con autoguardado de SharePoint, prácticamente al momento).
+Tamaños: el archivo actual (≈0,9 MB) va de sobra dentro de los límites de «Ejecutar script»; la respuesta
+con 60 días ocupa ≈100 KB.
 
 Versiones: cuando sale la OQ‑2, el script devuelve también la OQ‑1 con `ES_ULTIMA_VERSION = false`
 y la app deja de mostrarla.
@@ -252,7 +241,7 @@ Para quien tenga Pro: conectar a la lista `OQ_Agenda` (Lista de SharePoint Onlin
 
 - **Fechas a mano**: el script entiende "inmediata", "s.24", "a partir del 22-09-26", "18-19-20/05/26", "11 noviembre"…
   Lo que no entiende queda en «Sin fecha» con el texto original, para asignarla en la app (queda `FECHA_MANUAL`).
-  Recomendación: que la celda *Fecha prevista ejecución* del formulario sea de tipo fecha.
+  Si algún día se puede proponer una mejora al Excel: que la celda *Fecha prevista ejecución* sea de tipo fecha.
 - **Clave**: si en el Excel se reordenan las ejecuciones de una OQ (la 2ª pasa a 1ª), cambia su `AGENDA_ID`.
-- La macro necesita guardar en la misma carpeta; si el Excel se abre desde una copia local sincronizada (OneDrive),
-  también funciona.
+- Si algún día cambian los nombres de las columnas de la hoja OQ, hay que ajustar el script (busca las columnas por nombre).
+- El script solo lee: no puede modificar ni el `.xlsm` ni `Puente_OQ.xlsx`.
