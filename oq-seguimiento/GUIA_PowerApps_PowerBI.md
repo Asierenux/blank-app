@@ -1,199 +1,245 @@
-# Seguimiento de Órdenes de Calidad (OQ) — Power BI + Power Apps
+# Seguimiento de Órdenes de Calidad (OQ) — Power Apps + SharePoint (sin Dataverse, sin Power BI Pro)
 
-Objetivo: ver de un vistazo **qué OQ hay cada día y en qué taller**, y marcar por cada ejecución
-**si se ha seguido**, **el resultado** y **comentarios**, sin tocar nunca el Excel de las OQ.
+Objetivo: una **agenda muy visual** (mes / semana / día) de las OQ por taller, donde cualquier persona del
+entorno de fábrica pueda marcar **seguida**, **resultado** y **comentarios**. El Excel de OQ es **solo lectura**.
 
 ## Arquitectura
 
 ```
- OQ_BBDD.xlsm (SharePoint)            Lista SharePoint "OQ_Seguimiento"
- SOLO LECTURA — se rellena como hoy   independiente — lo único que se escribe
-            │                                   ▲             │
-            │ Power Query (lee)                 │ Patch       │ Power Query (lee)
-            ▼                                   │             ▼
-   ┌──────────────────────── Informe Power BI ───────────────────────────┐
-   │  Agenda (día / semana / pendientes)   +   objeto visual Power Apps   │
-   │  KPIs, % seguimiento, % éxito…            (marcar seguido/resultado) │
-   └──────────────────────────────────────────────────────────────────────┘
+OQ_BBDD.xlsm (SharePoint)                         ← se rellena igual que hoy, no se modifica
+   │  al guardar: la macro deja una copia OQ_Export.xlsx (solo valores) en la misma carpeta
+   ▼
+Power Automate (cada hora)
+   │  Excel Online → "Ejecutar script" ExtraerAgendaOQ  (lee, interpreta fechas, 1 fila por ejecución)
+   │  SharePoint  → crea / actualiza elementos en la lista OQ_Agenda (sin tocar el seguimiento)
+   ▼
+Lista SharePoint "OQ_Agenda"  ◄────────►  App de lienzo Power Apps "Agenda OQ" (entorno de fábrica)
+ (datos OQ + seguimiento)                     calendario mes/semana/día · seguido · resultado · comentarios
+   │
+   └──► (opcional) Power BI para quien tenga Pro: indicadores
 ```
 
-- **El Excel no se modifica nunca.** Power BI solo lo lee; las OQ nuevas aparecen en cada actualización.
-- **El seguimiento es independiente**: vive en su propia lista. Cada registro guarda, además del
-  resultado, una *copia* de los datos clave de la OQ (OQ, fecha, taller, motivo). Si mañana la fila
-  del Excel cambia, se mueve o el Excel se archiva, el seguimiento sigue completo.
-- **Unidad de seguimiento = una ejecución** (OQ + fecha + taller), con clave `AGENDA_ID`:
-  la OQ26270‑1 genera `OQ26270-1#1` (11/12/2026 · OCT1) y `OQ26270-1#2` (14/12/2026 · OCT2).
-- Sin Power Automate, sin macros nuevas, licencias M365 estándar (Power BI Pro para publicar/compartir).
+Todo con conectores **estándar** (SharePoint, Excel Online Business): vale la licencia normal de M365.
+La lista es **independiente** del Excel: aunque el Excel cambie o se archive, la agenda y el seguimiento siguen.
 
 ## Ficheros
 
 | Fichero | Para qué |
 |---|---|
-| `powerquery/fnFecha.pq` | Función que interpreta las fechas escritas a mano ("inmediata", "s.24", "a partir del 22-09-26", "18-19-20/05/26", "11 noviembre"…). Probada contra las 1.426 fechas reales del Excel: 1.212 exactas, 189 aproximadas, 25 sin fecha interpretable. |
-| `powerquery/OQ_Agenda.pq` | Lee el `.xlsm` desde SharePoint y genera una fila por ejecución, cruzada con el seguimiento. |
-| `powerquery/OQ_Seguimiento.pq` | Lee la lista de seguimiento. |
-| `prototipo_agenda_OQ.html` | Maqueta navegable del aspecto/funcionamiento buscado (no se sube a git: lleva datos reales). |
-| `preparar_datos.py` | Versión Python de la misma limpieza (opcional: análisis o carga puntual). |
+| `agenda_visual_OQ.html` | **Diseño de referencia** de la app con vuestros datos 2026: calendario mensual por colores de taller, semana tipo tablero, día, pendientes, panel de seguimiento. Abrir en el navegador. (No se sube a git: datos internos.) |
+| `officescript/ExtraerAgendaOQ.ts` | Office Script que ejecuta el flujo. Probado con vuestro Excel: 1.444 ejecuciones, 1.212 fechas exactas, 189 aproximadas; la OQ26270‑1 sale con 11/12 OCT1 y 14/12 OCT2. |
+| `powerquery/*.pq` | Solo si algún día se usa Power BI (lee el `.xlsm` directamente). |
+| `preparar_datos.py` | La misma limpieza en Python (análisis puntual / carga inicial alternativa). |
 
 ---
 
-## Paso 1 — Lista SharePoint `OQ_Seguimiento`
+## Paso 1 — Macro: copia `.xlsx` al guardar (el `.xlsm` no cambia)
 
-Sitio de SharePoint del equipo → **Nuevo → Lista → Lista en blanco** → `OQ_Seguimiento`:
+Power Automate no puede leer `.xlsm`. En el editor VBA del `OQ_BBDD.xlsm`, en **ThisWorkbook**, pegar:
+
+```vba
+Private Sub Workbook_AfterSave(ByVal Success As Boolean)
+    If Success Then ExportarOQ
+End Sub
+
+Private Sub ExportarOQ()
+    Dim wb As Workbook, sep As String
+    On Error GoTo fin
+    Application.ScreenUpdating = False: Application.DisplayAlerts = False: Application.EnableEvents = False
+    ThisWorkbook.Sheets("OQ").Copy                       ' libro nuevo con la hoja OQ
+    Set wb = ActiveWorkbook
+    wb.Sheets(1).UsedRange.Value = wb.Sheets(1).UsedRange.Value   ' solo valores
+    sep = IIf(Left(ThisWorkbook.Path, 4) = "http", "/", Application.PathSeparator)
+    wb.SaveAs ThisWorkbook.Path & sep & "OQ_Export.xlsx", xlOpenXMLWorkbook
+fin:
+    If Not wb Is Nothing Then wb.Close False
+    Application.EnableEvents = True: Application.DisplayAlerts = True: Application.ScreenUpdating = True
+End Sub
+```
+
+Cada vez que alguien guarda el Excel se actualiza `OQ_Export.xlsx` en la misma carpeta de SharePoint.
+Nadie debe editar `OQ_Export.xlsx` (se puede dejar con permisos de solo lectura para todos salvo quien guarda).
+
+## Paso 2 — Lista SharePoint `OQ_Agenda`
+
+Nuevo → Lista → Lista en blanco `OQ_Agenda`. Columnas:
 
 | Columna | Tipo | Notas |
 |---|---|---|
-| `Title` (renombrar a «ID ejecución» si se quiere) | Una línea de texto | `AGENDA_ID`, p. ej. `OQ26270-1#2`. **Exigir valores únicos** (esto la indexa). |
-| `SEGUIDO` | Sí/No | Por defecto No. |
-| `RESULTADO` | Elección | Pendiente, Éxito, Parcial, No éxito, Anulada. Por defecto Pendiente. |
-| `COMENTARIOS` | Varias líneas de texto (sin formato) | |
-| `FECHA_SEGUIMIENTO` | Fecha y hora | La rellena la app. |
-| `SEGUIDO_POR` | Una línea de texto | La rellena la app (`User().FullName`). |
-| `OQ_ID` | Una línea de texto | Copia de la OQ → independencia del Excel. |
-| `FECHA_PREVISTA` | Fecha | Copia. |
-| `DONDE` | Una línea de texto | Copia. |
-| `MOTIVO` | Varias líneas de texto | Copia. |
+| `Title` | Texto | = `AGENDA_ID` (`OQ26270-1#2`). **Exigir valores únicos**. |
+| `OQ_ID` | Texto | |
+| `OQ_NUMERO`, `OQ_VERSION`, `N_EJECUCION` | Número | Indexar `OQ_NUMERO`. |
+| `ES_ULTIMA_VERSION` | Sí/No | **Indexar**. |
+| `FECHA_PREVISTA` | Fecha (solo fecha) | **Indexar**. |
+| `TIPO_FECHA` | Texto | EXACTA / APROXIMADA / SIN_FECHA |
+| `FECHA_TEXTO_ORIGINAL` | Texto | Lo escrito a mano en el Excel ("a partir del…"). |
+| `FECHA_MANUAL` | Sí/No | Sí cuando alguien cambia la fecha desde la app (el flujo ya no la pisa). |
+| `DONDE` | Texto | OCT1 / OCT2 / OCT3 / EXT… **Indexar**. |
+| `FECHA_REGISTRO` | Fecha | |
+| `REFERENCIA`, `SOLICITANTE`, `DESTINO`, `DURACION`, `PREPARACION`, `CONFECCION`, `TERMINACION`, `CODIGOS`, `CBLS`, `DIMENSIONES` | Texto | |
+| `MOTIVO`, `TAREAS_TALLER`, `TAREAS_FP_DM` | Varias líneas (texto sin formato) | |
+| **`SEGUIDO`** | Sí/No (def. No) | ← app |
+| **`RESULTADO`** | Elección: Pendiente, Éxito, Parcial, No éxito, Anulada (def. Pendiente) | ← app |
+| **`COMENTARIOS`** | Varias líneas | ← app |
+| **`FECHA_SEGUIMIENTO`** | Fecha y hora | ← app |
+| **`SEGUIDO_POR`** | Texto | ← app |
 
-Configuración de la lista → **Versiones**: activar historial → queda auditado quién cambió qué y cuándo.
-Permisos: lectura/escritura para quien hace el seguimiento; el Excel puede seguir con sus permisos actuales.
+Activar **historial de versiones** (auditoría de quién cambió qué). Permisos: *Editar* para los usuarios de la app.
 
-## Paso 2 — Power BI Desktop: consultas
+## Paso 3 — Office Script
 
-1. **Inicio → Transformar datos → Nuevo origen → Consulta en blanco → Editor avanzado**, tres veces:
-   - `fnFecha` ← pegar `powerquery/fnFecha.pq`
-   - `OQ_Seguimiento` ← pegar `powerquery/OQ_Seguimiento.pq`
-   - `OQ_Agenda` ← pegar `powerquery/OQ_Agenda.pq`
-2. En `OQ_Seguimiento` y `OQ_Agenda`, cambiar `Sitio` por la URL del sitio (solo hasta `/sites/NOMBRE`)
-   y, si hace falta, el nombre del archivo. Autenticación: **Cuenta de organización**.
-3. Desactivar *Habilitar carga* en `fnFecha` y `OQ_Seguimiento` (solo se usan dentro de `OQ_Agenda`).
-   *Opcional*: dejar cargada también `OQ_Seguimiento` para ver comentarios de OQ que ya no estén en el Excel.
+1. Abrir `OQ_Export.xlsx` en Excel para la web → **Automatizar → Nuevo script**.
+2. Borrar el contenido, pegar `officescript/ExtraerAgendaOQ.ts`, nombrarlo **ExtraerAgendaOQ** y guardar.
+   (Se guarda en el OneDrive de quien lo crea, que debe ser el mismo propietario del flujo.)
+3. *Ejecutar* una vez para comprobar que no da error (no modifica el libro; devuelve las filas al flujo).
 
-`OQ_Agenda` sale con: `AGENDA_ID, OQ_ID, OQ_NUMERO, OQ_VERSION, ES_ULTIMA_VERSION, N_EJECUCION,
-FECHA_PREVISTA, TIPO_FECHA, FECHA_TEXTO_ORIGINAL, DONDE`, los datos de la OQ (referencia, motivo,
-solicitante, duración, preparación, confección, terminación, códigos, CBL, dimensiones),
-`TAREAS_TALLER` (las del taller de esa ejecución), las tareas de PLO/FLUX, OVE, FP y GQA, y el
-seguimiento: `SEGUIDO, RESULTADO, COMENTARIOS, FECHA_SEGUIMIENTO, SEGUIDO_POR` y un `ESTADO` calculado:
-**Programada · Vencida sin seguir · Seguida · Éxito · Parcial · No éxito · Anulada · Sustituida · Sin fecha**.
+## Paso 4 — Flujo de Power Automate «Sincronizar agenda OQ»
 
-## Paso 3 — Modelo y medidas (DAX)
+1. **Desencadenador**: *Periodicidad* cada 1 hora (o «Cuando se modifica un archivo (solo propiedades)» sobre `OQ_Export.xlsx`).
+2. **Excel Online (Business) → Ejecutar script**: Ubicación = sitio SharePoint, Biblioteca, Archivo = `OQ_Export.xlsx`,
+   Script = `ExtraerAgendaOQ`, `diasAtras` = `60`.
+3. **Aplicar a cada** → `@{outputs('Ejecutar_script')?['body/result']}` (Configuración → simultaneidad 5):
+   1. **SharePoint → Obtener elementos** (`OQ_Agenda`), Consulta de filtro:
+      `Title eq '@{items('Aplicar_a_cada')?['AGENDA_ID']}'`, Recuento superior `1`.
+   2. **Condición**: `length(body('Obtener_elementos')?['value'])` es igual a `0`
+      - **Sí → Crear elemento**: todas las columnas del script
+        (`FECHA_PREVISTA` = `if(empty(items('Aplicar_a_cada')?['FECHA_PREVISTA']), null, items('Aplicar_a_cada')?['FECHA_PREVISTA'])`),
+        `SEGUIDO` = No, `RESULTADO` = Pendiente.
+      - **No → Actualizar elemento**: Id = `first(body('Obtener_elementos')?['value'])?['ID']`;
+        solo columnas de la OQ (motivo, tareas, donde, versión, `ES_ULTIMA_VERSION`…). **No** rellenar
+        SEGUIDO / RESULTADO / COMENTARIOS. Para la fecha:
+        `if(first(body('Obtener_elementos')?['value'])?['FECHA_MANUAL'], first(body('Obtener_elementos')?['value'])?['FECHA_PREVISTA'], if(empty(items('Aplicar_a_cada')?['FECHA_PREVISTA']), null, items('Aplicar_a_cada')?['FECHA_PREVISTA']))`
+4. **Carga inicial**: ejecutar el flujo una vez a mano con `diasAtras` = `330` (todo 2026) y volver a dejar `60`.
 
-```dax
-Calendario = ADDCOLUMNS(CALENDAR(DATE(2024,1,1), DATE(YEAR(TODAY())+1,12,31)),
-  "Año", YEAR([Date]), "MesNum", YEAR([Date])*100+MONTH([Date]), "Mes", FORMAT([Date],"mmm yyyy"),
-  "Semana", YEAR([Date]) & "-S" & FORMAT(WEEKNUM([Date],21),"00"),
-  "DíaSemana", FORMAT([Date],"ddd"), "DíaSemanaNum", WEEKDAY([Date],2),
-  "Relativo", SWITCH(TRUE(), [Date]=TODAY(),"Hoy", [Date]=TODAY()+1,"Mañana",
-              [Date]<TODAY(),"Pasado", [Date]<=TODAY()+7,"Próx. 7 días", "Más adelante"))
+Versiones: cuando sale la OQ‑2, el script devuelve también la OQ‑1 con `ES_ULTIMA_VERSION = false`
+y la app deja de mostrarla.
+
+## Paso 5 — App de lienzo «Agenda OQ»
+
+En el **entorno de fábrica** → Crear → Aplicación de lienzo en blanco (tableta). Datos: lista `OQ_Agenda`.
+Copiar el diseño de `agenda_visual_OQ.html`: colores por taller (OCT1 azul `#2F6FED`, OCT2 verde `#0F9D8A`,
+OCT3 morado `#8A4FD8`, EXT naranja `#E07B12`), cabecera con la fecha de hoy y contadores, pestañas
+**Mes · Semana · Día · Pendientes · Sin fecha**, panel derecho de seguimiento.
+
+### App.Formulas / OnStart
+```powerfx
+// App.OnStart
+Set(varVista, "Mes"); Set(varDia, Today()); Set(varSel, Blank());
+Set(varLunes, DateAdd(Today(), -(Weekday(Today(), StartOfWeek.Monday) - 1), TimeUnit.Days));
+Set(varIniMes, Date(Year(Today()), Month(Today()), 1));
+ClearCollect(colTalleres,
+  {T: "OCT1", C: ColorValue("#2F6FED")}, {T: "OCT2", C: ColorValue("#0F9D8A")},
+  {T: "OCT3", C: ColorValue("#8A4FD8")}, {T: "EXT",  C: ColorValue("#E07B12")});
+Set(varFiltroTaller, "Todos");
+Select(btnCargar)   // carga del periodo visible (ver abajo)
+
+// App.Formulas (named formulas)
+ColorTaller(t: Text): Color = Coalesce(LookUp(colTalleres, StartsWith(t, T)).C, ColorValue("#7B8798"));
 ```
-Relación `Calendario[Date]` 1 → * `OQ_Agenda[FECHA_PREVISTA]`. Marcar `Calendario` como tabla de fechas.
+(Si vuestra versión no admite funciones con nombre, usar `Coalesce(LookUp(colTalleres, StartsWith(ThisItem.DONDE, T)).C, Gray)` en cada sitio.)
 
-```dax
-Ejecuciones          = CALCULATE(COUNTROWS(OQ_Agenda), OQ_Agenda[ES_ULTIMA_VERSION] = TRUE())
-OQ distintas         = CALCULATE(DISTINCTCOUNT(OQ_Agenda[OQ_NUMERO]), OQ_Agenda[ES_ULTIMA_VERSION] = TRUE())
-Hoy                  = CALCULATE([Ejecuciones], OQ_Agenda[FECHA_PREVISTA] = TODAY())
-Próximos 7 días      = CALCULATE([Ejecuciones], OQ_Agenda[FECHA_PREVISTA] >= TODAY(), OQ_Agenda[FECHA_PREVISTA] < TODAY() + 7)
-Vencidas             = CALCULATE([Ejecuciones], OQ_Agenda[FECHA_PREVISTA] < TODAY())
-Vencidas sin seguir  = CALCULATE([Vencidas], OQ_Agenda[SEGUIDO] = FALSE())
-% Seguimiento        = DIVIDE([Vencidas] - [Vencidas sin seguir], [Vencidas])
-Cerradas             = CALCULATE([Ejecuciones], OQ_Agenda[RESULTADO] IN {"Éxito", "Parcial", "No éxito"})
-Éxitos               = CALCULATE([Ejecuciones], OQ_Agenda[RESULTADO] = "Éxito")
-% Éxito              = DIVIDE([Éxitos], [Cerradas])
-Días hasta seguimiento =
-    AVERAGEX(FILTER(OQ_Agenda, OQ_Agenda[SEGUIDO] && NOT ISBLANK(OQ_Agenda[FECHA_SEGUIMIENTO])),
-             DATEDIFF(OQ_Agenda[FECHA_PREVISTA], OQ_Agenda[FECHA_SEGUIMIENTO], DAY))
-Color estado =
-    SWITCH(SELECTEDVALUE(OQ_Agenda[ESTADO]),
-        "Éxito", "#12805C", "Parcial", "#B26A00", "No éxito", "#C0362C",
-        "Vencida sin seguir", "#C0362C", "Seguida", "#1F5EFF", "#8A94A6")
+### Carga del periodo (delegable)
+Botón oculto `btnCargar.OnSelect` — se llama al cambiar de mes/semana/día:
+```powerfx
+With({ini: DateAdd(varIniMes, -7, TimeUnit.Days), fin: DateAdd(varIniMes, 42, TimeUnit.Days)},
+  ClearCollect(colPeriodo,
+    Filter(OQ_Agenda, ES_ULTIMA_VERSION = true, FECHA_PREVISTA >= ini, FECHA_PREVISTA <= fin)))
 ```
 
-## Paso 4 — Páginas del informe
+### Cabecera
+```powerfx
+// lblHoyNum / lblHoyMes
+Day(Today())            Upper(Text(Today(), "mmm", "es-ES"))
+// Contadores
+CountRows(Filter(colPeriodo, FECHA_PREVISTA = Today()))                                   // Hoy
+CountRows(Filter(colPeriodo, FECHA_PREVISTA >= varLunes, FECHA_PREVISTA <= DateAdd(varLunes, 6, TimeUnit.Days)))  // Semana
+CountRows(Filter(OQ_Agenda, ES_ULTIMA_VERSION = true, SEGUIDO = false, FECHA_PREVISTA < Today()))  // Vencidas (rojo si > 0)
+```
 
-1. **Agenda** (la principal, la que se abre cada día)
-   - Tarjetas: *Hoy*, *Próximos 7 días*, *Vencidas sin seguir* (rojo si > 0), *% Seguimiento*, *% Éxito*.
-   - Segmentadores: `Calendario[Semana]` (por defecto la actual, con filtro relativo «esta semana»),
-     `DONDE`, `OQ_SOLICITANTE`, `ESTADO`. Botones/marcadores: **Hoy · Esta semana · Pendientes · Sin fecha**.
-   - Matriz *Día* (filas = `Calendario[Date]`) → *OQ* con `OQ_ID`, `DONDE`, `CODIGOS`, `OQ_MOTIVO`,
-     `OQ_DURACION`, `ESTADO` (formato condicional de fondo con la medida *Color estado*).
-   - A la derecha, el **objeto visual Power Apps** (paso 5): al hacer clic en una OQ de la matriz,
-     muestra sus tareas y permite registrar el seguimiento.
-2. **Pendientes**: tabla de *Vencidas sin seguir*, ordenada por fecha, con días de retraso.
-3. **Resultados**: % éxito por taller, solicitante, referencia (DCL/DQP/DQM), código, MAC y BNS;
-   evolución mensual por `ESTADO`; tabla con comentarios de los «No éxito» y «Parcial».
-4. **Detalle OQ** (obtener detalles): todas las tareas por taller (PLO/FLUX, OCT1/2/3, OVE, FP, GQA).
+### Vista Mes (calendario 7 × 6)
+- `galMes`: galería vertical, **WrapCount = 7**, plantilla ~ 130 px alto.
+```powerfx
+// galMes.Items  (empieza en el lunes de la semana del día 1)
+With({l: DateAdd(varIniMes, -(Weekday(varIniMes, StartOfWeek.Monday) - 1), TimeUnit.Days)},
+  ForAll(Sequence(42, 0), {Dia: DateAdd(l, Value, TimeUnit.Days)}))
+// Fondo de la celda
+If(Month(ThisItem.Dia) <> Month(varIniMes) || Weekday(ThisItem.Dia, StartOfWeek.Monday) > 5,
+   ColorValue("#F6F8FB"), White)
+// Número del día: círculo azul si es hoy
+lblNum.Text = Day(ThisItem.Dia);  circHoy.Visible = ThisItem.Dia = Today()
+// Contador
+lblCnt.Text = With({n: CountRows(Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia))}, If(n > 0, n & " OQ", ""))
+```
+- Dentro de la celda, `galChips` (galería anidada, alto ~ 4 filas de 22 px):
+```powerfx
+galChips.Items = FirstN(SortByColumns(Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia,
+                   varFiltroTaller = "Todos" || StartsWith(DONDE, varFiltroTaller)), "DONDE"), 4)
+// rectángulo del chip
+Fill = ColorTaller(ThisItem.DONDE)
+// texto del chip
+Substitute(ThisItem.OQ_ID, "OQ", "") & "  " & ThisItem.DONDE & "  " &
+Switch(ThisItem.RESULTADO.Value, "Éxito", "★", "Parcial", "◐", "No éxito", "✗",
+       If(ThisItem.SEGUIDO, "✓", If(ThisItem.FECHA_PREVISTA < Today(), "!", "")))
+OnSelect = Set(varSel, ThisItem)
+```
+- Flechas ◀ ▶: `Set(varIniMes, Date(Year(varIniMes), Month(varIniMes) ± 1, 1)); Select(btnCargar)`.
+- Título: `Proper(Text(varIniMes, "mmmm yyyy", "es-ES"))`.
 
-## Paso 5 — App de seguimiento (objeto visual Power Apps dentro del informe)
+### Vista Semana (tablero por días)
+`galSemana` horizontal con 5 columnas (L‑V; añadir S/D si hay OQ):
+```powerfx
+galSemana.Items = ForAll(Sequence(7, 0), {Dia: DateAdd(varLunes, Value, TimeUnit.Days)})
+// galTarjetas anidada
+Filter(colPeriodo, FECHA_PREVISTA = ThisItem.Dia,
+       varFiltroTaller = "Todos" || StartsWith(DONDE, varFiltroTaller))
+```
+Tarjeta: barra lateral `ColorTaller(ThisItem.DONDE)`, `OQ_ID`, `MOTIVO`, etiqueta del taller, códigos, y una
+«píldora» de estado (Vencida en rojo, Seguida azul, Éxito verde…).
 
-1. En la página *Agenda*, insertar el objeto visual **Power Apps para Power BI**.
-2. Arrastrar al visual los campos: `AGENDA_ID`, `OQ_ID`, `FECHA_PREVISTA`, `DONDE`, `OQ_MOTIVO`,
-   `OQ_SOLICITANTE`, `OQ_DURACION`, `OQ_REFERENCIA`, `CODIGOS`, `TAREAS_TALLER`, `TALLER_FP_FM`.
-3. **Crear nuevo** → se abre Power Apps con un formulario de ejemplo. Añadir origen de datos: lista `OQ_Seguimiento`.
+### Vistas Pendientes y Sin fecha
+```powerfx
+SortByColumns(Filter(OQ_Agenda, ES_ULTIMA_VERSION = true, SEGUIDO = false, FECHA_PREVISTA < Today()),
+              "FECHA_PREVISTA", SortOrder.Descending)
+Filter(OQ_Agenda, ES_ULTIMA_VERSION = true, IsBlank(FECHA_PREVISTA))
+```
 
-Controles y fórmulas (Power Fx):
+### Panel de seguimiento (derecha, `Visible = !IsBlank(varSel)`)
+Etiquetas con `varSel.OQ_ID`, `varSel.DONDE`, fecha (y `"≈ " & varSel.FECHA_TEXTO_ORIGINAL` si es aproximada),
+referencia, solicitante, códigos, puesta, duración, y cuadros con `MOTIVO`, `TAREAS_TALLER`, `TAREAS_FP_DM`.
 
 ```powerfx
-// galOQ (galería) — Items: las filas que el usuario ha seleccionado/filtrado en el informe
-PowerBIIntegration.Data
-
-// Texto de cada fila de galOQ
-ThisItem.OQ_ID & " · " & ThisItem.DONDE & " · " & Text(ThisItem.FECHA_PREVISTA, "dd/mm/yyyy")
-
-// Variable con el seguimiento existente (OnSelect de galOQ y OnVisible de la pantalla)
-Set(varSeg, LookUp(OQ_Seguimiento, Title = galOQ.Selected.AGENDA_ID))
-
-// lblTareas.Text
-"Tareas " & galOQ.Selected.DONDE & ":" & Char(10) & galOQ.Selected.TAREAS_TALLER &
-Char(10) & Char(10) & "FP/DM:" & Char(10) & galOQ.Selected.TALLER_FP_FM
-
-// tglSeguido.Default
-Coalesce(varSeg.SEGUIDO, false)
-
-// radResultado.Items / Default
-["Pendiente", "Éxito", "Parcial", "No éxito", "Anulada"]
-Coalesce(varSeg.RESULTADO.Value, "Pendiente")
-
-// txtComentarios.Default (modo multilínea)
-Coalesce(varSeg.COMENTARIOS, "")
+tglSeguido.Default    = varSel.SEGUIDO
+radResultado.Items    = ["Éxito", "Parcial", "No éxito", "Pendiente", "Anulada"]
+radResultado.Default  = varSel.RESULTADO.Value
+txtComentarios.Default = varSel.COMENTARIOS
+dteFecha.DefaultDate  = varSel.FECHA_PREVISTA
 
 // btnGuardar.OnSelect
-Set(varSeg,
-    Patch(OQ_Seguimiento,
-        Coalesce(LookUp(OQ_Seguimiento, Title = galOQ.Selected.AGENDA_ID), Defaults(OQ_Seguimiento)),
-        {
-            Title:             galOQ.Selected.AGENDA_ID,
-            OQ_ID:             galOQ.Selected.OQ_ID,
-            FECHA_PREVISTA:    DateValue(Text(galOQ.Selected.FECHA_PREVISTA)),
-            DONDE:             galOQ.Selected.DONDE,
-            MOTIVO:            galOQ.Selected.OQ_MOTIVO,
-            SEGUIDO:           tglSeguido.Value || radResultado.Selected.Value <> "Pendiente",
-            RESULTADO:         {Value: radResultado.Selected.Value},
-            COMENTARIOS:       txtComentarios.Text,
-            FECHA_SEGUIMIENTO: Now(),
-            SEGUIDO_POR:       User().FullName
-        }));
-Notify("Seguimiento guardado (" & galOQ.Selected.OQ_ID & ")", NotificationType.Success)
+Set(varSel, Patch(OQ_Agenda, varSel, {
+    SEGUIDO:           tglSeguido.Value || radResultado.Selected.Value <> "Pendiente",
+    RESULTADO:         {Value: radResultado.Selected.Value},
+    COMENTARIOS:       txtComentarios.Text,
+    FECHA_SEGUIMIENTO: Now(),
+    SEGUIDO_POR:       User().FullName,
+    FECHA_PREVISTA:    dteFecha.SelectedDate,
+    FECHA_MANUAL:      varSel.FECHA_MANUAL || dteFecha.SelectedDate <> varSel.FECHA_PREVISTA }));
+Select(btnCargar);
+Notify("Seguimiento guardado: " & varSel.OQ_ID, NotificationType.Success)
 ```
 
-4. **Guardar y publicar** la app y compartirla con los mismos usuarios del informe (Power Apps → Compartir).
-5. Lo guardado se ve al momento en la app; los colores y KPIs del informe se actualizan en la
-   siguiente actualización del conjunto de datos (o con el botón *Actualizar* en Desktop).
+Publicar y **compartir** la app con el grupo de la fábrica (y dar permiso *Editar* en la lista `OQ_Agenda`).
+Funciona en navegador, Teams (pestaña) y la app móvil de Power Apps.
 
-## Paso 6 — Publicar y actualizar
+## Opcional — Power BI
 
-- **Publicar** en el área de trabajo del equipo. En el servicio: *Conjunto de datos → Configuración →
-  Credenciales del origen de datos* (cuenta organizativa) y **Actualización programada**
-  (p. ej. 7:00, 9:00, 11:00, 13:00, 15:00, 17:00 — hasta 8/día con Pro). No hace falta gateway: todo está en SharePoint Online.
-- Crear una **aplicación de Power BI** o anclar el informe en Teams (pestaña Power BI) para que el
-  equipo tenga la agenda a mano.
+Para quien tenga Pro: conectar a la lista `OQ_Agenda` (Lista de SharePoint Online 2.0) y usar las medidas DAX
+(cumplimiento de seguimiento, % éxito por taller/solicitante/código). No hace falta para la app.
 
 ## Notas
 
-- **Fechas**: lo que no se puede interpretar sale con `ESTADO = "Sin fecha"` y su texto original
-  (p. ej. "Al finalizar stock BM53825"). Recomendación de proceso: que la celda *Fecha prevista ejecución*
-  del formulario sea de tipo fecha obligatoria y añadir un campo aparte para notas ("a partir de…", "en MAC4").
-- **Versiones**: al salir la OQ‑2, las ejecuciones de la OQ‑1 pasan a «Sustituida» (salvo que ya tuvieran resultado).
-- **Clave**: si en el Excel se borra o reordena una ejecución (EJECUCION_FECHA_2 pasa a _1), cambiaría su
-  `AGENDA_ID`; el seguimiento antiguo se conserva en la lista con su copia de datos, pero quedaría sin cruzar.
-- **Móvil**: comprobad en vuestro tenant si el objeto visual de Power Apps se muestra en la app móvil de
-  Power BI. Si no, la misma app puede abrirse aparte en Power Apps para registrar el seguimiento
-  (necesitaría entonces leer las OQ desde otra fuente: avisadme y lo adaptamos).
+- **Fechas a mano**: el script entiende "inmediata", "s.24", "a partir del 22-09-26", "18-19-20/05/26", "11 noviembre"…
+  Lo que no entiende queda en «Sin fecha» con el texto original, para asignarla en la app (queda `FECHA_MANUAL`).
+  Recomendación: que la celda *Fecha prevista ejecución* del formulario sea de tipo fecha.
+- **Clave**: si en el Excel se reordenan las ejecuciones de una OQ (la 2ª pasa a 1ª), cambia su `AGENDA_ID`.
+- La macro necesita guardar en la misma carpeta; si el Excel se abre desde una copia local sincronizada (OneDrive),
+  también funciona.

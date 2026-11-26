@@ -166,3 +166,4 @@ cython_debug/
 oq-seguimiento/*.xlsx
 oq-seguimiento/*.xlsm
 oq-seguimiento/prototipo_agenda_OQ.html
+oq-seguimiento/agenda_visual_OQ.html
